@@ -1,0 +1,44 @@
+This is PyTopo, an application for exploring maps using local data.
+See the project home page at http://shallowsky.com/software/topo
+for more information.
+
+==================================
+PyTopo quick start guide:
+
+To run pytopo, you need some local map data.
+
+Eventually PyTopo will be able to download map data from openstreetmap,
+but until that happens, you need to get it one of these ways:
+
+- Take a large map (a raster image, PDF, etc.) and split it into
+  small tiles (using something like the "mapsplit" script, provided here)
+  then figure out appropriate coordinates for the top left;
+
+- Download OpenStreetMap tiles using a program such as TangoGPS;
+
+- Use commercial Topo! regional map sets, e.g. "San Francisco Bay Area"
+
+Since that can be tricky, you can use some sample tiles, provided here,
+which were downloaded from OpenStreetMap.
+
+If you have this source in ~/src/pytopo, then do the following:
+
+mkdir ~/Maps
+ln -s ~/src/pytopo/data/opencyclemap ~/Maps/
+mkdir ~/.config/pytopo
+cp ~/src/pytopo/.pytopo ~/.config/pytopo
+
+That will give you an entry called "cimatest" pointing to the
+opencyclemap data for Cima Dome, in the Mojave desert.
+
+pytopo cimatest
+should run pytopo starting at that location.
+
+Arrow keys navigate you around. See the home page for more information
+on things you can do and how to create more map data.
+
+More documentation coming soon.
+Contributions appreciated (code, documentation or map data) --
+please join the project on http://code.google.com/p/pytopo/
+
+Have fun!
