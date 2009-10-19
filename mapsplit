@@ -1,0 +1,27 @@
+#! /usr/bin/env python
+
+# Split maps so they'll be usable by pytopo.
+# Split a filename such as o37119a1.tif into a 10x10
+# grid with filenames like q37122c2/012t0501.gif
+
+import sys, os
+
+def ohstr(num) :
+    if (num < 10) : return "0" + str(num)
+    return str(num)
+
+def SplitMap(mapname, dirname) :
+    print "Splitting", mapname
+    w = 262
+    h = 328
+    # os.mkdir(dirname)
+    for i in range(0, 10) :
+        for j in range(0, 10) :
+            fnam = dirname + "012t" + ohstr(i+1) + ohstr(j+1) + ".gif"
+            print fnam
+            os.system("convert " + mapname + " -crop " + str(w) + "x" + str(h)
+                      + "+" + str(i*w) + "+"  + str(j*h)
+                      + " " + fnam)
+
+SplitMap(sys.argv[1], sys.argv[2])
+
