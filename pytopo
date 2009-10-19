@@ -1,0 +1,1638 @@
+#!/usr/bin/env python
+
+# pytopo: show topographic maps using data files from Topo! CD
+# to generate a map at the specified coordinates.
+# Home page: http://shallowsky.com/software/topo/
+
+# Copyright 2005 - 2009 by Akkana Peck, akkana@shallowsky.com
+# Please feel free to use, distribute or modify this program
+# under the terms of the GPL v2 or, at your option, a later GPL version.
+# I'd appreciate hearing about it if you make any changes.
+
+# We will do all calculations in decimal degrees,
+# but take inputs in deg.decimal_minutes.
+
+VersionString = "PyTopo Version 0.8 by Akkana Peck"
+
+import sys, os, math, gtk, gc
+HaveDOM = True
+try :
+    import xml.dom.minidom
+except ImportError, e:
+    HaveDOM = False
+
+import pdb
+
+#import traceback
+#import cProfile
+
+#########################################################
+#
+# Global Variables that you can override in your .pytopo
+# (which may live in $HOME or in $home/.config/pytopo):
+#
+
+# Map collections you have, with format information.
+# You must define at least one collection in .pytopo.
+# It should be a list of instances of MapCollection subtypes.
+# Example:
+#Collections = [
+#    Topo1MapCollection( "mojave", "/home/name/Maps/emj_data", 7.5, 269, 328 ),
+#    GenericMapCollection( "pa-geo", "/home/name/Maps/pa-geo-300",
+#                          "pa-geo-300-", ".jpg",
+#                          -122.497, 37.498, 300, 400, 10746, 13124,
+#                          2, True, False )
+#]
+# The currently supported types are:
+#
+# Topo1MapCollection: data from local-area Topo! packages,
+#   the kind that have 7.5 minute and 15 minute varieties included.
+#    (self, _name, _location, _series, tile_w, tile_h) :
+#
+# Topo2MapCollection: data from local-area Topo! packages that
+#   have only the 7.5-minute series and use jpg instead of gif.
+#    (collection_name, directory_path, file_prefix, tile_w, tile_h) :
+#
+# GenericMapCollection: a more general reader, for maps you split up
+#   yourself or the Topo! national park maps.
+#   ( collection_name, directory_path, filename_prefix, filename_suffix,
+#     left_longitude, top_latitude, x_scale, y_scale,
+#     num_digits, use_dash, latitude_first )
+#    Filenames might look like: pa-map-03-17.png
+#    where prefix and suffix are pa-map- and .png,
+#    left_longitude and top_latitude specify the top left corner of
+#    the (0, 0) image in degrees.decimal_minutes,
+#    x_scale and y_scale are in pixels per degree,
+#    num_digits is the number of digits used to specify grid points,
+#    usedash specifies whether to put a dash between grid numbers,
+#    and latitude_first indicates that latitude changes more rapidly
+#    than longitude (i.e. in pa-map-03-17.png, it's the third map over
+#    and the 17th map down).
+# GenericMapCollection is subject to change (to add new parameters) as
+# different types of map are added and the rules need to be generalized.
+#Collections = []
+
+# Named sites you might want to use as starting points.
+# Format: [ sitename, longitude, latitude, collection_name ]
+# Coordinates are in degrees.decimal_minutes.
+# Example:
+# KnownSites = [
+#     # San Francisco Bay Area
+#     [ "saratogagap", 122.0725, 37.155, "sfr" ],
+#     [ "lexington", 121.594, 37.12, "sfr" ],
+#     # Death Valley
+#     [ "zabriskie", 116.475, 36.245, "deathvalley" ],
+#     # From the Big Sur map:
+#     [ "pinnacles", 121.0865, 36.3247, "bigsur" ],
+#     ]
+#KnownSites = []
+
+#
+# End of variables likely to need customization.
+#
+#########################################################
+
+#########################################################
+#
+# Types of map collections we understand.
+# If you split your own map into maplets, you may
+# want to define your own subclass to handle it:
+# see GenericMapCollection for an example.
+#
+# You can put your own subclasses in ~/.pytopo,
+# but please consider contributing them so I can
+# integrate them into future PyTopo releases!
+#
+
+Debug = False
+
+class MapCollection :
+
+    """A MapCollection is a set of maplet tiles on disk,
+combined with knowledge about the geographic coordinates
+and scale of those tiles so they can be drawn in a map window.
+
+Child classes implementing MapCollection must define functions
+__init__, get_maplet, draw_map, and get_top_left.
+"""
+
+    def __init__(self, _name, _location) :
+        self.name = _name
+        self.location = _location
+
+        # Set some defaults so that we can test pytopo with a null collection:
+        self.img_width = 100
+        self.img_height = 100
+        self.xscale = 100.
+        self.yscale = 100.
+
+    def get_maplet(self, longitude, latitude) :
+        """Returns pixbuf, x_offset, y_offset:
+         - the pixbuf for the maplet image (or null)
+         - the offset in pixels into the image for the given coordinates,
+           from top left.
+        """
+        return None,0,0
+
+    # Draw a map in a window, centered around the specified coordinates.
+    # drawwin is a DrawWin object.
+    def draw_map(self, center_lon, center_lat, drawwin) :
+        return
+
+    # A way to display some part of a map collection even if we're fuzzy
+    # on the coordinates -- get the coordinate of the first maplet
+    # and return as longitude, latitude.
+    def get_top_left(self) :
+        return 0, 0
+
+class TiledMapCollection(MapCollection) :
+
+    """Code common to map collections that have raster tiles of a fixed size.
+TiledMapCollection classes must implement
+  (pixbuf, x_off, y_off, pathname) = get_maplet(curlon, curlat)
+  (pixbuf, newpath) = get_next_maplet(oldpath, dX, dY)
+"""
+
+    def __init__(self, _name, _location, _tile_w, _tile_h) :
+        MapCollection.__init__(self, _name, _location)
+        self.img_width = _tile_w
+        self.img_height = _tile_h
+
+    def draw_map(self, center_lon, center_lat, drawable) :
+        """Draw maplets at the specified coordinates, to fill the drawable."""
+        global Debug
+
+        # Get the current window size:
+        win_width, win_height = drawable.get_size()
+        if (Debug) :
+            print "Window is", win_width, "x", win_height
+
+        # Find the coordinate boundaries for the set of maps to draw.
+        # This may (indeed, usually will) include maps off the screen,
+        # so the coordinates will span a greater area than the visible window.
+        if (Debug) :
+            print "Calculating boundaries: min =", \
+                   MapUtils.DecDegToDegMinStr(center_lon), \
+                   center_lon, "+/-", win_width, \
+                   "/", self.xscale, "/ 2"
+        min_lon = center_lon - win_width / self.xscale / 2
+        max_lon = center_lon + win_width / self.xscale / 2
+        min_lat = center_lat - win_height / self.yscale / 2
+        max_lat = center_lat + win_height / self.yscale / 2
+
+        if (Debug) :
+            print "Map from", min_lon, MapUtils.DecDegToDegMinStr(min_lon), \
+                   MapUtils.DecDegToDegMinStr(min_lat), \
+                   "to", MapUtils.DecDegToDegMinStr(max_lon), \
+                   MapUtils.DecDegToDegMinStr(max_lat)
+
+        # Start from the upper left: min_lon, max_lat
+
+        #pdb.set_trace()
+        curlat = max_lat
+        cur_y = 0
+        y_maplet_name = None
+        initial_x_off = None
+        while cur_y < win_height:
+            curlon = min_lon
+            cur_x = 0
+            x_maplet_name = None
+            while cur_x < win_width :
+
+                # Reset the expected image size:
+                w = self.img_width
+                h = self.img_height
+
+                # Is it the first maplet in this row?
+                if x_maplet_name == None :
+
+                    # Is it the first maplet in the map --
+                    # usually the one in the upper left corner?
+                    # Then we need to specify coordinates.
+                    if y_maplet_name == None :
+                        pixbuf, x_off, y_off, x_maplet_name = \
+                            self.get_maplet(curlon, curlat)
+
+                        # Save the x offset: we'll need it for the
+                        # beginning of each subsequent row.
+                        initial_x_off = x_off
+
+                    # Not upper left corner --
+                    # must be the beginning of a new row.
+                    # Get the maplet below the beginning of the last row.
+                    else :
+                        pixbuf, x_maplet_name = \
+                            self.get_next_maplet(y_maplet_name, 0, 1)
+                        x_off = initial_x_off
+                        y_off = 0
+
+                    # Either way, whether or not we got a pixbuf,
+                    # if we're at the beginning of a row, save the
+                    # beginning-of-row maplet name and the offset:
+                    if cur_x == 0 :
+                        y_maplet_name = x_maplet_name
+
+                # Continuing an existing row.
+                # Get the maplet to the right of the last one.
+                else :
+                    pixbuf, x_maplet_name = self.get_next_maplet(x_maplet_name,
+                                                                 1, 0)
+                    x_off = 0
+
+                if Debug :
+                    print "    ", x_maplet_name
+
+                x = cur_x
+                y = cur_y
+
+                if pixbuf != None :
+                    w = pixbuf.get_width() - x_off
+                    h = pixbuf.get_height() - y_off
+                    if (Debug) :
+                        print "img size:", pixbuf.get_width(), \
+                              pixbuf.get_height()
+
+                    # If the image won't completely fill the grid space,
+                    # fill the whole rectangle first with black.
+                    # Note: this may not guard against images with
+                    # transparent areas. Don't do that.
+                    if (pixbuf.get_width() < self.img_width or
+                        pixbuf.get_height() < self.img_height) :
+                        drawable.set_bg_color()
+                        drawable.draw_rectangle(1, x, y,
+                                                self.img_width, self.img_height)
+                        if (Debug) :
+                            print "Filling in background:", x, y,
+                            print self.img_width, self.img_height
+
+                    if (Debug) :
+                        print "Drawing maplet for",
+                        print MapUtils.DecDegToDegMinStr(curlon),
+                        print MapUtils.DecDegToDegMinStr(curlat),
+                        print "at", x, y, "offset", x_off, y_off,
+                        print "size", w, h
+
+                    drawable.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
+
+                    # Make sure the pixbuf goes out of scope properly:
+                    pixbuf = 0
+                else :
+                    if (Debug) :
+                        print "No maplet for", curlon, curlat,
+                        print "at", x, y, "offset", x_off, y_off
+                    drawable.set_bg_color()
+                    w -= x_off
+                    h -= y_off
+                    drawable.draw_rectangle(1, x, y, w, h)
+
+                # Useful when testing:
+                if (Debug) :
+                    drawable.set_grid_color()
+                    drawable.draw_rectangle(0, x, y, w, h)
+                    drawable.draw_line(x, y, x+w, y+h)
+                    drawable.set_bg_color()
+
+                # You may ask, why not just do this subtraction before
+                # draw_pixbuf so we don't have to subtract w and h twice?
+                # Alas, we may not have the real w and h until we've done
+                # pixbuf.get_width(), so we'd be subtracting the wrong thing.
+                # XXX Not really true any more, since we're assuming fixed
+                # XXX tile size. Revisit this!
+                cur_x += w
+                curlon += float(w) / self.xscale
+
+            if (Debug) :
+                print " "
+                print "New row: adding y =", h,
+                print "Subtracting lat", float(h) / self.yscale
+                
+            cur_y += h
+            curlat -= float(h) / self.yscale
+            #curlat -= float(self.img_height) / self.yscale
+
+        # Free all pixbuf data. Just letting pixbuf go out of scope
+        # isn't enough; it's necessary to force garbage collection
+        # otherwise Python will let the process grow until it
+        # fills all of memory.
+        # http://www.daa.com.au/pipermail/pygtk/2003-December/006499.html
+        # (At this indentation level, we free after draing the whole map.)
+        gc.collect()
+
+class OSMMapCollection(TiledMapCollection) :
+
+    """
+    A collection of tiles downloaded from the OpenStreetMap project
+    or one of its renderers, using the OSM naming scheme.
+    See also http://tfischernet.wordpress.com/2009/05/04/drawing-gps-traces-on-map-tiles-from-openstreetmap/
+    """
+
+    def __init__(self, _name, _location, _ext,
+                 _img_width, _img_height, _init_zoom) :
+        """arguments:
+        name       -- user-visible name of the collection
+        location   -- directory on disk where the maps reside
+        prefix     -- initial part of each maplet filename
+        ext        -- filename extension including the dot, e.g. .jpg
+        """
+        TiledMapCollection.__init__(self, _name, _location,
+                                    _img_width, _img_height, )
+        self.ext = _ext
+        self.img_width = _img_width
+        self.img_height = _img_height
+        self.zoom = _init_zoom
+#        self.left_longitude = _left_long    # Left of 00-00 image
+#        self.top_latitude = _top_lat        # Top of 00-00 image
+
+        # Next values are from http://wiki.openstreetmap.org/wiki/Zoom_levels
+        # but can't be right for both X and Y ...
+        #self.xscale = 1282.0 * self.zoom
+        #self.yscale = 1282.0 * self.zoom
+        powzoom = pow(2, self.zoom)
+        self.xscale = powzoom * 1.38425
+        self.yscale = powzoom * 1.13525
+        # At zoom level 13, each pixel is 11.461318051575931 meters
+        # according to
+        # http://wiki.openstreetmap.org/wiki/Height_and_width_of_a_map
+        # so if we can convert meters to lat and lon difference,
+        # we'll have scale.
+        # Unlike Topo! maplets, OSM maplets are square and, apparently,
+        # represent a constant amount of distance (at what projection?)
+        # rather than a constant number of degrees.
+        #
+        # A degree of longitude at the equator is 111.2 kilometers.
+        # A minute is 1853 meters. A second is 30.9 meters.
+        # For other latitudes multiply by cos(lat).
+        # Unfortunately we don't actually have the latitude yet,
+        # so we'll have to calculate it.
+        #
+        # The kokoweef maplet 13/1467/3233.png (256x256) has boundaries
+        # upper left:  -115^31.83' 35^25.49'
+        # lower right: -115^29.22' 35^23.39'
+        # (distance 33229.77 feet, 6.29 miles, 309 = N 51 W)
+        # So at zoom level 13,
+        # xscale = 256 px / 2.61' = 5885.05747126436781609195
+        # yscale = 256 px / 2.1'  = 7314.28571428571428571429
+        #
+        self.yscale = 8702.2  # zoom 13, 1112/11.461318051575931
+        self.xscale = self.yscale / math.cos(35.35 * math.pi / 180.)
+        self.yscale = 7314.28571428571428571429
+        self.xscale = 5885.05747126436781609195
+
+        self.yscale = powzoom / 1.12
+        # xscale should be yscale * cos(latitude), but the measured
+        # distance on my test OSM tile isn't quite: 5885 instead of
+        # my calculated 5965. That seems rather far off to be due
+        # to differences in datum. Hmm.
+        self.xscale = self.yscale * math.cos(35.35 * math.pi / 180.)
+        print "Scales:", self.xscale, "x", self.yscale
+
+    def get_maplet(self, longitude, latitude) :
+        """Get the maplet containing the specified coordinates.
+        Returns pixbuf, x_offset, y_offset, filename
+        where offsets are pixels from top left of the specified coords
+        and pixbuf or (less often) filename may be None.
+        """
+#         # from tangoGPS:
+#         ln2 = math.log(2.)
+#         xtile = int(longitude * self.img_width * math.exp(self.zoom * ln2) / 2. / math.pi + math.exp(self.zoom * ln2) * self.img_width / 2.)
+#         ytile = -int(OSMMapCollection.atanh(math.sin(latitude)) \
+#                          * math.exp(self.zoom * ln2) \
+#                          / math.pi \
+#                        + math.exp(self.zoom * ln2)) \
+#                      * self.img_height / 2
+
+        # from gpx2png:
+        xtile = int( ( longitude + 180 ) / 360 * ( 1 << self.zoom ) )
+        l = math.log( math.tan( latitude * math.pi / 180. )
+                          + 1. / math.cos( latitude * math.pi / 180. ) )
+        ytile = int( ( 1. - l / math.pi ) / 2. * ( 1 << self.zoom ) )
+
+        filename = os.path.join(self.location, str(self.zoom),
+                            str(xtile), str(ytile)) + self.ext
+        if filename == None or not os.access(filename, os.R_OK) :
+            if Debug :
+                print "get_maplet: no maplet for", filename
+            return None, 0, 0, filename
+        pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
+
+        # Offsets aren't implemented yet:
+        x_off = 0
+        y_off = 0
+
+        return pixbuf, x_off, y_off, filename
+
+    # maplet size 256. Files per dir:
+    # at zoom 12, 28
+    # at zoom 13, 53
+    # at zoom 14, 107
+    def get_next_maplet(self, fullpathname, dX, dY) :
+        """Given a maplet's pathname, get the next or previous one.
+        Does not currently work for jumps more than 1 in any direction.
+        Returns pixbuf, newpath (either may be None).
+        """
+        fulldir, filename = os.path.split(fullpathname)
+        ystr, ext = os.path.splitext(filename)
+        zoomdir, xstr = os.path.split(fulldir)
+        xstr = str(int(xstr) + dX)
+        ystr = str(int(ystr) + dY)
+
+        newpath = os.path.join(zoomdir, xstr, ystr + ext)
+
+        if newpath == None or not os.access(newpath, os.R_OK) :
+            return None, newpath
+        pixbuf = gtk.gdk.pixbuf_new_from_file(newpath)
+        return pixbuf, newpath
+
+    def CoordsToFilename(self, longitude, latitude) :
+        """Given coordinates in decimal degrees, map to the closest filename"""
+        return None
+
+    def get_top_left(self) :
+        """Get the coordinates of the top left corner of the map."""
+        return None, None
+
+class GenericMapCollection(TiledMapCollection) :
+
+    """
+    A GenericMapCollection is tiled, like the Topo collections,
+    but uses a less specific naming scheme:
+    prefix-nn-mm.ext, with or without the dashes.
+    """
+
+    def __init__(self, _name, _location, _prefix, _ext,
+                 _left_long, _top_lat,
+                 _img_width, _img_height, _xscale, _yscale,
+                 _numdigits, _usedash, _latfirst) :
+        """arguments:
+        name       -- user-visible name of the collection
+        location   -- directory on disk where the maps reside
+        prefix     -- initial part of each maplet filename
+        ext        -- filename extension including the dot, e.g. .jpg
+        left_long  -- longitude of the left edge
+        top_lat    -- latitude of the top edge
+        img_width  -- width of each maplet in pixels
+        img_height -- height of each maplet in pixels
+        xscale     -- pixels per degree longitude
+        yscale     -- pixels per degree latitude
+        numdigits  -- number of digits in x and y file specifiers
+        usedash    -- Boolean, use a dash between x and y in filenames?
+        latfirst   -- Boolean, is latitude the first of the two numbers?
+        
+        """
+        TiledMapCollection.__init__(self, _name, _location,
+                                    _img_width, _img_height, )
+        self.prefix = _prefix
+        self.numdigits = _numdigits
+        self.usedash = _usedash
+        self.ext = _ext
+        self.latfirst = _latfirst
+        self.img_width = _img_width
+        self.img_height = _img_height
+        self.left_longitude = _left_long    # Left of 00-00 image
+        self.top_latitude = _top_lat        # Top of 00-00 image
+        self.xscale = float(_xscale)        # Pixels per degree
+        self.yscale = float(_yscale)        # Pixels per degree
+
+    def get_maplet(self, longitude, latitude) :
+        """Get the maplet containing the specified coordinates.
+        Returns pixbuf, x_offset, y_offset, filename
+        where offsets are pixels from top left of the specified coords
+        and pixbuf or (less often) filename may be None.
+        """
+        filename = self.CoordsToFilename(longitude, latitude)
+        if (Debug) :
+            print "Generic get_maplet", longitude, latitude, "->", filename
+        if filename == None or not os.access(filename, os.R_OK) :
+            #print "Can't open", filename, "for", longitude, latitude
+            return None, 0, 0, filename
+        #print "Opened", filename, "for", longitude, latitude
+        pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
+
+        # Offsets aren't implemented yet:
+        x_off = 0
+        y_off = 0
+
+        return pixbuf, x_off, y_off, filename
+
+    def get_next_maplet(self, fullpathname, dX, dY) :
+        """Given a maplet's pathname, get the next or previous one.
+        Does not currently work for jumps more than 1 in any direction.
+        Returns pixbuf, newpath (either may be None).
+        """
+        pathname, filename = os.path.split(fullpathname)
+        if (Debug) :
+            print "Generic get_next_maplet", filename, dX, dY
+        name, ext = os.path.splitext(filename)
+        #traceback.print_stack()
+        mapb = int(name[-self.numdigits:])
+        if self.usedash :
+            mapa = int(name[-self.numdigits*2 - 1 : -self.numdigits-1])
+        else :
+            mapa = int(name[-self.numdigits*2 : -self.numdigits])
+        if self.latfirst :
+            newa = MapUtils.ohstring(mapa + dX, self.numdigits)
+            newb = MapUtils.ohstring(mapb + dY, self.numdigits)
+        else :
+            newa = MapUtils.ohstring(mapa + dY, self.numdigits)
+            newb = MapUtils.ohstring(mapb + dX, self.numdigits)
+        if self.usedash :
+            newname = self.prefix + newa + "-" + newb
+        else :
+            newname = self.prefix + newa + newb
+        newpath = os.path.join(self.location, newname + ext)
+        if filename == None or not os.access(filename, os.R_OK) :
+            return None, newpath
+        pixbuf = gtk.gdk.pixbuf_new_from_file(newpath)
+        return pixbuf, newpath
+
+    def CoordsToFilename(self, longitude, latitude) :
+        """Given coordinates in decimal degrees, map to the closest filename"""
+        if self.left_longitude > longitude or self.top_latitude < latitude :
+            return None
+        x_grid = MapUtils.intTrunc((longitude - self.left_longitude) *
+                                   self.xscale / self.img_width)
+        y_grid = MapUtils.intTrunc((self.top_latitude - latitude) *
+                                   self.yscale / self.img_height)
+        if not self.latfirst :
+            temp = x_grid
+            x_grid = y_grid
+            y_grid = temp
+        retstr = os.path.join(self.location,
+                              self.prefix + MapUtils.ohstring(x_grid,
+                                                              self.numdigits));
+        if self.usedash:
+            retstr = retstr + "-"
+        retstr = retstr + MapUtils.ohstring(y_grid, self.numdigits) + self.ext
+        return retstr
+
+    def get_top_left(self) :
+        """Get the coordinates of the top left corner of the map."""
+        return self.left_longitude, self.top_latitude
+
+class TopoMapCollection(TiledMapCollection) :
+
+    """TiledMapCollections using the Topo! map datasets.
+    Filenames are named according to a fairly strict convention.
+    Some variants can toggle between more than one scale (series).
+    """
+
+    def __init__(self, _name, _location, _series, _tile_w, _tile_h,
+                 _ser7prefix="012t", _ser15prefix="024t", _img_ext=".gif") :
+        """arguments:
+        name        -- user-visible name of the collection
+        location    -- directory on disk where the maps reside
+        series      -- initial series to use, 7.5 or 15 minutes of arc.
+        tile_w      -- width of each maplet in pixels
+        tile_h      -- height of each maplet in pixels
+        img_ext     -- filename extension including the dot, e.g. .jpg
+        ser7prefix  -- prefix for tile files implementing the 7.5-min series
+        ser15prefix -- prefix for tile files implementing the 15-min series
+        """
+
+        TiledMapCollection.__init__(self, _name, _location, _tile_w, _tile_h)
+        self.set_series(_series)
+        self.ser7prefix = _ser7prefix
+        self.ser15prefix = _ser15prefix
+        self.img_ext = _img_ext
+
+        # Correction because Topo1 maps aren't in WGS 84.
+        # Right now these numbers are EMPIRICAL and inaccurate.
+        # Need to do them right!
+        # http://www.ngs.noaa.gov/cgi-bin/nadcon.prl says the correction
+        # in the Mojave area from NAD27 to NAD84 (nobody converts to
+        # WGS84, alas) should be -0.05463', 2.99014' (-1.684m, 75.554m)
+        self.lonCorrection = 0 # 0.032778 / 1000
+        self.latCorrection = 0 # -1.794084 / 1000
+
+    def set_series(self, _series) :
+        """Set the series to either 7.5 or 15 minutes."""
+
+        global Debug
+
+        #traceback.print_stack()
+        self.series = _series
+        self.xscale = self.img_width * 600.0 / self.series
+        self.yscale = self.img_height * 600.0 / self.series
+        if (Debug) :
+            print "set series to", self.series
+        # 600 is minutes/degree * maplets/minute
+
+        # The fraction of a degree that each maplet spans:
+        self.frac = float(self.img_width) / self.xscale
+        if (Debug) :
+            if self.frac != float(self.img_height) / self.yscale :
+                print "x and y fractions not equal!",
+                print self.frac, float(self.img_height) / self.yscale
+
+    def get_maplet(self, longitude, latitude) :
+        """Get the maplet containing the specified coordinates.
+        Returns pixbuf, x_offset, y_offset, filename
+        where offsets are pixels from top left of the specified coords
+        and pixbuf or (less often) filename may be None.
+        """
+
+        global Debug
+
+        filename = self.CoordsToFilename(longitude - self.lonCorrection,
+                                         latitude - self.latCorrection)
+        if (Debug) :
+            print "T1MC get_maplet(", MapUtils.DecDegToDegMinStr(longitude),
+            print  ",", MapUtils.DecDegToDegMinStr(latitude), "):", filename
+
+        # Calculate offsets.
+        # Maplets are self.series minutes wide and tall,
+        # so any offset from that is an offset into the maplet:
+        # the number of pixels in X and Y that have to be added
+        # to get from the maplet's upper left corner to the
+        # indicated coordinates.
+        # But then we have to correct to get to WGS84 coordinates.
+        # XXX the WGS84 part doesn't work right yet.
+
+        # longitude increases rightward:
+        x_off = int((longitude - MapUtils.TruncateToFrac(longitude, self.frac)
+                     - self.lonCorrection) * self.xscale)
+        if (Debug) :
+            print "truncated", MapUtils.DecDegToDegMinStr(longitude), "to",
+            print MapUtils.DecDegToDegMinStr(MapUtils.TruncateToFrac(longitude, self.frac))
+
+        # Latitude decreases downward:
+        y_off = int((MapUtils.TruncateToFrac(latitude, self.frac) +
+                     self.frac - latitude - self.latCorrection) * self.yscale)
+                     
+        if (Debug) :
+            print "truncated", MapUtils.DecDegToDegMinStr(latitude), "to",
+            print MapUtils.DecDegToDegMinStr(MapUtils.TruncateToFrac(latitude,
+                                                                     self.frac))
+            print "y_off is", y_off
+
+        if not os.access(filename, os.R_OK) :
+            return None, x_off, y_off, filename
+        pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
+
+        return pixbuf, x_off, y_off, filename
+
+    def get_next_maplet(self, fullpathname, dX, dY) :
+        """Given a maplet's pathname, get the next or previous one.
+        Does not currently work for jumps more than 1 in any direction.
+        Returns pixbuf, newpath (either may be None).
+        """
+
+        if (Debug) :
+            print "get_next_maplet:", fullpathname, dX, dY
+        pathname, filename = os.path.split(fullpathname)
+        collecdir, mapdir = os.path.split(pathname)
+        maplat = mapdir[1:3]
+        maplon = mapdir[3:6]
+        name, ext = os.path.splitext(filename)
+        xdir = int(mapdir[-1])
+        ydir = ord(mapdir[-2]) - ord('a')     # ydir is a letter a-h
+        if self.series == 7.5 :
+            serstr = self.ser7prefix
+            grid = 10
+        else :
+            serstr = self.ser15prefix
+            grid = 5
+
+        x = int(name[-4:-2]) + dX
+        y = int(name[-2:]) + dY
+
+        if x < 1 :
+            x = grid
+            xdir = xdir + 1
+            if xdir > 8 :
+                xdir = 1
+                if Debug :
+                    print mapdir, name, ": wrapping mapdir coordinates -x",
+                    print maplon
+                maplon = str(int(maplon) + 1)
+        if x > grid :
+            x = 1
+            xdir = xdir - 1
+            if xdir < 1 :
+                xdir = 8
+                if Debug :
+                    print mapdir, name, ": wrapping mapdir coordinates +x",
+                    print maplon
+                maplon = str(int(maplon) - 1)
+
+        if y > grid :
+            y = 1
+            ydir = ydir - 1
+            if ydir < 0 :
+                ydir = 7
+                if Debug :
+                    print mapdir, name, ": wrapping mapdir coordinates +y",
+                    print maplat
+                maplat = str(int(maplat) - 1)
+
+        if y < 1 :
+            y = grid
+            ydir = ydir + 1
+            if ydir > 7 :
+                ydir = 0
+                if Debug :
+                    print mapdir, name, ": wrapping mapdir coordinates -y",
+                    print maplat
+                maplat = str(int(maplat) + 1)
+
+        # We're ready to piece the filename back together!
+        newpath = os.path.join(collecdir,
+                               "q" + MapUtils.ohstring(maplat, 2) \
+                                   + MapUtils.ohstring(maplon, 3) \
+                                   + chr(ydir + ord('a')) + str(xdir),
+                               serstr + MapUtils.ohstring(x, 2) \
+                                   + MapUtils.ohstring(y, 2) + ext)
+        if not os.access(newpath, os.R_OK) :
+            if Debug :
+                print "get_next_maplet(", fullpathname, dX, dY, ")"
+                print "  Can't open", newpath
+            return None, newpath
+
+        pixbuf = gtk.gdk.pixbuf_new_from_file(newpath)
+        return pixbuf, newpath
+
+    #
+    # Quirk: Topo1 collections are numbered with WEST longitude --
+    # i.e. longitude is written as positive but it's actually negative.
+    #
+    # Second quirk: Topo1 collections aren't in the WGS 84 coordinate
+    # system used by GPS receivers, and need to be translated.
+    # http://en.wikipedia.org/wiki/Geographic_coordinate_system
+    # http://en.wikipedia.org/wiki/Geodetic_system
+    #
+    def CoordsToFilename(self, longitude, latitude) :
+        """Given a pair of coordinates in deg.mmss, map to the
+        containing filename, e.g. q37122c2/012t0501.gif.
+        """
+
+        latDeg = MapUtils.intTrunc(latitude)
+        longDeg = MapUtils.intTrunc(-longitude)
+        latMin = (latitude - latDeg ) * 60.
+        longMin = (-longitude - longDeg) * 60.
+
+        # The 7.5 here is because of the 7.5 in the directory names above
+        # (we're getting the offset of this image from the origin of
+        # the 7.5-series map covered by the directory),
+        # not the map series we're actually plotting now.
+        longMinOrd = MapUtils.intTrunc(longMin / 7.5)
+        latMinOrd = MapUtils.intTrunc(latMin / 7.5)
+
+        dirname = "q" + MapUtils.ohstring(latDeg, 2) \
+            + MapUtils.ohstring(longDeg, 3) \
+            + chr(ord('a') + latMinOrd) + str(longMinOrd+1)
+
+        # Find the difference between our desired coordinates
+        # and the origin of the map this directory represents.
+        # The 7.5 here is because of the 7.5 in the directory names above.
+        latMinDiff = latMin - (latMinOrd * 7.5)
+        longMinDiff = longMin - (longMinOrd * 7.5)
+
+        latOffset = MapUtils.intTrunc(latMinDiff * 10 / self.series)
+        longOffset = MapUtils.intTrunc(longMinDiff * 10 / self.series)
+
+        # Now calculate the current filename.
+	# Note that series is either 7.5 or 15
+        if (self.series > 13) :
+            fileprefix = "024t"
+            numcharts = 5
+        else :
+            fileprefix = "012t"
+            numcharts = 10
+        filename = fileprefix + MapUtils.ohstring(numcharts-longOffset, 2) + \
+                   MapUtils.ohstring(numcharts-latOffset, 2) + self.img_ext
+
+        return self.location + "/" + dirname + "/" + filename
+
+    def dir_to_latlong(self, qdir) :
+        """Given a directory, figure out the corresponding coords."""
+        letter = ord(qdir[6]) - ord('a')
+        digit = int(qdir[7]) - 1
+        thislon = -int(qdir[3:6]) + (digit * 7.5 * 1.5 / 60)
+        #thislon += self.lonCorrection
+        thislat = int(qdir[1:3]) + (letter * 7.5 * 1.5 / 60)
+        #thislat += self.latCorrection
+        return thislon, thislat
+
+    def get_top_left(self) :
+        """Get the coordinates of the top left corner of the map."""
+        minlong = 181
+        maxlat = -91
+        topleftdir = None
+
+        mapdirs = os.listdir(self.location)
+        # mapdirs.sort()
+        for mapdir in mapdirs :
+            if mapdir[0] == 'q' :
+                # Now first_mapdir is some name like "qAAABBcD" ... decode it.
+                thislong, thislat = self.dir_to_latlong(mapdir)
+                #if thislong < minlong and thislat > maxlat :
+                if thislong < minlong :
+                    minlong = thislong
+                    if thislat > maxlat :
+                        maxlat = thislat
+                        topleftdir = mapdir
+        if maxlat < -90 or minlong > 180 :
+            return 0, 0    # shouldn't happen
+
+        # Now we have the top left directory. Still need the top left file:
+        files = os.listdir(os.path.join(self.location, topleftdir))
+
+        return minlong, maxlat
+
+# End of TopoMapCollection class
+
+class Topo1MapCollection(TopoMapCollection) :
+
+    """
+Topo1MapCollection: data from local-area Topo! packages,
+  the kind that have 7.5 minute and 15 minute varieties included.
+   (self, _name, _location, _series, tile_w, tile_h) :
+    """
+
+    def __init__(self, _name, _location, _series, _tile_w, _tile_h) :
+        TopoMapCollection.__init__(self, _name, _location, _series,
+                                   _tile_w, _tile_h,
+                                   _ser7prefix="012t", _ser15prefix="024t",
+                                   _img_ext=".gif")
+
+# A Topo2MapCollection is just a Topo1MapCollection that has only
+# 7.5-series and has a different file prefix.
+# On North Palisade 7.5 (q37118a5) we get 410x256 pixel images.
+class Topo2MapCollection(TopoMapCollection) :
+
+    """
+Topo2MapCollection: data from local-area Topo! packages that
+  have only the 7.5-minute series and use jpg instead of gif.
+   (collection_name, directory_path, file_prefix, tile_w, tile_h) :
+    """
+
+    def __init__(self, _name, _location, _prefix, _tile_w, _tile_h) :
+        TopoMapCollection.__init__(self, _name, _location, 7.5,
+                                   _tile_w, _tile_h,
+                                   _ser7prefix=_prefix, _ser15prefix=None,
+                                   _img_ext=".jpg")
+
+class TrackPoints :
+
+    """Parsing and handling of GPS track files.
+    Currently only GPX format is supported.
+    """
+
+    def __init__(self) :
+        self.points = []
+        self.waypoints = []
+        self.minlon = 361
+        self.maxlon = -361
+        self.minlat = 91
+        self.maxlat = -91
+
+    def handleTrackPoint(self, point, waypoint=False) :
+        #time = getVal(point, "time")
+        lat = float(point.getAttribute("lat"))
+        lon = float(point.getAttribute("lon"))
+        #ele = float(getVal(point, "ele"))
+        #ele = round(ele * 3.2808399, 2)      # convert from meters to feet
+
+        if lon < self.minlon :
+            self.minlon = lon
+        elif lon > self.maxlon :
+            self.maxlon = lon
+        if lat < self.minlat :
+            self.minlat = lat
+        elif lat > self.maxlat :
+            self.maxlat = lat
+
+        if (waypoint) :
+            name = "WP"
+            n = point.getElementsByTagName("name")
+            if len(n) > 0 :
+                n = n[0].childNodes
+                if len(n) >= 1 and n[0].nodeType == n[0].TEXT_NODE :
+                    name = n[0].data
+
+            self.waypoints.append([lon, lat, name])
+        else :
+            self.points.append([lon, lat])
+
+    def getBounds() :
+        return self.minlon, self.minlat, self.maxlon, self.maxlat
+
+    def readTrackFile(self, filename) :
+        global Debug
+
+        if (Debug) :
+            print "Using track file", filename
+
+        if not HaveDOM :
+            print "WARNING: Can't read track file: need module xml.dom.minidom"
+            return
+        if (Debug) :
+            print "Reading track file", filename
+        dom = xml.dom.minidom.parse(filename)
+
+        # Handle track(s)
+        trkpts = dom.getElementsByTagName("trkpt")
+        for i in range (0, len(trkpts), 1) :
+            self.handleTrackPoint(trkpts[i], False)
+
+        # Handle waypoints
+        waypts = dom.getElementsByTagName("wpt")
+        for i in range (0, len(waypts), 1) :
+            self.handleTrackPoint(waypts[i], True)
+
+        # GPX also allows for routing, rtept, but I don't think we need those.
+
+class MapUtils :
+
+    """MapUtils really just exists to contain a bunch of utility
+    functions useful for mapping classes.
+    """
+
+    @staticmethod
+    def DegMinToDecDeg(coord) :
+        """Convert degrees.minutes to decimal degrees"""
+        deg = MapUtils.intTrunc(coord)
+        dec = (coord - deg) / .6
+        return deg + dec
+
+    @staticmethod
+    def DecDegToDegMin(coord) :
+        """Convert decimal degrees to degrees.minutes"""
+        deg = MapUtils.intTrunc(coord)
+        min = abs(coord - deg) * .6
+        return deg + min
+
+    @staticmethod
+    def DecDegToDegMinStr(coord) :
+        """Convert decimal degrees to a nice degrees/minutes string"""
+        deg = MapUtils.intTrunc(coord)
+        min = abs(coord - deg) * 60.
+        min = MapUtils.TruncateToFrac(min, .01)
+        return str(deg) + "^" + str(min) + "'"
+
+    @staticmethod
+    def angle_to_bearing(angle) :
+        return (450 - angle) % 360
+
+    # Convert an angle (degrees) to the appropriate quadrant string, e.g. N 57 E.
+    @staticmethod
+    def angle_to_quadrant(angle) :
+        if angle > 180 :
+            angle = angle - 360
+        if angle == 0 :
+            return "N"
+        if angle == -90 :
+            return "W"
+        if angle == 90 :
+            return "E"
+        if angle == 180 :
+            return "S"
+        if angle > -90 and angle < 90 :
+            if angle < 0 :
+                return "N " + str(-angle) + " W"
+            return "N " + str(angle) + " E"
+        if angle < 0 :
+            return "S " + str(180 + angle) + " W"
+        return "S " + str(180 - angle) + " E"
+
+    @staticmethod
+    def intTrunc(num) :
+        """Truncate to an integer, but no .999999 stuff"""
+        return int(num + .00001)
+
+    @staticmethod
+    def TruncateToFrac(num, frac) :
+        """Truncate to a multiple of the given fraction"""
+        t = float(MapUtils.intTrunc(num / frac)) * frac
+        if num < 0 :
+            t = t - frac
+        return t
+
+    @staticmethod
+    def ohstring(num, numdigits) :
+        """Return a zero-prefixed string of the given number of digits."""
+        fmt_arr = [ "", "%01d", "%02d", "%03d", "%04d",
+                    "%05d", "%06d", "%07d", "%08d" ]
+        if numdigits < len(fmt_arr) :
+            return fmt_arr[numdigits] % int(num)
+        else :
+            s = '%0' + str(numdigits) + 'd'
+            return s % int(num)
+
+    @staticmethod
+    def ohstring_old(num, numdigits) :
+        """Return a zero-prefixed string of the given number of digits."""
+        s = str(num)
+        mult = pow(10, numdigits-1)
+        while (numdigits > 1) :
+            if (num < mult) : s = "0" + s
+            mult = mult / 10
+            numdigits = numdigits-1
+        return s
+
+# End of "MapUtils" pseudo-class.
+
+class MapWindow() :
+
+    """The PyTopo UI: the map window.
+This is intended to hold the GTK specific drawing code,
+and to be extensible into other widget libraries.
+To that end, it needs to implement the following methods
+that are expected by the MapCollection classes:
+   win_width, win_height = get_size()
+   set_bg_color(), set_grid_color(), set_map_color()
+   draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
+   draw_rectangle(fill, x, y, width, height)
+   draw_line(x, y, width, height)
+"""
+
+    def __init__(self) :
+        # The current map collection being used:
+        self.Collection = None
+
+        self.center_lon = 0
+        self.center_lat = 0
+        self.trackpoints = None
+
+        # Print distances in metric?
+        # This should be set externally!
+        self.use_metric = False
+
+        # Where to save generated maps. The default is fine for most people.
+        # Which is a good thing since there's currently no way to change it.
+        self.MapSaveDir = os.environ["HOME"] + "/Topo/"
+
+        # X/gtk graphics variables we need:
+        self.drawing_area = 0
+        self.xgc = 0
+
+        self.click_last_long = 0
+        self.click_last_lat = 0
+
+        self.bg_color = gtk.gdk.color_parse("black")
+        self.track_color = gtk.gdk.color_parse("magenta")
+        self.waypoint_color = gtk.gdk.color_parse("blue")
+        # Grid color is only needed when Debug,
+        # but this is called before ParseArgs so we don't know Debug.
+        self.grid_color = gtk.gdk.color_parse("green")
+
+    def show_window(self) :
+        """Create the initial window."""
+        win = gtk.Window()
+        win.set_name("PyTopo")
+        win.connect("destroy", gtk.main_quit)
+        win.set_border_width(5)
+
+        vbox = gtk.VBox(spacing=3)
+        win.add(vbox)
+        vbox.show()
+
+        self.drawing_area = gtk.DrawingArea()
+        # XXX remove hardwired image size numbers
+        self.drawing_area.set_size_request(800, 600)
+        vbox.pack_start(self.drawing_area)
+        self.drawing_area.show()
+
+        self.drawing_area.set_events(gtk.gdk.EXPOSURE_MASK |
+                                     gtk.gdk.BUTTON_RELEASE_MASK )
+
+        self.drawing_area.connect("expose-event", self.expose_event)
+        self.drawing_area.connect("button-release-event", self.button_event)
+
+        # The default focus in/out handlers on drawing area cause
+        # spurious expose events.  Trap the focus events, to block that:
+        # XXX can we pass "pass" in to .connect?
+        self.drawing_area.connect("focus-in-event", self.nop)
+        self.drawing_area.connect("focus-out-event", self.nop)
+
+        # Handle key presses on the drawing area.
+        # If seeing spurious expose events, try setting them on win instead,
+        # and comment out gtk.CAN_FOCUS.
+        self.drawing_area.set_flags(gtk.CAN_FOCUS)
+        self.drawing_area.connect("key-press-event", self.key_press_event)
+
+        win.show()
+        gtk.main()
+
+    #
+    # Draw maplets to fill the window, centered at center_lon, center_lat
+    #
+    def draw_map(self) :
+        """Redraw the map."""
+        global Debug
+
+        if self.Collection == None :
+            print "No collection!"
+            return
+
+        # XXX Collection.draw_map wants center, but we only have lower right.
+        if (Debug) :
+            print ">>>>>>>>>>>>>>>>"
+            print "window draw_map centered at",
+            print MapUtils.DecDegToDegMinStr(self.center_lon),
+            print MapUtils.DecDegToDegMinStr(self.center_lat)
+        self.Collection.draw_map(self.center_lon, self.center_lat, self)
+
+        # Now draw any trackpoints that are visible:
+        if self.trackpoints != None :   # may be trackpoints or waypoints
+            win_width, win_height = self.drawing_area.window.get_size()
+            if len(self.trackpoints.points) > 0 :
+                cur_x = None;
+                cur_y = None;
+                self.xgc.line_style = gtk.gdk.LINE_ON_OFF_DASH
+                self.xgc.line_width = 3
+                self.set_track_color()
+
+                for pt in self.trackpoints.points :
+                    x = int((pt[0] - self.center_lon) * self.Collection.xscale
+                            + win_width/2)
+                    y = int((self.center_lat - pt[1]) * self.Collection.yscale
+                            + win_height/2)
+
+                    if ((x >= 0 and x < win_width and
+                         y >= 0 and y < win_height) or
+                        (cur_x < win_width and cur_y < win_height)) :
+                        if cur_x != None and cur_y != None :
+                            self.draw_line(cur_x, cur_y, x, y)
+                        cur_x = x
+                        cur_y = y
+                    else :
+                        #print "Skipping", pt[0], pt[1], ": would be", x, ",", y
+                        cur_x = None;
+                        cur_y = None;
+
+            if len(self.trackpoints.waypoints) > 0 :
+                self.set_waypoint_color()
+                self.xgc.line_style = gtk.gdk.LINE_SOLID
+                self.xgc.line_width = 2
+                for pt in self.trackpoints.waypoints :
+                    x = int((pt[0] - self.center_lon) * self.Collection.xscale
+                            + win_width/2)
+                    y = int((self.center_lat - pt[1]) * self.Collection.yscale
+                            + win_height/2)
+
+                    if x >= 0 and x < win_width and y >= 0 and y < win_height :
+                        self.draw_string(x, y, pt[2])
+                        self.draw_rectangle(True, x-3, y-3, 6, 6)
+
+    #
+    # Drawing-related routines:
+    #
+
+    def get_size(self) :
+        """Return the width and height of the canvas."""
+        return self.drawing_area.window.get_size()
+
+    def set_bg_color(self) :
+        """Change to the normal background color (usually black)."""
+        #self.xgc.set_rgb_fg_color(self.bg_color)
+        self.xgc.foreground = self.xgc.background
+
+    def set_grid_color(self) :
+        """Change to the color used to show the grid (for debugging)."""
+        self.xgc.set_rgb_fg_color(self.grid_color)
+
+    def set_track_color(self) :
+        """Change to the color used for tracks. May set line thickness too."""
+        self.xgc.set_rgb_fg_color(self.track_color)
+
+    def set_waypoint_color(self) :
+        """Change to the color used for tracks. May set line thickness too."""
+        self.xgc.set_rgb_fg_color(self.waypoint_color)
+
+    def draw_pixbuf(self, pixbuf, x_off, y_off, x, y, w, h) :
+        """Draw the pixbuf at the given position and size,
+        starting at the specified offset."""
+        self.drawing_area.window.draw_pixbuf(self.xgc, pixbuf, x_off, y_off,
+                                              x, y, w, h)
+    def draw_rectangle(self, fill, x, y, w, h) :
+        """Draw a rectangle."""
+        self.drawing_area.window.draw_rectangle(self.xgc, fill, x, y, w, h)
+
+    def draw_line(self, x, y, x2, y2) :
+        """Draw a line."""
+        self.drawing_area.window.draw_line(self.xgc, x, y, x2, y2)
+
+    def draw_string(self, x, y, str) :
+        """Draw a string."""
+        import pango
+        layout = self.drawing_area.create_pango_layout (str);
+        fontdesc = pango.FontDescription("Sans Bold 12")
+        layout.set_font_description (fontdesc); 
+        self.drawing_area.window.draw_layout(self.xgc, x, y, layout);
+
+    # Save the current map as something which could be gimped or printed.
+    # XXX THIS IS BROKEN, code assumes start_lon/start_lat but has center_.
+    def save_as(self) :
+
+        """Save a static map. Somewhat BROKEN, needs rewriting."""
+
+        file_list = ""
+        win_width, win_height = self.get_size()
+
+        # Calculate dAngle in decimal degrees
+        dAngle = self.Collection.img_width / self.Collection.xscale
+
+        # Calculate number of charts based on window size, and round up
+        # so the saved map shows at least as much as the window does.
+        #win_width, win_height = drawing_area.window.get_size()
+        num_lon = int (.8 + float(win_width) / self.Collection.img_width)
+        num_lat = int (.8 + float(win_height) / self.Collection.img_height)
+
+        ny = 0
+        curlat = self.center_lat + dAngle*num_lat * .25
+        while ny < num_lat :
+            curlon = self.center_lon - dAngle*num_lon * .25
+            nx = 0
+            while nx < num_lon :
+                file_list += " " + \
+                    self.Collection.CoordsToFilename(curlon, curlat)
+                curlon += dAngle
+                nx += 1
+            curlat -= dAngle
+            ny += 1
+
+        outfile = self.MapSaveDir + "topo" + "_" + \
+                  str(self.center_lon) + "_" + str(self.center_lat) + ".gif"
+        cmdstr = "montage -geometry 262x328 -tile " + \
+                 str(nx) + "x" + str(ny) + " " + \
+                 file_list + " " + outfile
+        #print "Running:", cmdstr
+        os.system(cmdstr)
+
+        if (os.access(outfile, os.R_OK)) :
+            print "Saved:", outfile
+
+    def expose_event(self, widget, event) :
+        """Handle exposes on the canvas."""
+        #print "Expose:", event.type, "for object", self
+        #print "area:", event.area.x, event.area.y, event.area.width, event.area.height
+
+        if self.xgc == 0 :
+            self.xgc = self.drawing_area.window.new_gc()
+            #self.xgc.set_foreground(white)
+
+        #x, y, w, h = event.area
+
+        self.draw_map()
+
+        #widget.queue_draw()
+        return True
+
+    def key_quit(self, *args) :
+        """Callback when the user types q."""
+        self.GracefulExit()
+
+#     def key_scroll(self, accelgroup, win, key, accel) :
+#         #print args
+#         #print gtk.keysyms.h
+#         if key == gtk.keysyms.h :
+#             print "It was an h"
+#         else :
+#             print "key_scroll, not an h"
+#         return True
+
+    def key_press_event(self, widget, event) :
+        """Handle any key press."""
+        if event.string == "q" :
+            self.GracefulExit()
+        if event.string == "+" or event.string == "=" :
+            if isinstance(self.Collection, Topo1MapCollection) :
+                self.Collection.set_series(7.5)
+        elif event.string == "-" :
+            if isinstance(self.Collection, Topo1MapCollection) :
+                self.Collection.set_series(15)
+        elif event.keyval == gtk.keysyms.Left :
+            self.center_lon -= \
+                float(self.Collection.img_width) / self.Collection.xscale
+        elif event.keyval == gtk.keysyms.Right :
+            self.center_lon += \
+                float(self.Collection.img_width) / self.Collection.xscale
+        elif event.keyval == gtk.keysyms.Up :
+            self.center_lat += \
+                float(self.Collection.img_height) / self.Collection.yscale
+        elif event.keyval == gtk.keysyms.Down :
+            self.center_lat -= \
+                float(self.Collection.img_height) / self.Collection.yscale
+        elif event.keyval == gtk.keysyms.l and \
+                 event.state == gtk.gdk.CONTROL_MASK :
+            pass    # Just fall through to draw_map()
+        elif event.string == "s" :
+            self.save_as()
+            return True
+        else :
+            #print "Unknown key,", event.keyval
+            return False
+
+        self.draw_map()
+        return True
+
+    def xy2coords(self, x, y, win_width, win_height) :
+        """Convert pixels to longitude/latitude."""
+        # collection.x_scale is in pixels per degree.
+        return (self.center_lon - \
+                    float(win_width/2 - x) / self.Collection.xscale,
+                self.center_lat + \
+                    float(win_height/2 - y) / self.Collection.yscale)
+
+    def button_event(self, widget, event) :
+        """Handle button pushes."""
+        #if (event.state == 0) :
+        #    if (event.button != 1) :
+        #        return
+        #    #print "Button 1 release"
+        #    return
+
+        if event.button == 1 :
+            global Debug
+
+            win_width, win_height = self.drawing_area.window.get_size()
+            cur_long, cur_lat = self.xy2coords(event.x, event.y,
+                                               win_width, win_height)
+            print "Click:", \
+                  MapUtils.DecDegToDegMinStr(cur_long), \
+                  MapUtils.DecDegToDegMinStr(cur_lat)
+
+            # Find angle and distance since last click.
+            # You would think that we could just use the long and lat
+            # differences, but it doesn't work that way, because maps
+            # aren't square: away from the equator, longitude isn't
+            # a great circle so a degree in longitude doesn't equal
+            # a degree in latitude.  (Even at the equator that's true,
+            # due to the earth's oblateness, but that is probably small
+            # enough to ignore.)
+            # So use the current image aspect ratio to convert from angles
+            # to pixels, then we'll convert from there to miles/km.
+            if self.click_last_long != 0 and self.click_last_lat != 0 :
+                xdiff = (cur_long - self.click_last_long)
+                ydiff = (cur_lat - self.click_last_lat)
+                dist = math.sqrt(xdiff*xdiff + ydiff*ydiff)
+                # dist is now in degrees.
+                # Convert to miles using latitude and radius of the earth.
+                dist = dist *2. * math.pi / 360.0 * 7926 \
+                       * math.cos(cur_lat*math.pi/180)
+                if self.use_metric :
+                    print "Distance:", round(dist*1600,2), "meters,", \
+                          round(dist*1.6,2), "km"
+                else :
+                    print "Distance:", round(dist*5280,2), "feet,", \
+                          round(dist,2), "miles"
+                angle = int(math.atan2(-ydiff, -xdiff) * 180 / math.pi)
+                angle = MapUtils.angle_to_bearing(angle)
+                print "Bearing:", angle, "=", MapUtils.angle_to_quadrant(angle)
+            self.click_last_long = cur_long
+            self.click_last_lat = cur_lat
+
+        return True
+
+#     def motion_notify_event(widget, event) :
+#         global xfrac
+#         if event.is_hint:
+#             x, y, state = event.window.get_pointer()
+#         else:
+#             x = event.x; y = event.y
+#             state = event.state
+#         if state & gtk.gdk.BUTTON1_MASK and pixmap != None:
+#             xfrac = event.x / w
+#         return True
+
+    #def null_event(widget, event) :
+    def nop(*args) :
+        "Do nothing."
+        return True
+
+    def GracefulExit(self) :
+        "Clean up the window and exit."
+        gtk.main_quit()
+        # The python profilers don't work if you call sys.exit here:
+        # sys.exit(0)
+
+
+# End of MapWindow class
+
+class PyTopo :
+
+    """A class to hold the mechanics of running the PyTopo program,
+    plus some important variables including Collections and KnownSites.
+    """
+
+    def __init__(self) :
+        self.Collections = []
+        self.KnownSites = []
+
+    @staticmethod
+    def Usage() :
+        global VersionString
+        print VersionString
+        print "Usage: pytopo [-t trackfile] site_name"
+        print "       pytopo [-t trackfile] start_lat start_long collection"
+        print "       pytopo -p"
+        print "Use degrees.decimal_minutes format for coordinates."
+        print "Set up site names in ~/.pytopo"
+        print "Print list of known sites with pytopo -p"
+        print ""
+        print "Track files may contain track points and/or waypoints;"
+        print "multiple track files are allowed."
+        print ""
+        print "Move around using arrow keys.  q quits."
+        print "Click in the map to print the coordinates of the clicked location."
+        print "'s' will attempt to save the current map as a GIF file in ~/Topo/."
+        sys.exit(1)
+
+    @staticmethod
+    def ErrorOut(errstr) :
+        """Print an error and exit cleanly."""
+        print "==============="
+        print errstr
+        print "===============\n"
+        PyTopo.Usage()
+
+    def print_sites(self) :
+        """Print the list of known sites."""
+        for site in self.KnownSites :
+            print site[0]
+        sys.exit(0)
+
+    def FindCollection(self, collname) :
+        """Find a collection with the given name."""
+        global Debug
+
+        #print "Looking for a collection named", collname
+        # Make sure collname is a MapCollection we know about:
+        collection = None
+        for coll in self.Collections :
+            if collname == coll.name :
+                if not os.access(coll.location, os.X_OK) :
+                    PyTopo.ErrorOut("Can't access location " + coll.location +
+                                    " for collection " + collname)
+                collection = coll
+                if (Debug) :
+                    print "Found the collection", collection.name
+                return collection
+        if collection == None :
+            PyTopo.ErrorOut("I can't find a map collection called " + collname)
+
+    def ParseArgs(self, mapwin, args) :
+        """Parse runtime arguments."""
+        global VersionString
+        global Debug
+
+        # Variables we expect from .pytopo:
+        do_collection = False
+    
+        while len(args) > 1 and args[1][0] == '-' \
+                and not args[1][1].isdigit() :
+            if args[1] == "-v" or args[1] == "--version" :
+                print VersionString
+                sys.exit(0)
+            if args[1] == "-15" :
+                series = 15
+            elif args[1] == "-p" :
+                self.print_sites()
+            elif args[1] == "-c" :
+                do_collection = True
+            elif args[1] == "-d" :
+                Debug = True
+            elif args[1] == "-t" and len(args) > 2:
+                try :
+                    if mapwin.trackpoints == None :
+                        mapwin.trackpoints = TrackPoints()
+                    mapwin.trackpoints.readTrackFile(args[2])
+                except IOError, e:
+                    print e
+                    #print dir(e)
+                    #mapwin.trackpoints = None
+                args = args[1:]
+            else :
+                PyTopo.ErrorOut("Unknown flag " + args[1])
+    
+            args = args[1:]
+    
+        if len(args) < 2 :
+            PyTopo.Usage()
+    
+        # Check for a named argument
+        if len(args) == 2 :
+            # Special -c collectionname to start somewhere inside a collection:
+            if (do_collection) :
+                mapwin.Collection = self.FindCollection(args[1])
+                mapwin.center_lon, mapwin.center_lat = \
+                    mapwin.Collection.get_top_left()
+                if (Debug) :
+                    print "Collection", args[0],
+                    print "Starting at", \
+                        MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
+                        ", ", MapUtils.DecDegToDegMinStr(mapwin.center_lat)
+                return
+    
+            # Try to match a known site:
+            for site in self.KnownSites :
+                if args[1] == site[0] :
+                    mapwin.Collection = self.FindCollection(site[3])
+    
+                    # site[1] and site[2] are the long and lat in deg.minutes
+                    #print site[0], site[1], site[2]
+                    mapwin.center_lon = MapUtils.DegMinToDecDeg(site[1])
+                    mapwin.center_lat = MapUtils.DegMinToDecDeg(site[2])
+                    #print "Center in decimal degrees:", centerLon, centerLat
+                    if (Debug) :
+                        print site[0] + ":", \
+                            MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
+                            MapUtils.DecDegToDegMinStr(mapwin.center_lat)
+                    return
+    
+        # Doesn't match a known site.  Look for coordinates.
+        if len(args) >= 3 :
+            try :
+                mapwin.center_lon = MapUtils.DegMinToDecDeg(float(args[1]))
+                mapwin.center_lat = MapUtils.DegMinToDecDeg(float(args[2]))
+                mapwin.Collection = PyTopo.FindCollection(args[3])
+                return
+    
+            except ValueError, e :
+                PyTopo.Usage()
+
+        if mapwin.trackpoints != None and len(args) == 2 :
+            mapwin.Collection = self.FindCollection(args[1])
+            minlon, minlat, maxlon, maxlat = mapwin.trackpoints.getCenter()
+            return
+
+        # Didn't match any known run mode:
+        PyTopo.Usage()
+    
+        return
+
+# Check for a user config file named .pytopo
+# in either $HOME/.config/pytopo or $HOME.
+#
+# Format of the user config file:
+# It is a python script, which can include arbitrary python code,
+# but the most useful will be KnownSites definitions,
+# with coordinates specified in degrees.decimal_minutes,
+# like this:
+# MapHome = "/cdrom"
+# KnownSites = [
+#     # Death Valley
+#     [ "zabriskie", 116.475, 36.245, "dv_data" ],
+#     [ "badwater", 116.445, 36.125, "dv_data" ],
+#     # East Mojave
+#     [ "zzyzyx", 116.05, 35.08, "emj_data" ]
+#     ]
+
+    def exec_config_file(self) :
+        """Load the user's .pytopo config file,
+        found either in $HOME/.config/pytopo/.pytopo or $HOME/pytopo.
+        """
+        userfile = os.path.join(os.environ["HOME"], ".config/pytopo/.pytopo")
+        if not os.access(userfile, os.R_OK) :
+            if Debug :
+                print "Couldn't open", userfile
+            userfile = os.path.join(os.environ["HOME"], "/.pytopo")
+            if not os.access(userfile, os.R_OK) :
+                if Debug :
+                    print "Couldn't open", userfile, "either"
+                return
+            elif Debug :
+                print "Found in HOME", userfile
+
+        # Now we'd better have a userfile
+
+        # Now that we're in a function inside the PyTopo class, we can't
+        # just execfile() and set a variable inside that file -- the file
+        # can only change it inside a "locals" dictionary.
+        # So set up the dictionary:
+        locals =  { 'Collections' : [ 3, 4 ],
+                    'KnownSites' : []
+                  }
+        execfile(userfile, globals(), locals)
+
+        # Then extract the changed values back out:
+        self.Collections = locals['Collections']
+        self.KnownSites = locals['KnownSites']
+
+    def main(self, pytopo_args) :
+        """main execution routine for pytopo."""
+        self.exec_config_file()
+        gc.enable()
+
+        mapwin = MapWindow()
+
+        self.ParseArgs(mapwin, pytopo_args)
+
+        # For cProfile testing, run with a dummy collection (no data needed):
+        #mapwin.Collection = MapCollection("dummy", "/tmp")
+
+        #print cProfile.__file__
+        #cProfile.run('mapwin.show_window()', 'cprof.out')
+        # http://docs.python.org/library/profile.html
+        # To analyze cprof.out output, do this:
+        # import pstats
+        # p = pstats.Stats('fooprof')
+        # p.sort_stats('time').print_stats(20)
+
+        mapwin.show_window()
+
+# Conditional main:
+if __name__ == "__main__" :
+    PyTopo().main(sys.argv)
+
