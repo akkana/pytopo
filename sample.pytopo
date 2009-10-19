@@ -1,0 +1,27 @@
+# My sites for pytopo
+
+init_width = 800
+init_height = 600
+
+# My map collections
+Collections = [
+# Some sample collection definitions:
+#    Topo1MapCollection( "sfr", "/home/user/Maps/sfr_data", 7.5, 262, 328 ),
+
+#    Topo2MapCollection( "kingscyn", "/home/user/Maps/kingscyn", "topo",
+#                        410, 256 ),
+
+#    GenericMapCollection( "pa-geo", "/home/user/Maps/pa-geo-300",
+#                          "pa-geo-300-", ".jpg",
+#                          -122.497, 37.498, 300, 400, 10746, 13124,
+#                          2, True, False ),
+
+    OSMMapCollection( "opencyclemap", "/home/user/Maps/opencyclemap",
+                      ".png", 256, 256, 13 ),
+  ]
+
+KnownSites = [
+    # Test data
+    [ "cimatest", -115.358, 35.173, "opencyclemap" ],
+  ]
+

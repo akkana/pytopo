@@ -26,7 +26,11 @@ If you have this source in ~/src/pytopo, then do the following:
 mkdir ~/Maps
 ln -s ~/src/pytopo/data/opencyclemap ~/Maps/
 mkdir ~/.config/pytopo
-cp ~/src/pytopo/.pytopo ~/.config/pytopo
+cp ~/src/pytopo/sample.pytopo ~/.config/pytopo
+  (If you prefer, you can put .pytopo directly in your home directory.)
+
+IMPORTANT: You must edit ~/.config/pytopo and change "user" to your
+login name.
 
 That will give you an entry called "cimatest" pointing to the
 opencyclemap data for Cima Dome, in the Mojave desert.
