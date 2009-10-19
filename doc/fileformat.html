@@ -1,0 +1,139 @@
+<html>
+<head>
+<title>pytopo: Topographic Maps for Linux</title>
+</head>
+<body bgcolor=white>
+
+<img align=right src="topoicon.jpg" width=218 height=290
+ alt="[PyTopo for Linux]">
+
+<h1>PyTopo: Setting Up Your .pytopo File</h1>
+
+<p>
+In order to use pytopo, you need to create a file called
+<b>.pytopo</b> in your home directory to tell pytopo
+where you keep your maps and what format they're in.
+There are also some other variables you can customize
+in that file.
+
+<h2>Collections</h2>
+<p>
+A <i>Collection</i> is a set of maps from one source, all
+in the same format. For instance, if I load the Topo! Death
+Valley CD into a directory, that would represent one collection.
+<p>
+You must have at least one collection in order to use pytopo
+(otherwise it won't know where to look for your map data).
+<p>
+Define your collections like this:
+<pre>
+Collections = [
+    Topo1MapCollection( "deathvalley", "/home/yourname/Maps/dvl_data",
+                        7.5, 266, 328 ),
+    Topo2MapCollection( "kingscyn", "/home/yourname/Maps/kingscyn", "topo",
+                        410, 256 ),
+    GenericMapCollection( "pa-geo", "/home/yourname/Maps/pa-geo-300",
+                          "pa-geo-300-", ".jpg",
+                          -122.497, 37.498, 300, 400, 10746, 13124,
+                          2, True, False )
+]
+</pre>
+This defines three collections. The first one is called "deathvalley",
+stored in the directory named <i>/home/yourname/Maps/dvl_data</i>,
+and uses the format <i>Topo1MapCollection</i> -- the simple format used
+in Topo! regional CD sets. The filenames already have latitude
+and longitude encoded into them, but you do need to specify the size.
+<p>
+The second collection is a different sort of Topo! format, one
+with filenames beginning with "topo" and much wider and shorter jpeg
+images.
+<p>
+The third collection, called "pa-geo" and stored
+in <i>/home/yourname/Maps/pa-geo</i>, is more complicated.
+<i>GenericMapCollection</i> is a much more general format
+suitable for map collections you create yourself.
+Suppose a sample map in the collection might have a filename
+like <b>pa-map-03-17.png</b>. Then the pieces of the
+GenericMapCollection are:
+<p>
+<p>
+<table>
+<tr><th align=left>Field <th align=left>Value <th align=left>Description
+<tr><td>Name <td>pa-geo <td>Name of the collection
+<tr><td>Directory <td>/home/yourname/Maps/pa-geo <td>Directory where
+the files live
+<tr><td>Prefix <td>pa-map- <td>Prefix prepended to every filename
+<tr><td>Suffix <td>.png <td>Suffix (extension) appended to every filename
+<tr><td>Longitude <td>123 <td>Longitude of upper left corner
+<tr><td>Latitude <td>37.5 <td>Latitude of upper left corner
+<tr><td>Width <td>Width of each maplet
+<tr><td>Height <td>Height of each maplet
+<tr><td>X scale <td>10742 <td>X scale (pixels per degree)
+<tr><td>Y scale <td>13120 <td>Y scale (pixels per degree)
+<tr><td>Num digits <td>2 <td>Number of digits for each grid point in
+the filenames
+<tr><td>Use dash? <td>True <td>Use a dash between X and Y grid point
+numbers in the file name? (E.g. pa-map-03-17.png vs. pa-map-0317.png.)
+<tr><td>Latitude first? <td>True <td>Is the latitude the first grid
+point (e.g. 03) in the filename?
+</table>
+<p>
+Map Collections are simply Python classes. If you have a weird type
+of map collection and you know some Python programming, you can define
+your own map collection type inside your .pytopo file. If you write
+a collection class that might be useful to someone else, please send
+it to me and I'll include it in the next version of pytopo.
+<p>
+I'm working on a new format, using tiles downloaded from the
+<a href="http://openstreetmap.org">OpenStreetMap</a> project.
+Stay tuned for PyTopo 0.9!
+
+<h2>Named Sites</h2>
+<p>
+Once you have one or more collections defined, you can start
+defining named sites which you can use as starting points
+when you run pytopo.
+<p>
+The format is:
+<pre>
+[ sitename, longitude, latitude, collection_name ]
+</pre>
+Coordinates are in degrees.decimal_minutes.
+<p>
+Example:
+<pre>
+ KnownSites = [
+     # San Francisco Bay Area
+     [ "saratogagap", 122.0725, 37.155, "sfr" ],
+     [ "lexington", 121.594, 37.12, "sfr" ],
+     # Death Valley
+     [ "zabriskie", 116.475, 36.245, "deathvalley" ],
+     # From the Big Sur map:
+     [ "pinnacles", 121.0865, 36.3247, "bigsur" ],
+     ]
+</pre>
+
+<h2>Other Useful Variables</h2>
+<p>
+You can customize pytopo by changing the values of these variables:
+
+<pre>
+# Where to save generated maps. The default is fine for most people.
+MapSaveDir = os.environ["HOME"] + "/Topo/"
+<b>Note:</b> Saving maps may be buggy. I haven't tested it in
+quite a long time.
+</pre>
+
+<p>
+Adding more customizable variables to this file is another feature
+coming in version 0.9.
+
+<hr>
+<a href="index.html">PyTopo</a><br>
+<a href="../">Other Software</a><br>
+<a href="../../">Shallowsky Home</a><br>
+<a href="./mailme.html">mail me</a>
+
+</body>
+</html>
+
