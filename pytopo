@@ -12,7 +12,20 @@
 # We will do all calculations in decimal degrees,
 # but take inputs in deg.decimal_minutes.
 
-VersionString = "PyTopo Version 0.8 by Akkana Peck"
+"""
+0.9 Release notes:
+
+NEW FORMAT
+
+OSMMapCollection handles collections of tiles (maplets) downloaded
+from the openstreetmap project, e.g. by programs such as TangoGPS.
+Eventually PyTopo will be able to download its own tiles.
+
+TODO: allow configuration of colors, line thickness etc.
+
+"""
+
+VersionString = "PyTopo Version 0.9dev by Akkana Peck"
 
 import sys, os, math, gtk, gc
 HaveDOM = True
@@ -1076,7 +1089,7 @@ that are expected by the MapCollection classes:
         # but this is called before ParseArgs so we don't know Debug.
         self.grid_color = gtk.gdk.color_parse("green")
 
-    def show_window(self) :
+    def show_window(self, init_width, init_height) :
         """Create the initial window."""
         win = gtk.Window()
         win.set_name("PyTopo")
@@ -1089,7 +1102,7 @@ that are expected by the MapCollection classes:
 
         self.drawing_area = gtk.DrawingArea()
         # XXX remove hardwired image size numbers
-        self.drawing_area.set_size_request(800, 600)
+        self.drawing_area.set_size_request(init_width, init_height)
         vbox.pack_start(self.drawing_area)
         self.drawing_area.show()
 
@@ -1419,6 +1432,8 @@ class PyTopo :
     def __init__(self) :
         self.Collections = []
         self.KnownSites = []
+        self.init_width = 800
+        self.init_height = 800
 
     @staticmethod
     def Usage() :
@@ -1587,7 +1602,7 @@ class PyTopo :
         if not os.access(userfile, os.R_OK) :
             if Debug :
                 print "Couldn't open", userfile
-            userfile = os.path.join(os.environ["HOME"], "/.pytopo")
+            userfile = os.path.join(os.environ["HOME"], ".pytopo")
             if not os.access(userfile, os.R_OK) :
                 if Debug :
                     print "Couldn't open", userfile, "either"
@@ -1602,13 +1617,17 @@ class PyTopo :
         # can only change it inside a "locals" dictionary.
         # So set up the dictionary:
         locals =  { 'Collections' : [ 3, 4 ],
-                    'KnownSites' : []
+                    'KnownSites' : [],
+                    'init_width' : self.init_width,
+                    'init_height' : self.init_height
                   }
         execfile(userfile, globals(), locals)
 
         # Then extract the changed values back out:
         self.Collections = locals['Collections']
         self.KnownSites = locals['KnownSites']
+        self.init_width = locals["init_width"]
+        self.init_height = locals["init_height"]
 
     def main(self, pytopo_args) :
         """main execution routine for pytopo."""
@@ -1630,7 +1649,7 @@ class PyTopo :
         # p = pstats.Stats('fooprof')
         # p.sort_stats('time').print_stats(20)
 
-        mapwin.show_window()
+        mapwin.show_window(self.init_width, self.init_height)
 
 # Conditional main:
 if __name__ == "__main__" :
