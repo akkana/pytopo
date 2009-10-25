@@ -27,7 +27,7 @@ TODO: allow configuration of colors, line thickness etc.
 
 VersionString = "PyTopo Version 0.9dev by Akkana Peck"
 
-import sys, os, math, gtk, gc
+import sys, os, math, gtk, gobject, gc
 HaveDOM = True
 try :
     import xml.dom.minidom
@@ -157,6 +157,10 @@ __init__, get_maplet, draw_map, and get_top_left.
     # and return as longitude, latitude.
     def get_top_left(self) :
         return 0, 0
+
+    # Most map collections can't zoom, but some can.
+    def zoom(self, amount) :
+        return
 
 class TiledMapCollection(MapCollection) :
 
@@ -348,22 +352,33 @@ class OSMMapCollection(TiledMapCollection) :
         ext        -- filename extension including the dot, e.g. .jpg
         """
         TiledMapCollection.__init__(self, _name, _location,
-                                    _img_width, _img_height, )
+                                    _img_width, _img_height)
         self.ext = _ext
         self.img_width = _img_width
         self.img_height = _img_height
-        self.zoom = _init_zoom
+        self.zoomlevel = _init_zoom
 #        self.left_longitude = _left_long    # Left of 00-00 image
 #        self.top_latitude = _top_lat        # Top of 00-00 image
 
+        # Call zoom so we set all scales appropriately:
+        print "Calling zoom with 0"
+        self.zoom(0)
+
+    def zoom(self, amount) :
+        """
+        Zoom in or out by the specified amount,
+        updating the scales appropriately.
+        """
+        self.zoomlevel += amount
+
         # Next values are from http://wiki.openstreetmap.org/wiki/Zoom_levels
         # but can't be right for both X and Y ...
-        #self.xscale = 1282.0 * self.zoom
-        #self.yscale = 1282.0 * self.zoom
-        powzoom = pow(2, self.zoom)
+        #self.xscale = 1282.0 * self.zoomlevel
+        #self.yscale = 1282.0 * self.zoomlevel
+        powzoom = pow(2, self.zoomlevel)
         self.xscale = powzoom * 1.38425
         self.yscale = powzoom * 1.13525
-        # At zoom level 13, each pixel is 11.461318051575931 meters
+        # At zoomlevel 13, each pixel is 11.461318051575931 meters
         # according to
         # http://wiki.openstreetmap.org/wiki/Height_and_width_of_a_map
         # so if we can convert meters to lat and lon difference,
@@ -382,11 +397,11 @@ class OSMMapCollection(TiledMapCollection) :
         # upper left:  -115^31.83' 35^25.49'
         # lower right: -115^29.22' 35^23.39'
         # (distance 33229.77 feet, 6.29 miles, 309 = N 51 W)
-        # So at zoom level 13,
+        # So at zoomlevel 13,
         # xscale = 256 px / 2.61' = 5885.05747126436781609195
         # yscale = 256 px / 2.1'  = 7314.28571428571428571429
         #
-        self.yscale = 8702.2  # zoom 13, 1112/11.461318051575931
+        self.yscale = 8702.2  # zoomlevel 13, 1112/11.461318051575931
         self.xscale = self.yscale / math.cos(35.35 * math.pi / 180.)
         self.yscale = 7314.28571428571428571429
         self.xscale = 5885.05747126436781609195
@@ -399,6 +414,8 @@ class OSMMapCollection(TiledMapCollection) :
         self.xscale = self.yscale * math.cos(35.35 * math.pi / 180.)
         print "Scales:", self.xscale, "x", self.yscale
 
+        return
+
     def get_maplet(self, longitude, latitude) :
         """Get the maplet containing the specified coordinates.
         Returns pixbuf, x_offset, y_offset, filename
@@ -407,26 +424,29 @@ class OSMMapCollection(TiledMapCollection) :
         """
 #         # from tangoGPS:
 #         ln2 = math.log(2.)
-#         xtile = int(longitude * self.img_width * math.exp(self.zoom * ln2) / 2. / math.pi + math.exp(self.zoom * ln2) * self.img_width / 2.)
+#         xtile = int(longitude * self.img_width * math.exp(self.zoomlevel * ln2) / 2. / math.pi + math.exp(self.zoomlevel * ln2) * self.img_width / 2.)
 #         ytile = -int(OSMMapCollection.atanh(math.sin(latitude)) \
-#                          * math.exp(self.zoom * ln2) \
+#                          * math.exp(self.zoomlevel * ln2) \
 #                          / math.pi \
-#                        + math.exp(self.zoom * ln2)) \
+#                        + math.exp(self.zoomlevel * ln2)) \
 #                      * self.img_height / 2
 
         # from gpx2png:
-        xtile = int( ( longitude + 180 ) / 360 * ( 1 << self.zoom ) )
+        xtile = int( ( longitude + 180 ) / 360 * ( 1 << self.zoomlevel ) )
         l = math.log( math.tan( latitude * math.pi / 180. )
                           + 1. / math.cos( latitude * math.pi / 180. ) )
-        ytile = int( ( 1. - l / math.pi ) / 2. * ( 1 << self.zoom ) )
+        ytile = int( ( 1. - l / math.pi ) / 2. * ( 1 << self.zoomlevel ) )
 
-        filename = os.path.join(self.location, str(self.zoom),
+        filename = os.path.join(self.location, str(self.zoomlevel),
                             str(xtile), str(ytile)) + self.ext
         if filename == None or not os.access(filename, os.R_OK) :
             if Debug :
                 print "get_maplet: no maplet for", filename
             return None, 0, 0, filename
-        pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
+        try :
+            pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
+        except gobject.GError, e :
+            return None, 0, 0, filename
 
         # Offsets aren't implemented yet:
         x_off = 0
@@ -435,9 +455,9 @@ class OSMMapCollection(TiledMapCollection) :
         return pixbuf, x_off, y_off, filename
 
     # maplet size 256. Files per dir:
-    # at zoom 12, 28
-    # at zoom 13, 53
-    # at zoom 14, 107
+    # at zoomlevel 12, 28
+    # at zoomlevel 13, 53
+    # at zoomlevel 14, 107
     def get_next_maplet(self, fullpathname, dX, dY) :
         """Given a maplet's pathname, get the next or previous one.
         Does not currently work for jumps more than 1 in any direction.
@@ -453,7 +473,10 @@ class OSMMapCollection(TiledMapCollection) :
 
         if newpath == None or not os.access(newpath, os.R_OK) :
             return None, newpath
-        pixbuf = gtk.gdk.pixbuf_new_from_file(newpath)
+        try :
+            pixbuf = gtk.gdk.pixbuf_new_from_file(newpath)
+        except gobject.GError, e :
+            return None, newpath
         return pixbuf, newpath
 
     def CoordsToFilename(self, longitude, latitude) :
@@ -867,6 +890,12 @@ Topo1MapCollection: data from local-area Topo! packages,
                                    _tile_w, _tile_h,
                                    _ser7prefix="012t", _ser15prefix="024t",
                                    _img_ext=".gif")
+
+    def zoom(self, amount) :
+        if self.series == 7.5 and amount < 0 :
+            self.set_series(15)
+        elif self.series == 15 and amount > 0 :
+            self.set_series(7.5)
 
 # A Topo2MapCollection is just a Topo1MapCollection that has only
 # 7.5-series and has a different file prefix.
@@ -1310,11 +1339,9 @@ that are expected by the MapCollection classes:
         if event.string == "q" :
             self.GracefulExit()
         if event.string == "+" or event.string == "=" :
-            if isinstance(self.Collection, Topo1MapCollection) :
-                self.Collection.set_series(7.5)
+            self.Collection.zoom(1)
         elif event.string == "-" :
-            if isinstance(self.Collection, Topo1MapCollection) :
-                self.Collection.set_series(15)
+            self.Collection.zoom(-1)
         elif event.keyval == gtk.keysyms.Left :
             self.center_lon -= \
                 float(self.Collection.img_width) / self.Collection.xscale
