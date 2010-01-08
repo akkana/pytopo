@@ -1136,6 +1136,7 @@ that are expected by the MapCollection classes:
         self.drawing_area.show()
 
         self.drawing_area.set_events(gtk.gdk.EXPOSURE_MASK |
+                                     gtk.gdk.BUTTON_PRESS_MASK |
                                      gtk.gdk.BUTTON_RELEASE_MASK )
 
         self.drawing_area.connect("expose-event", self.expose_event)
