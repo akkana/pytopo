@@ -21,6 +21,25 @@ OSMMapCollection handles collections of tiles (maplets) downloaded
 from the openstreetmap project, e.g. by programs such as TangoGPS.
 Eventually PyTopo will be able to download its own tiles.
 
+Finding zero-length files:
+ find Maps/opencyclemap/13 -size 0
+ cd Maps/opencyclemap/13/1429
+ wget http://a.andy.sandbox.cloudmade.com/tiles/cycle/13/1429/3230.png
+
+cd Maps/opencyclemap
+  foreach level (*)
+    cd Maps/opencyclemap/$level
+    foreach dir (*)
+      cd Maps/opencyclemap/$level/$dir
+        foreach fil (`find . -size 0`)
+          echo $dir/$fil
+          rm $fil
+          wget http://a.andy.sandbox.cloudmade.com/tiles/cycle/$level/$dir/$fil
+        end
+    end
+  end
+end
+
 TODO: allow configuration of colors, line thickness etc.
 
 """
@@ -376,8 +395,15 @@ class OSMMapCollection(TiledMapCollection) :
         #self.xscale = 1282.0 * self.zoomlevel
         #self.yscale = 1282.0 * self.zoomlevel
         powzoom = pow(2, self.zoomlevel)
-        self.xscale = powzoom * 1.38425
-        self.yscale = powzoom * 1.13525
+#        self.xscale = powzoom * 1.38425
+#        self.yscale = powzoom * 1.13525
+
+        # These give approximately the right scale, empirically.
+        # But they don't give the right offset, and sometimes aren't
+        # even on the right map!
+        self.xscale = powzoom * .709
+        self.yscale = powzoom * .867
+
         # At zoomlevel 13, each pixel is 11.461318051575931 meters
         # according to
         # http://wiki.openstreetmap.org/wiki/Height_and_width_of_a_map
@@ -401,41 +427,84 @@ class OSMMapCollection(TiledMapCollection) :
         # xscale = 256 px / 2.61' = 5885.05747126436781609195
         # yscale = 256 px / 2.1'  = 7314.28571428571428571429
         #
-        self.yscale = 8702.2  # zoomlevel 13, 1112/11.461318051575931
-        self.xscale = self.yscale / math.cos(35.35 * math.pi / 180.)
-        self.yscale = 7314.28571428571428571429
-        self.xscale = 5885.05747126436781609195
+#        self.yscale = 8702.2  # zoomlevel 13, 1112/11.461318051575931
+#        self.xscale = self.yscale / math.cos(35.35 * math.pi / 180.)
+#        self.yscale = 7314.28571428571428571429
+#        self.xscale = 5885.05747126436781609195
 
-        self.yscale = powzoom / 1.12
+#        self.yscale = powzoom / 1.12
         # xscale should be yscale * cos(latitude), but the measured
         # distance on my test OSM tile isn't quite: 5885 instead of
         # my calculated 5965. That seems rather far off to be due
         # to differences in datum. Hmm.
-        self.xscale = self.yscale * math.cos(35.35 * math.pi / 180.)
+        #self.xscale = self.yscale * math.cos(35.35 * math.pi / 180.)
         print "Scales:", self.xscale, "x", self.yscale
 
         return
 
     def get_maplet(self, longitude, latitude) :
         """Get the maplet containing the specified coordinates.
+        Input coordinates are in decimal degrees.
         Returns pixbuf, x_offset, y_offset, filename
         where offsets are pixels from top left of the specified coords
         and pixbuf or (less often) filename may be None.
         """
-#         # from tangoGPS:
-#         ln2 = math.log(2.)
-#         xtile = int(longitude * self.img_width * math.exp(self.zoomlevel * ln2) / 2. / math.pi + math.exp(self.zoomlevel * ln2) * self.img_width / 2.)
-#         ytile = -int(OSMMapCollection.atanh(math.sin(latitude)) \
-#                          * math.exp(self.zoomlevel * ln2) \
-#                          / math.pi \
-#                        + math.exp(self.zoomlevel * ln2)) \
-#                      * self.img_height / 2
+
+        # Neither of these algorithms is right!
+        # I can't find any documentation of the actual tile naming convention.
+        # possible types: "gpx2png", "tango", "slippy"
+        algorithm = "slippy"
+
+        # In home/akkana/Maps/opencyclemap/13 :
+        # Barnwell intersection: 1473/3236.png
+        # pytopo says: -115^14.15' 35^17.56'
+        # Castle Peaks saddle:   1475/3234.png
+        # trkpt lat="35.372740896" lon="-115.154481595"
+        # pytopo says: -115^9.21' 35^22.35'
+
+        # Hole-in-the-Wall: 1470/3243.png
+        #  pytopo says: -115^23.37' 35^2.5'
+        #  wpt lat="35.042350078" lon="-115.395682342"
+        
+        # Rock house: -115^20.23' 35^9.34'
+        #  wpt lat="35.155000510" lon="-115.334812626"
+
+        # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+        if algorithm == "slippy" :
+            n = pow(2, self.zoomlevel)
+            xtilef = ((longitude + 180) / 360) * n
+            lat_rad = latitude * math.pi / 180
+            ytilef = (1 - (math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi)) / 2 * n
+            #print longitude, latitude, xtilef, ytilef
+
+            # XXX Figure out the offsets here
+
+            xtile = int(xtilef)
+            ytile = int(ytilef)
+
+            tilesize = 256
+            x_off = int((xtilef - xtile) * tilesize)
+            y_off = int((ytilef - ytile) * tilesize)
+
+        # from tangoGPS:
+        elif algorithm == "tango" :
+            ln2 = math.log(2.)
+            xtile = int(longitude * self.img_width * math.exp(self.zoomlevel * ln2) / 2. / math.pi + math.exp(self.zoomlevel * ln2) * self.img_width / 2.)
+            ytile = -int(math.atanh(math.sin(latitude)) \
+                             * math.exp(self.zoomlevel * ln2) \
+                             / math.pi \
+                             + math.exp(self.zoomlevel * ln2)) \
+                             * self.img_height / 2
 
         # from gpx2png:
-        xtile = int( ( longitude + 180 ) / 360 * ( 1 << self.zoomlevel ) )
-        l = math.log( math.tan( latitude * math.pi / 180. )
+        # This isn't right: sometimes it's off by a tile or even a little more.
+        # Add 1 to both xtile and ytile for macedonia cyn,
+        # but doesn't work for other nearby zones.
+        elif algorithm == "use_gpx2png" :
+            xtile = int( ( longitude + 180 ) / 360 * ( 1 << self.zoomlevel ) )
+            l = math.log( math.tan( latitude * math.pi / 180. )
                           + 1. / math.cos( latitude * math.pi / 180. ) )
-        ytile = int( ( 1. - l / math.pi ) / 2. * ( 1 << self.zoomlevel ) )
+            ytile = int( ( 1. - l / math.pi ) / 2. * ( 1 << self.zoomlevel ) )
 
         filename = os.path.join(self.location, str(self.zoomlevel),
                             str(xtile), str(ytile)) + self.ext
@@ -448,9 +517,9 @@ class OSMMapCollection(TiledMapCollection) :
         except gobject.GError, e :
             return None, 0, 0, filename
 
-        # Offsets aren't implemented yet:
-        x_off = 0
-        y_off = 0
+        # Offsets:
+        #x_off = 0  # 256 for macedonia cyn
+        #y_off = 0  # 256-15 for macedonia cyn
 
         return pixbuf, x_off, y_off, filename
 
@@ -1493,7 +1562,8 @@ class PyTopo :
     def print_sites(self) :
         """Print the list of known sites."""
         for site in self.KnownSites :
-            print site[0]
+            print site[0], "(", os.path.basename(site[3]), ")"
+            #print site[0], site[1]
         sys.exit(0)
 
     def FindCollection(self, collname) :
