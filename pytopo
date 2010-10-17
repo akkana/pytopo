@@ -412,42 +412,6 @@ class OSMMapCollection(TiledMapCollection) :
         self.xscale = powzoom * .709
         self.yscale = powzoom * .867
 
-        # At zoomlevel 13, each pixel is 11.461318051575931 meters
-        # according to
-        # http://wiki.openstreetmap.org/wiki/Height_and_width_of_a_map
-        # so if we can convert meters to lat and lon difference,
-        # we'll have scale.
-        # Unlike Topo! maplets, OSM maplets are square and, apparently,
-        # represent a constant amount of distance (at what projection?)
-        # rather than a constant number of degrees.
-        #
-        # A degree of longitude at the equator is 111.2 kilometers.
-        # A minute is 1853 meters. A second is 30.9 meters.
-        # For other latitudes multiply by cos(lat).
-        # Unfortunately we don't actually have the latitude yet,
-        # so we'll have to calculate it.
-        #
-        # The kokoweef maplet 13/1467/3233.png (256x256) has boundaries
-        # upper left:  -115^31.83' 35^25.49'
-        # lower right: -115^29.22' 35^23.39'
-        # (distance 33229.77 feet, 6.29 miles, 309 = N 51 W)
-        # So at zoomlevel 13,
-        # xscale = 256 px / 2.61' = 5885.05747126436781609195
-        # yscale = 256 px / 2.1'  = 7314.28571428571428571429
-        #
-#        self.yscale = 8702.2  # zoomlevel 13, 1112/11.461318051575931
-#        self.xscale = self.yscale / math.cos(35.35 * math.pi / 180.)
-#        self.yscale = 7314.28571428571428571429
-#        self.xscale = 5885.05747126436781609195
-
-#        self.yscale = powzoom / 1.12
-        # xscale should be yscale * cos(latitude), but the measured
-        # distance on my test OSM tile isn't quite: 5885 instead of
-        # my calculated 5965. That seems rather far off to be due
-        # to differences in datum. Hmm.
-        #self.xscale = self.yscale * math.cos(35.35 * math.pi / 180.)
-        print "Scales:", self.xscale, "x", self.yscale
-
         return
 
     def get_maplet(self, longitude, latitude) :
@@ -458,77 +422,24 @@ class OSMMapCollection(TiledMapCollection) :
         and pixbuf or (less often) filename may be None.
         """
 
-        # Neither of these algorithms is right!
-        # I can't find any documentation of the actual tile naming convention.
-        # possible types: "gpx2png", "tango", "slippy"
-        algorithm = "slippy"
-
-        # In home/akkana/Maps/opencyclemap/13 :
-        # Barnwell intersection: 1473/3236.png
-        # pytopo says: -115^14.15' 35^17.56'
-        # Castle Peaks saddle:   1475/3234.png
-        # trkpt lat="35.372740896" lon="-115.154481595"
-        # pytopo says: -115^9.21' 35^22.35'
-
-        # Hole-in-the-Wall: 1470/3243.png
-        #  pytopo says: -115^23.37' 35^2.5'
-        #  wpt lat="35.042350078" lon="-115.395682342"
-        
-        # Rock house: -115^20.23' 35^9.34'
-        #  wpt lat="35.155000510" lon="-115.334812626"
-
         # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
-        if algorithm == "slippy" :
-            n = pow(2, self.zoomlevel)
-            xtilef = ((longitude + 180) / 360) * n
-            lat_rad = latitude * math.pi / 180
-            ytilef = (1 - (math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad)) / math.pi)) / 2 * n
-            #print longitude, latitude, xtilef, ytilef
+        n = 2.0 ** self.zoomlevel
+        xtilef = ((longitude + 180) / 360) * n
+        lat_rad = latitude * math.pi / 180
+        ytilef = (1 - (math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad))
+                       / math.pi)) * n / 2
 
-            # XXX Figure out the offsets here
+        xtile = int(xtilef)
+        ytile = int(ytilef)
 
-            xtile = int(xtilef)
-            ytile = int(ytilef)
-
-            tilesize = 256
-            x_off = int((xtilef - xtile) * tilesize)
-            y_off = int((ytilef - ytile) * tilesize)
-
-        # from tangoGPS:
-        elif algorithm == "tango" :
-            ln2 = math.log(2.)
-            xtile = int(longitude * self.img_width * math.exp(self.zoomlevel * ln2) / 2. / math.pi + math.exp(self.zoomlevel * ln2) * self.img_width / 2.)
-            ytile = -int(math.atanh(math.sin(latitude)) \
-                             * math.exp(self.zoomlevel * ln2) \
-                             / math.pi \
-                             + math.exp(self.zoomlevel * ln2)) \
-                             * self.img_height / 2
-
-        # from gpx2png:
-        # This isn't right: sometimes it's off by a tile or even a little more.
-        # Add 1 to both xtile and ytile for macedonia cyn,
-        # but doesn't work for other nearby zones.
-        elif algorithm == "use_gpx2png" :
-            xtile = int( ( longitude + 180 ) / 360 * ( 1 << self.zoomlevel ) )
-            l = math.log( math.tan( latitude * math.pi / 180. )
-                          + 1. / math.cos( latitude * math.pi / 180. ) )
-            ytile = int( ( 1. - l / math.pi ) / 2. * ( 1 << self.zoomlevel ) )
+        tilesize = 256
+        x_off = int((xtilef - xtile) * tilesize)
+        y_off = int((ytilef - ytile) * tilesize)
 
         filename = os.path.join(self.location, str(self.zoomlevel),
                             str(xtile), str(ytile)) + self.ext
-        if filename == None or not os.access(filename, os.R_OK) :
-            if Debug :
-                print "get_maplet: no maplet for", filename
-            return None, 0, 0, filename
-        try :
-            pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
-        except gobject.GError, e :
-            return None, 0, 0, filename
 
-        # Offsets:
-        #x_off = 0  # 256 for macedonia cyn
-        #y_off = 0  # 256-15 for macedonia cyn
-
+        pixbuf = self.fetch_or_download_maplet(filename)
         return pixbuf, x_off, y_off, filename
 
     # maplet size 256. Files per dir:
@@ -537,7 +448,7 @@ class OSMMapCollection(TiledMapCollection) :
     # at zoomlevel 14, 107
     def get_next_maplet(self, fullpathname, dX, dY) :
         """Given a maplet's pathname, get the next or previous one.
-        Does not currently work for jumps more than 1 in any direction.
+        May not work for jumps more than 1 in any direction.
         Returns pixbuf, newpath (either may be None).
         """
         fulldir, filename = os.path.split(fullpathname)
@@ -551,29 +462,46 @@ class OSMMapCollection(TiledMapCollection) :
         if newpath == None :
             return None, newpath
 
-        if not os.access(newpath, os.R_OK) :
+        pixbuf = self.fetch_or_download_maplet(newpath)
+        return pixbuf, newpath
+
+    def fetch_or_download_maplet(self, path) :
+        global Debug
+        if not os.access(path, os.R_OK) :
             if not self.download_url :
-                return None, None
+                if Debug :
+                    print "Downloads not enabled; skipping", path
+                return None
+            # XXX Should download in the background, and return None
+            # to display a black rect in the meantime.
             try :
-                # no os.path.join: these are web URLs that always use /
-                url = self.download_url + '/' + str(self.zoomlevel) + '/' \
-                    + xstr + '/' + ystr + ext
-                thedir = os.path.dirname(newpath)
+                # path is a full path on the local filesystem, OS independent.
+                # We need to turn it into a url (Unix path) with slashes.
+                thedir = os.path.dirname(path)
                 if not os.access(thedir, os.W_OK) :
                     os.makedirs(thedir)
-                print "Trying to download from", url
-                urllib.urlretrieve(url, newpath)
-                print "Got it!"
+                xdir, basename = os.path.split(path)
+                xdir = os.path.basename(xdir)
+                url = self.download_url + '/' + str(self.zoomlevel) + '/' \
+                    + xdir + '/' + basename
+                if Debug :
+                    print "Requesting", url,
+                urllib.urlretrieve(url, path)
+                if Debug :
+                    print "Got it!"
             except Exception, e:
                 print "problem downloading"
                 print str(e)
-                return None, None
+                return None
+        elif Debug :
+            print path, "was already there"
 
         try :
-            pixbuf = gtk.gdk.pixbuf_new_from_file(newpath)
+            pixbuf = gtk.gdk.pixbuf_new_from_file(path)
         except gobject.GError, e :
-            return None, newpath
-        return pixbuf, newpath
+            return None
+
+        return pixbuf
 
     def CoordsToFilename(self, longitude, latitude) :
         """Given coordinates in decimal degrees, map to the closest filename"""
