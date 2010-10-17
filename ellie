@@ -4,13 +4,19 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-import sys, os, math, xml.dom.minidom
+VERSION = 0.3
 
-import pylab
+import sys, os, math, datetime, xml.dom.minidom
+
+try:
+    import pylab
+    have_pylab = True
+except ImportError:
+    have_pylab = False
+    print "pylab isn't installed; will print stats only, no plotting"
 
 #import matplotlib.pyplot as plt
 #from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
-#import datetime
 
 # Climb threshold: any short climb that doesn't gain more than
 # this number of feet won't be counted toward total climb.
@@ -19,6 +25,10 @@ import pylab
 # just swinging the bag around, or unhooking it from your belt
 # to check your current position, can do that.
 CLIMB_THRESHOLD = 8
+
+# How fast do we have to be moving to count toward the moving average speed?
+# This is in miles/hour.
+SPEED_THRESHOLD = .5
 
 # The variables we're going to plot:
 times = [ ]
@@ -29,12 +39,16 @@ distances = [ ]
 lastlat = 0
 lastlon = 0
 lastele = -1
-dist = 0
+total_dist = 0
 total_climb = 0
 this_climb = 0
 this_climb_start = 0
 
-def getVal(parent, name):
+lasttime = None
+moving_time = datetime.timedelta(0)
+stopped_time = datetime.timedelta(0)
+
+def getVal(parent, name) :
     nodeList = parent.getElementsByTagName(name)
     if len(nodeList) < 1 :
         return "No " + name + " element"
@@ -65,27 +79,39 @@ def accumulate_climb(ele) :
     lastele = ele
 
 def handleTrackPoint(point) :
-    global lastlat, lastlon, dist
-    time = getVal(point, "time")
+    global lastlat, lastlon, lasttime, total_dist, moving_time, stopped_time
+    time = datetime.datetime.strptime(getVal(point, "time"),
+                                      '%Y-%m-%dT%H:%M:%SZ')
     lat =  float(point.getAttribute("lat"))
     lon = float(point.getAttribute("lon"))
     ele = float(getVal(point, "ele"))
     ele = round(ele * 3.2808399, 2)      # convert from meters to feet
 
     if lastlat != 0 and lastlon != 0 :
-        dist = dist + math.sqrt((lat - lastlat)**2
-                                + (lon - lastlon)**2) * 69.046767
-        # 69.046767 converts nautical miles (arcminutes) to miles
+        dist = math.sqrt((lat - lastlat)**2 + (lon - lastlon)**2) * 69.046767
+            # 69.046767 converts nautical miles (arcminutes) to miles
+        total_dist += dist
+
+        delta_t = time - lasttime   # This is a datetime.timedelta object
+        speed = dist / delta_t.seconds * 60 * 60    # miles/hour
+        if speed > SPEED_THRESHOLD :
+            moving_time += delta_t
+            #print "moving\t",
+        else :
+            stopped_time += delta_t
+            #print "stopped\t",
+
+    lasttime = time
 
     accumulate_climb(ele)
 
     lastlat = lat
     lastlon = lon
 
-    #print dist, ele, "\t", time, lat, lon, "\t", total_climb
-    #print dist, ele, "\t", time, total_climb
+    #print total_dist, ele, "\t", time, lat, lon, "\t", total_climb
+    #print total_dist, ele, "\t", time, total_climb
 
-    distances.append(dist)
+    distances.append(total_dist)
     eles.append(ele)
 
 def handleTrackFile(dom) :
@@ -96,6 +122,7 @@ def handleTrackFile(dom) :
 
 def main(args) :
     if len(args) < 2 :
+        print "Ellie version", VERSION
         print "Usage:", args[0], file.gpx
         return 1
 
@@ -114,6 +141,14 @@ def main(args) :
     #
     # Plot the results:
     #
+    if not have_pylab :
+        print "%.1f miles. Total climb: %d'" % (total_dist, int(total_climb))
+        print "%d minutes moving, %d stopped" % (int(moving_time.seconds / 60),
+                                                 int(stopped_time.seconds / 60))
+        print "Average speed moving: %.1f mph" % (total_dist *60*60
+                                                  / moving_time.seconds)
+        return 0
+
     pylab.plot(distances, eles)
 
     title_string = "Elevation profile (" + str(round(distances[-1], 1)) \
