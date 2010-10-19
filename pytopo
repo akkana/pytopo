@@ -55,9 +55,9 @@ try :
 except ImportError, e:
     HaveDOM = False
 
-import urllib
+import types, urllib
 
-import pdb
+#import pdb
 
 #import traceback
 #import cProfile
@@ -198,6 +198,11 @@ TiledMapCollection classes must implement
         self.img_width = _tile_w
         self.img_height = _tile_h
 
+        # For collections that support downloading new tiles,
+        # keep a list of tiles that still need downloading:
+        self.download_tiles = []
+        self.download_func = None
+
     def draw_map(self, center_lon, center_lat, drawable) :
         """Draw maplets at the specified coordinates, to fill the drawable."""
         global Debug
@@ -285,53 +290,16 @@ TiledMapCollection classes must implement
                 x = cur_x
                 y = cur_y
 
-                if pixbuf != None :
-                    w = pixbuf.get_width() - x_off
-                    h = pixbuf.get_height() - y_off
-                    if (Debug) :
-                        print "img size:", pixbuf.get_width(), \
-                              pixbuf.get_height()
+                # If the pixbuf wasn't available, the collection may return
+                # a URL to be downloaded. Check for that:
+                if type(pixbuf) == types.TupleType :
+                    print "Need to download", pixbuf[0]
+                    self.download_tiles.insert(0, (pixbuf[0], pixbuf[1],
+                                                   x, y, x_off, y_off,
+                                                   drawable))
+                    pixbuf = None
 
-                    # If the image won't completely fill the grid space,
-                    # fill the whole rectangle first with black.
-                    # Note: this may not guard against images with
-                    # transparent areas. Don't do that.
-                    if (pixbuf.get_width() < self.img_width or
-                        pixbuf.get_height() < self.img_height) :
-                        drawable.set_bg_color()
-                        drawable.draw_rectangle(1, x, y,
-                                                self.img_width, self.img_height)
-                        if (Debug) :
-                            print "Filling in background:", x, y,
-                            print self.img_width, self.img_height
-
-                    if (Debug) :
-                        print "Drawing maplet for",
-                        print MapUtils.DecDegToDegMinStr(curlon),
-                        print MapUtils.DecDegToDegMinStr(curlat),
-                        print "at", x, y, "offset", x_off, y_off,
-                        print "size", w, h
-
-                    drawable.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
-
-                    # Make sure the pixbuf goes out of scope properly:
-                    pixbuf = 0
-                else :
-                    if (Debug) :
-                        print "No maplet for", curlon, curlat,
-                        print "at", x, y, "offset", x_off, y_off
-                    drawable.set_bg_color()
-                    w -= x_off
-                    h -= y_off
-                    drawable.draw_rectangle(1, x, y, w, h)
-
-                # Useful when testing:
-                if (Debug) :
-                    drawable.set_grid_color()
-                    drawable.draw_rectangle(0, x, y, w, h)
-                    drawable.draw_line(x, y, x+w, y+h)
-                    drawable.set_bg_color()
-
+                w, h = self.draw_one_tile(pixbuf, drawable, x, y, x_off, y_off)
                 # You may ask, why not just do this subtraction before
                 # draw_pixbuf so we don't have to subtract w and h twice?
                 # Alas, we may not have the real w and h until we've done
@@ -357,6 +325,120 @@ TiledMapCollection classes must implement
         # http://www.daa.com.au/pipermail/pygtk/2003-December/006499.html
         # (At this indentation level, we free after draing the whole map.)
         gc.collect()
+
+        # If we queued any downloads, schedule a function to take care of that:
+        if len(self.download_tiles) > 0 and self.download_func == None :
+            gobject.timeout_add(300, self.download_more)
+
+    def draw_one_tile(self, pixbuf, drawable, x, y, x_off, y_off) :
+        if pixbuf != None :
+            w = pixbuf.get_width() - x_off
+            h = pixbuf.get_height() - y_off
+            if (Debug) :
+                print "img size:", pixbuf.get_width(), \
+                      pixbuf.get_height()
+
+            # If the image won't completely fill the grid space,
+            # fill the whole rectangle first with black.
+            # Note: this may not guard against images with
+            # transparent areas. Don't do that.
+            if (pixbuf.get_width() < self.img_width or
+                pixbuf.get_height() < self.img_height) :
+                drawable.set_bg_color()
+                drawable.draw_rectangle(1, x, y,
+                                        self.img_width, self.img_height)
+                if (Debug) :
+                    print "Filling in background:", x, y,
+                    print self.img_width, self.img_height
+
+            # if (Debug) :
+            #     print "Drawing maplet for",
+            #     print MapUtils.DecDegToDegMinStr(curlon),
+            #     print MapUtils.DecDegToDegMinStr(curlat),
+            #     print "at", x, y, "offset", x_off, y_off,
+            #     print "size", w, h
+
+            drawable.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
+
+            # Make sure the pixbuf goes out of scope properly:
+            pixbuf = 0
+        else :
+            # if (Debug) :
+            #     print "No maplet for", curlon, curlat,
+            #     print "at", x, y, "offset", x_off, y_off
+            drawable.set_bg_color()
+            w = self.img_width - x_off
+            h = self.img_height - y_off
+            drawable.draw_rectangle(1, x, y, w, h)
+
+        # Useful when testing:
+        if (Debug) :
+            drawable.set_grid_color()
+            drawable.draw_rectangle(0, x, y, w, h)
+            drawable.draw_line(x, y, x+w, y+h)
+            drawable.set_bg_color()
+        return w, h
+
+    def download_finished(self, path) :
+        """Callback when a tile finishes downloading.
+           The path argument is either the local file path just downloaded,
+           or an exception, e.g. IOError.
+        """
+
+        # If we got an IOError -- perhaps we're offline --
+        # path will be None here.
+        # In that case, just give up on downloading.
+        if path == None :
+            print "Download failed; giving up"
+            self.download_func = None
+            # Clear self.download_tiles, so that if the net returns
+            # we'll start on new stuff, not old stuff.
+            # Not clear if this is the right thing to do or not.
+            self.download_tiles.clear()
+            return
+
+        # Otherwise, we got a path for a successful tile download.
+        # Draw it on the map:
+        print "\n======= download_finished:", path
+        url, path, x, y, x_off, y_off, drawable = self.download_tiles.pop()
+        pixbuf = gtk.gdk.pixbuf_new_from_file(path)
+        self.draw_one_tile(pixbuf, drawable, x, y, x_off, y_off)
+
+        # It's okay to start a new download now:
+        self.download_func = None
+
+        # Anything more to download?
+        if len(self.download_tiles) > 0 :
+            self.download_more()
+
+    def download_more(self) :
+        """Idle/timeout proc to download any pending tiles.
+           Should always return False so it won't get rescheduled.
+           Eventually this should download in a separate thread.
+        """
+
+        # If we already have a download going, don't start another one
+        # (eventually we might want to run several in parallel).
+        if self.download_func != None :
+            print "There's already a download going; not downloading more"
+            return False
+
+        # If there are no more tiles to download, we're done:
+        if len(self.download_tiles) == 0 :
+            self.download_func = None
+            return False
+
+        print "download_more()"
+
+        url, path, x, y, x_off, y_off, drawable = self.download_tiles[-1]
+        # Don't actually pop() it until it has downloaded.
+        #urllib.urlretrieve(url, path)
+        self.download_func = start_job(download_job(url, path,
+                                                    self.download_finished))
+        if Debug :
+            print "Started download %s to %s" % (url, path)
+
+        return False
 
 class OSMMapCollection(TiledMapCollection) :
 
@@ -472,29 +554,17 @@ class OSMMapCollection(TiledMapCollection) :
                 if Debug :
                     print "Downloads not enabled; skipping", path
                 return None
-            # XXX Should download in the background, and return None
-            # to display a black rect in the meantime.
-            try :
-                # path is a full path on the local filesystem, OS independent.
-                # We need to turn it into a url (Unix path) with slashes.
-                thedir = os.path.dirname(path)
-                if not os.access(thedir, os.W_OK) :
-                    os.makedirs(thedir)
-                xdir, basename = os.path.split(path)
-                xdir = os.path.basename(xdir)
-                url = self.download_url + '/' + str(self.zoomlevel) + '/' \
-                    + xdir + '/' + basename
-                if Debug :
-                    print "Requesting", url,
-                urllib.urlretrieve(url, path)
-                if Debug :
-                    print "Got it!"
-            except Exception, e:
-                print "problem downloading"
-                print str(e)
-                return None
-        elif Debug :
-            print path, "was already there"
+
+            # path is a full path on the local filesystem, OS independent.
+            # We need to turn it into a url (Unix path) with slashes.
+            thedir = os.path.dirname(path)
+            if not os.access(thedir, os.W_OK) :
+                os.makedirs(thedir)
+            xdir, basename = os.path.split(path)
+            xdir = os.path.basename(xdir)
+            url = self.download_url + '/' + str(self.zoomlevel) + '/' \
+                + xdir + '/' + basename
+            return (url, path)
 
         try :
             pixbuf = gtk.gdk.pixbuf_new_from_file(path)
@@ -1741,6 +1811,53 @@ class PyTopo :
         # p.sort_stats('time').print_stats(20)
 
         mapwin.show_window(self.init_width, self.init_height)
+
+#
+# A relatively clean way of downloading files in a separate thread.
+# http://code.activestate.com/recipes/577129-run-asynchronous-tasks-using-coroutines/
+#
+def start_job(generator):
+    """Start a job (a coroutine that yield generic tasks)."""
+    def _task_return(result):
+        """Function to be sent to tasks to be used as task_return."""
+        def _advance_generator():
+            try:
+                new_task = generator.send(result)
+            except StopIteration:
+                return
+            new_task(_task_return)
+        # make sure the generator is advanced in the main thread
+        gobject.idle_add(_advance_generator)            
+    _task_return(None)
+    return generator
+
+import threading
+gobject.threads_init()  
+
+def threaded_task(function, *args, **kwargs):
+    """Run function(*args, **kwargs) inside a thread and return the result."""
+    def _task(task_return):
+        def _thread():
+            result = function(*args, **kwargs)
+            gobject.idle_add(task_return, result)
+        thread = threading.Thread(target=_thread, args=())
+        thread.setDaemon(True)
+        thread.start()
+    return _task
+
+def download_job(url, localpath, callback):
+    def download(url, localpath, callback):
+        print "requesting", url
+        try :
+            urllib.urlretrieve(url, localpath)
+            return localpath
+        except IOError, e :
+            return None
+
+    sys.stderr.write("[start_download: %s to %s]" % (url, localpath))
+    path = yield threaded_task(download, url, localpath, callback)
+    sys.stderr.write("[wrote %s to %s]" % (url, localpath))
+    callback(path)
 
 # Conditional main:
 if __name__ == "__main__" :
