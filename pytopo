@@ -150,6 +150,8 @@ and scale of those tiles so they can be drawn in a map window.
 
 Child classes implementing MapCollection must define functions
 __init__, get_maplet, draw_map, and get_top_left.
+Get_top_left() is only for debugging, when you're trying to figure out
+map coordinates and need a starting place. Should probably remove it.
 """
 
     def __init__(self, _name, _location) :
@@ -182,7 +184,9 @@ __init__, get_maplet, draw_map, and get_top_left.
         return 0, 0
 
     # Most map collections can't zoom, but some can.
-    def zoom(self, amount) :
+    # This will recalculate the xscale and yscale, which
+    # in many projections will need to know current latitude.
+    def zoom(self, amount, latitude=45) :
         return
 
 class TiledMapCollection(MapCollection) :
@@ -211,6 +215,10 @@ TiledMapCollection classes must implement
         win_width, win_height = drawable.get_size()
         if (Debug) :
             print "Window is", win_width, "x", win_height
+
+        # Now that we have a latitude, call zoom so we can finally
+        # set the x and y scales accurately.
+        self.zoom(0, center_lat)
 
         # Find the coordinate boundaries for the set of maps to draw.
         # This may (indeed, usually will) include maps off the screen,
@@ -466,33 +474,62 @@ class OSMMapCollection(TiledMapCollection) :
         self.img_width = _img_width
         self.img_height = _img_height
         self.zoomlevel = _init_zoom
+        self.powzoom = 2.0 ** self.zoomlevel   # to avoid re-re-calculating
         self.download_url = _download_url
-#        self.left_longitude = _left_long    # Left of 00-00 image
-#        self.top_latitude = _top_lat        # Top of 00-00 image
 
         # Call zoom so we set all scales appropriately:
         self.zoom(0)
 
-    def zoom(self, amount) :
+    # Utilities for mapping tiles to/from degrees.
+    # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
+    def deg2num(self, lat_deg, lon_deg):
+        lat_rad = math.radians(lat_deg)
+        xtilef = (lon_deg + 180.0) / 360.0 * self.powzoom
+        ytilef = ((1.0 - math.log(math.tan(lat_rad) +
+                                  (1 / math.cos(lat_rad))) / math.pi)
+                  / 2.0 * self.powzoom)
+        xtile = int(xtilef)
+        ytile = int(ytilef)
+
+        tilesize = 256
+        x_off = int((xtilef - xtile) * tilesize)
+        y_off = int((ytilef - ytile) * tilesize)
+
+        return(xtile, ytile, x_off, y_off)
+
+    def num2deg(self, xtile, ytile):
+        lon_deg = xtile / self.powzoom * 360.0 - 180.0
+        lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * ytile / self.powzoom)))
+        lat_deg = math.degrees(lat_rad)
+        return(lat_deg, lon_deg)
+
+    def zoom(self, amount, latitude=45) :
         """
         Zoom in or out by the specified amount,
         updating the scales appropriately.
+        Call zoom(0) to update x/y scales without changing zoom level.
+        Pass latitude for map collections (e.g. OSM) that cover
+        large areas so scale will tend to vary with latitude.
         """
+        global Debug
+
         self.zoomlevel += amount
+        if amount != 0 :
+            self.powzoom = 2.0 ** self.zoomlevel
 
-        # Next values are from http://wiki.openstreetmap.org/wiki/Zoom_levels
-        # but can't be right for both X and Y ...
-        #self.xscale = 1282.0 * self.zoomlevel
-        #self.yscale = 1282.0 * self.zoomlevel
-        powzoom = pow(2, self.zoomlevel)
-#        self.xscale = powzoom * 1.38425
-#        self.yscale = powzoom * 1.13525
+        # Get scale, in pixels / degree.
+        # (2 ** zoomlevel) tiles covers the whole world.
+        self.xscale = self.powzoom * 180./256.
 
-        # These give approximately the right scale, empirically.
-        # But they don't give the right offset, and sometimes aren't
-        # even on the right map!
-        self.xscale = powzoom * .709
-        self.yscale = powzoom * .867
+        # But because of the Mercator projection,
+        # yscale has to be adjusted for latitude.
+        (xtile, ytile, x_off, y_off) = self.deg2num(latitude, 180)
+        (lat1, lon1) = self.num2deg(xtile, ytile)
+        (lat2, lon2) = self.num2deg(xtile+1, ytile-1)
+        self.xscale = 256. / (lon2 - lon1)
+        self.yscale = 256. / (lat2 - lat1)
+        if Debug :
+            print "Zoom: Calculated scales:", self.xscale, self.yscale
 
         return
 
@@ -504,19 +541,7 @@ class OSMMapCollection(TiledMapCollection) :
         and pixbuf or (less often) filename may be None.
         """
 
-        # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
-        n = 2.0 ** self.zoomlevel
-        xtilef = ((longitude + 180) / 360) * n
-        lat_rad = latitude * math.pi / 180
-        ytilef = (1 - (math.log(math.tan(lat_rad) + 1 / math.cos(lat_rad))
-                       / math.pi)) * n / 2
-
-        xtile = int(xtilef)
-        ytile = int(ytilef)
-
-        tilesize = 256
-        x_off = int((xtilef - xtile) * tilesize)
-        y_off = int((ytilef - ytile) * tilesize)
+        (xtile, ytile, x_off, y_off) = self.deg2num(latitude, longitude)
 
         filename = os.path.join(self.location, str(self.zoomlevel),
                             str(xtile), str(ytile)) + self.ext
@@ -524,7 +549,7 @@ class OSMMapCollection(TiledMapCollection) :
         pixbuf = self.fetch_or_download_maplet(filename)
         return pixbuf, x_off, y_off, filename
 
-    # maplet size 256. Files per dir:
+    # maplet size is 256. Files per dir:
     # at zoomlevel 12, 28
     # at zoomlevel 13, 53
     # at zoomlevel 14, 107
@@ -985,7 +1010,7 @@ Topo1MapCollection: data from local-area Topo! packages,
                                    _ser7prefix="012t", _ser15prefix="024t",
                                    _img_ext=".gif")
 
-    def zoom(self, amount) :
+    def zoom(self, amount, latitude=45) :
         if self.series == 7.5 and amount < 0 :
             self.set_series(15)
         elif self.series == 15 and amount > 0 :
