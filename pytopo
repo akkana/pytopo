@@ -302,7 +302,6 @@ TiledMapCollection classes must implement
                 # If the pixbuf wasn't available, the collection may return
                 # a URL to be downloaded. Check for that:
                 if type(pixbuf) == types.TupleType :
-                    print "Need to download", pixbuf[0]
                     self.download_tiles.insert(0, (pixbuf[0], pixbuf[1],
                                                    x, y, x_off, y_off,
                                                    drawable))
