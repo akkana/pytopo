@@ -1,0 +1,61 @@
+<html>
+<head>
+<title>Ellie: plot elevation from a GPS track</title>
+</head>
+<body>
+
+<img width=300 height=236 align=right src="ellieicon.jpg" 
+ alt="[Ellie: plot elevation]">
+
+<h1>Ellie: plot elevation from a GPS track</h1>
+
+<p>
+There are lots of ways, mostly related to the <a
+href="http://openstreetmap.org">Open Street Map</a> project,
+to display GPS data on Linux. But none of them display elevation.
+I like being able to track how much I climbed on a hike or bike
+ride.
+<p>
+So I wrote a little Python script which I'm calling ellie.
+It parses track log files, in gpx format, and gives you a graph
+and a few statistics.
+<p>
+It uses pylab for plotting, which uses matplotlib; you'll need
+the python-matplotlib package installed (or its equivalent).
+
+<h2>Download</h2>
+<p>
+Get it here: <a href="ellie-0.2">ellie v. 0.2</a>.
+
+<h2>Usage</h2>
+<p>
+<code>ellie tracklog.gpx</code>
+It can currently plot only one track log at a time (is there
+much need to do more?)
+
+<h2>Screen shot</h2>
+<a href="ellie-shot.jpg">
+<img width=450 height=378 align=left src="ellie-shotT.jpg"
+ alt="[Ellie screenshot]">
+</a>
+<br clear=all>
+
+<h2>Changelog</h2>
+<dl>
+
+<dt> 0.1:
+<dd>First release.
+
+<dt>3/18/2009, 0.2:
+<dd>Fixed meters/feet confusion. Smarter total climb code: don't
+count little blips like taking the GPS out of its case to read it.
+
+</dl>
+
+<hr>
+<a href="../index.html">More Software</a><br>
+<a href="../../index.html">Shallowsky Home</a><br>
+<a href="../../mailme.html">mail me</a>
+
+</body>
+</html>

@@ -1,0 +1,262 @@
+<html>
+<head>
+<title>pytopo: Topographic Maps for Linux</title>
+</head>
+<body bgcolor=white>
+
+<img align=right src="topoicon.jpg" width=218 height=290
+ alt="[PyTopo for Linux]">
+
+<h1>pytopo: Topographic Maps for Linux</h1>
+
+<p>
+<b>PyTopo</b> is a Python-gtk script which interprets
+local tiled map data (for instance, from a <i>Topo!</i> data CD),
+and displays it in an interactive viewer, where you can scroll
+to adjacent maps, switch between resolutions, or produce a map
+image for printing or editing.
+<p>
+<b>Why does PyTopo exist?</b>
+There were several existing Linux mapping applications which take data
+from online web sites or roads databases, and others which take GPS
+data and correlate it with online maps.
+But I typically need maps when I'm travelling and don't have
+net access!
+I couldn't find any apps that would display data for any location,
+without requiring a GPS, using local map sources with no net connection
+needed.
+(There are a few possibilities but nothing that really solves the problem:
+GPSdrive claims it can do local mapping now, 
+but I've tried three versions with no luck getting it to run at all.
+And there's a neat little
+program called TangoGPS that can download and show OSM maps, but it has a
+difficult interface that's optimized for cellphones.)
+
+<p>
+<b>Download: The current version is <a href="pytopo-0.8">PyTopo 0.8</a>.</b>
+
+<p>
+0.8 had lots of changes -- including changes, I'm sorry to say,
+to the configuration file where you define your collections.
+I wrote up some <a href="releasenotes-0.8">Release notes for 0.8</a>
+and have updated the <a href="fileformat.html">Pytopo file formats</a>
+page to reflect the new syntax.
+
+<p>
+Or get the current SVN version:
+<b><a href="http://code.google.com/p/pytopo/">PyTopo is hosted
+on Google Code</a></b>.
+
+<h2>Using PyTopo</h2>
+<p>
+<b>Begin</b> by creating a file named <i>.pytopo</i> in your home directory,
+in which you define a list of named coordinates, and specify some other
+parameters such as location of the map data and preferred window size.
+Read the comments at the beginning of the <i>pytopo</i> script for
+samples of the .pytopo file.
+
+<h3>Key bindings</h3>
+<table>
+<tr>
+<th>Left, Right,<br>Up, Down
+<td>Scroll the map in the indicated direction.
+<tr>
+<th>+/=, -
+<td>Zoom in to the 7.5 minute series, or out to the 15 minute series.
+(Zooming isn't supported in other map formats yet.)
+<tr>
+<th>s
+<td>Save the current map to a file under <i>$HOME/Topo</i>
+<tr>
+<th>Space
+<td>Print (to standard output) the current coordinates of map center.
+</table>
+
+<p>
+<b>Clicking</b> in the map displays the coordinates of where you
+clicked, as well as the distance and bearing from the last clicked
+point.
+
+<h3>Usage (commandline arguments)</h3>
+<pre>
+Usage: pytopo [-t trackfile] site_name
+       pytopo [-t trackfile] start_lat start_long collection
+       pytopo -p
+Use degrees.decimal_minutes format for coordinates.
+Set up site names in ~/.pytopo
+Print list of known sites with pytopo -p
+
+Track files may contain track points and/or waypoints;
+multiple track files are allowed.
+</pre>
+
+<h2>Bugs/Wishlist</h2>
+<p>
+I'm working on a new OSMMapCollection format that uses tiles
+downloaded from OpenStreetMap.org (for instance, by TangoGPS);
+this code is included in PyTopo 0.8 but is not yet stable nor
+documented, so if you use it you'll certainly see some bugs.
+I didn't want to hold 0.8 just for that, so expect better OSM support
+in PyTopo 0.9.
+<p>
+Track logs (a new feature in 0.8) are also not fully working: they
+may be off by a bit, if the coordinate system ("datum") your GPS
+is using differs from the datum of your maps (which is likely,
+especially with Topo!) data. I'm working on fixing that properly --
+darnit, that may require yet another format change since
+MapCollections may need to specify that -- but the fix probably
+won't come until 0.9.
+
+<h2>Getting Map Data</h2>
+<p>
+PyTopo assumes that you already have maps locally, on disk or CD,
+in a supported image format,
+named according to the <i>Topo!</i> naming conventions.
+(PyTopo 0.5 adds support for other naming conventions as well.)
+<p>
+The <i>Topo!</i> local area and specific park map packages
+sold in camping/hiking stores
+(sometimes under the aegis of National Geographic) are
+reasonably priced as a source of map data.
+They come with Windows software, but Linux users can ignore
+the software and use the data files, which are
+standard GIF, named in a fairly straightforward way.
+They're a good source of US map data.
+<p>
+<b>Caution: the <i>Topo! Back Roads Explorer</i> and the statewide
+explorer collections are <i>not</i> in this friendly format.</b>
+They use large data files
+in a proprietary ".tpq" format.
+<a href="http://cholla.mmto.org/computers/topomaps/">Tom Trebisky
+has analyzed the format and has written an extractor</a>,
+and he also has <a href="http://cholla.mmto.org/gtopo/">a C GTK
+viewer</a> for this format. (Eventually I hope to integrate
+direct support for them into pytopo as well.)
+<p>
+Just to be clear: I am not distributing map data.
+
+<h3>Making Your Own Map Collections</h3>
+<p>
+You can buy map bits directly from the USGS, but they have
+a hefty setup fee so it's not cost effective unless you're buying
+quite a lot.
+<p>
+For some areas, you can download topo maps; for instance,
+for California you can get maps in TIFF format from the
+<a href="http://casil.ucdavis.edu/casil/gis.ca.gov/drg/">California
+Spatial Information Library</a>. You still have to split up the
+maps into maplets, though; if you have ImageMagick, you can use
+a command like
+<pre wrap>
+convert in-map.jpg -rotate 90 -crop 300x300 -repage +0+0 out-map%02d.jpg
+</pre>
+<p>
+Note: previously I included <i>-trim</i> as part of that line, and
+a lot of pages you'll find googling for image splitting will tell you
+to use -trim. Don't: it will give you maps of inconsistent sizes,
+and pytopo has no way to tell where the origin of the map should be.
+<p>
+A map split this way can be read with PyTopo 0.5 or later.
+Maps downloaded as PDF (such as USGS geologic maps) might work
+in imagemagick, but if not, try converting them
+to a raster format before splitting, using a program like GIMP
+or a command like
+<pre wrap>
+gs -sDEVICE=jpeg -r300 -sOutputFile=output-map.jpg input-map.pdf
+</pre>
+
+<h2>Non-interactive mapping scripts</h2>
+<p>
+I wrote some older commandline helper scripts, but honestly, I don't use them
+myself and don't vouch for them. I list them here merely on the chance
+that someone might find one of them a useful building block:
+<p>
+<ul>
+<li><a href="topomap">topomap</a>, which takes start and end coordinates
+and builds a custom map.  This is mostly replaced by the 's'
+functionality in pytopo, but might be useful if you need to display
+a map larger than you can display on your screen.
+<li><a href="onetopo">onetopo</a>, which takes start coordinates and
+combines the maplets into one complete USGS 7.5-minute map.
+</ul>
+
+<p>
+<h2>Is it Only For Linux?</h2>
+PyTopo should run fine on any system which has Python, gtk,
+gdk-pixbuf, and PyGTK. If it doesn't work, please let me know.
+
+<h2>Coming Soon</h2>
+<i>(Stuff I want that should be easy to implement or is already
+    in progress.)</i>
+<ul>
+<li>New Collection class for tiles downloaded from OpenStreetMap.
+<li>Downloading its own tiles from OSM to save locally.
+<li>Zoom farther out or in (i.e. scale the map images rather
+    than always displaying them at 1:1).
+<li>Drag scrolling, including diagonal scrolling, rather than
+    moving only with arrow keys by multiples of a whole maplet.
+</ul>
+
+<h2>Wishlist</h2>
+<i>(Stuff that would be nifty, but is either difficult,
+or requires additional map data that I'd have to pay for.
+If you want something on this list, bribing me with interesting
+map data would be an excellent approach.)</i>
+<ul>
+<li>Draw maps from non-tiled openstreetmap vector data.
+<li>Combine with elevation data to make pretty maps.
+    (The limiting factor here is getting some elevation data and
+    figuring out the format.)
+<li>Flip back and forth between two sets of maps.
+    (Limiting factor: getting other set of maps in digital format,
+    e.g.  geologic maps or road maps.)
+<li>Better control over projections and datum (PyTopo isn't smart
+    about those at all).
+</ul>
+
+<h2>Change Log</h2>
+<dl>
+<dt>0.8, June 20, 2009
+<dd>Support track/waypoint files;<br>
+    support worldwide coordinates by using negative longitudes when
+    west of the prime meridian;<br>
+    complete codebase refactor -- cleaner, more generalizable, more OO code;<br>
+    base class for implementing new tiled map collections;<br>
+    some associated MapCollection file format changes;<br>
+    accept config file in .config/pytopo as well as ~/.pytopo<br>;
+    introduce new (still buggy and undocumented) OSMMapCollection.
+<dt>0.7, September 10, 2008
+<dd>Add -c to find the center of a collection;<br>
+    fix a bug when latitude or longitude is less than 10&deg;.
+<dt>0.6, October 12, 2007
+<dd>Fix bad memory leak (will run much better on small-memory machines now).
+  <br>Integrate Tom Trebisky's Topo2 format.
+<dt>0.5, August 21, 2006
+<dd>Formal 0.5 release:
+  Fix a bug when specifying long/lat on the command line.
+<dt>0.5b2, June 2, 2006
+<dd>Fix "save as". Fix latitude reported when clicking.
+<dt>0.5b1, April 16, 2006
+<dd>Read more general map formats. Display to arbitrarily sized
+windows. Bug fixes. Code refactoring.
+<dt>0.4, April 17, 2005
+<dd>Calculate distance and bearing between clicks; assorted bug fixes.
+<dt>0.3, April 13, 2005
+<dd>Add 's' binding to save current map to a file (using
+    <i>montage</i> from ImageMagick).<br>
+    Better fix for expose handling.
+<dt>0.2, April 8, 2005
+    Temporary fix for spurious expose problem (excessive CPU usage).
+<dt>0.1, April 5, 2005
+<dd>Coordinate handling routines mostly working.
+    Store coordinates of center, not edge, so zoom works.
+</dl>
+
+<hr>
+<a href="../ellie/">Ellie: Plot GPS elevation profiles</a><br>
+<a href="../">More Software</a><br>
+<a href="/">Shallowsky Home</a><br>
+<a href="/mailme.html">mail me</a>
+
+</body>
+</html>
