@@ -1600,7 +1600,7 @@ class PyTopo :
         self.Collections = []
         self.KnownSites = []
         self.init_width = 800
-        self.init_height = 800
+        self.init_height = 600
 
     @staticmethod
     def Usage() :
