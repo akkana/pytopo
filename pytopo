@@ -18,8 +18,7 @@
 NEW FORMAT
 
 OSMMapCollection handles collections of tiles (maplets) downloaded
-from the openstreetmap project, e.g. by programs such as TangoGPS.
-Eventually PyTopo will be able to download its own tiles.
+from the openstreetmap project
 
 Finding zero-length files:
  find Maps/opencyclemap/13 -size 0
@@ -27,6 +26,7 @@ Finding zero-length files:
  #wget http://a.andy.sandbox.cloudmade.com/tiles/cycle/13/1429/3230.png
  wget http://b.tile.opencyclemap.org/cycle/13/1473/3236.png
 
+Downloading your own file collection (faster than doing it interactively):
 cd Maps/opencyclemap
   foreach level (*)
     cd Maps/opencyclemap/$level
@@ -46,7 +46,7 @@ TODO: allow configuration of colors, line thickness etc.
 
 """
 
-VersionString = "PyTopo Version 0.9dev by Akkana Peck"
+VersionString = "PyTopo Version 0.9 by Akkana Peck"
 
 import sys, os, math, gtk, gobject, gc
 HaveDOM = True
@@ -480,6 +480,10 @@ class OSMMapCollection(TiledMapCollection) :
         self.powzoom = 2.0 ** self.zoomlevel   # to avoid re-re-calculating
         self.download_url = _download_url
 
+        self.location = self.sub_tilde(self.location)
+
+        # Handle ~ format for location
+
         # If we're download-capable, we'd better have a directory
         # to download to, so make it if it's not there already:
         if self.download_url and not os.access(self.location, os.W_OK) :
@@ -487,6 +491,15 @@ class OSMMapCollection(TiledMapCollection) :
 
         # Call zoom so we set all scales appropriately:
         self.zoom(0)
+
+    @staticmethod
+    def sub_tilde(name) :
+        # config.get alas doesn't substitute $HOME or ~
+        if name[0:2] == "~/" :
+            name = os.path.join(os.environ['HOME'], name[2:])
+        elif name[0:6] == "$HOME/" :
+            name = os.path.join(os.environ['HOME'], name[6:])
+        return name
 
     # Utilities for mapping tiles to/from degrees.
     # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
@@ -1790,19 +1803,30 @@ class PyTopo :
 
     def exec_config_file(self) :
         """Load the user's .pytopo config file,
-        found either in $HOME/.config/pytopo/.pytopo or $HOME/pytopo.
+        found either in $HOME/.config/pytopo/ or $HOME/pytopo.
         """
-        userfile = os.path.join(os.environ["HOME"], ".config/pytopo/.pytopo")
+        home = os.environ["HOME"]
+        userfile = os.path.join(home, ".config", "pytopo", "pytopo.sites")
         if not os.access(userfile, os.R_OK) :
             if Debug :
                 print "Couldn't open", userfile
-            userfile = os.path.join(os.environ["HOME"], ".pytopo")
+            userfile = os.path.join(home, ".pytopo")
             if not os.access(userfile, os.R_OK) :
                 if Debug :
                     print "Couldn't open", userfile, "either"
-                return
-            elif Debug :
-                print "Found in HOME", userfile
+                userfile = os.path.join(home, ".config", "pytopo", ".pytopo")
+                if not os.access(userfile, os.R_OK) :
+                    if Debug :
+                        print "Couldn't open", userfile, "either"
+                    userfile = self.create_initial_config()
+                    if userfile == None :
+                        print "Couldn't create a new pytopo config file"
+                        return
+                else :
+                    print "Suggestion: rename", userfile, "to", pytopo.sites
+                    print userfile, "may eventually be deprecated"
+        if Debug :
+            print "Found", userfile
 
         # Now we'd better have a userfile
 
@@ -1822,6 +1846,48 @@ class PyTopo :
         self.KnownSites = locals['KnownSites']
         self.init_width = locals["init_width"]
         self.init_height = locals["init_height"]
+
+    def create_initial_config(self) :
+        home = os.environ["HOME"]
+        userfile = os.path.join(home, ".config", "pytopo", "pytopo.sites")
+        try :
+            fp = open(userfile, 'w')
+        except :
+            userfile = os.path.join(home, ".pytopo")
+            try :
+                fp = open(userfile, 'w')
+            except :
+                return None
+
+        # Now we have fp open. Write a very basic config to it.
+        print >>fp, """# Pytopo site file
+
+# Map collections
+
+Collections = [
+    OSMMapCollection( "openstreetmap", "~/Maps/openstreetmap",
+                      ".png", 256, 256, 10,
+                      "http://a.tile.openstreetmap.org" ),
+    ]
+
+KnownSites = [
+    # Some base values to get new users started.
+    # Note that these coordinates are a bit northwest of the city centers;
+    # they're the coordinates of the map top left, not center.
+    [ "san-francisco", -121.75, 37.4, "openstreetmap" ],
+    [ "new-york", -73.466, 40.392, "openstreetmap" ],
+    [ "london", 0.1, 51.266, "openstreetmap" ],
+    [ "sydney", 151.0, -33.5, "openstreetmap" ],
+    ]
+"""
+        fp.close()
+
+        print """Welcome to Pytopo!
+Created an initial site file in %s
+You can add new sites and collections there; see the instructions at
+   http://shallowsky.com/software/topo/
+""" % (userfile)
+        return userfile
 
     def main(self, pytopo_args) :
         """main execution routine for pytopo."""
@@ -1879,8 +1945,8 @@ def threaded_task(function, *args, **kwargs):
     return _task
 
 def download_job(url, localpath, callback):
+    global Debug
     def download(url, localpath, callback):
-        sys.stderr.write("[start_download: %s\n  to %s]" % (url, localpath))
         try :
             urllib.urlretrieve(url, localpath)
             return localpath
@@ -1888,7 +1954,8 @@ def download_job(url, localpath, callback):
             return None
 
     path = yield threaded_task(download, url, localpath, callback)
-    sys.stderr.write("[wrote %s]" % (localpath))
+    if Debug :
+        print >>sys.stderr, "[downloaded %s]" % (localpath)
     callback(path)
 
 # Conditional main:
