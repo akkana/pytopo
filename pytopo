@@ -487,7 +487,7 @@ class OSMMapCollection(TiledMapCollection) :
         # If we're download-capable, we'd better have a directory
         # to download to, so make it if it's not there already:
         if self.download_url and not os.access(self.location, os.W_OK) :
-            os.mkdir(self.location)
+            os.makedirs(self.location)
 
         # Call zoom so we set all scales appropriately:
         self.zoom(0)
@@ -1848,11 +1848,20 @@ class PyTopo :
         self.init_height = locals["init_height"]
 
     def create_initial_config(self) :
+        """Make an initial configuration file.
+           If the user has a ~/.config, make ~/.config/pytopo/pytopo.sites
+           else fall back on ~/.pytopo.
+        """
         home = os.environ["HOME"]
-        userfile = os.path.join(home, ".config", "pytopo", "pytopo.sites")
+        confdir = os.path.join(home, ".config", "pytopo")
         try :
+            if not os.access(confdir, os.W_OK) :
+                os.mkdir(confdir)
+            userfile = os.path.join(confdir, "pytopo.sites")
             fp = open(userfile, 'w')
         except :
+            fp = None
+        if not fp :
             userfile = os.path.join(home, ".pytopo")
             try :
                 fp = open(userfile, 'w')
