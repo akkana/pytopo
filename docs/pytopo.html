@@ -33,27 +33,34 @@ program called TangoGPS that can download and show OSM maps, but it has a
 difficult interface that's optimized for cellphones.)
 
 <p>
-<b>Download: The current version is <a href="pytopo-0.8">PyTopo 0.8</a>.</b>
+<b>Download: The current version is <a href="pytopo-0.9">PyTopo 0.9</a>.</b>
 
 <p>
-0.8 had lots of changes -- including changes, I'm sorry to say,
-to the configuration file where you define your collections.
-I wrote up some <a href="releasenotes-0.8">Release notes for 0.8</a>
-and have updated the <a href="fileformat.html">Pytopo file formats</a>
-page to reflect the new syntax.
+The big news in 0.9 is the new OSM Map Collection, which can download map
+tiles from the <a href="http://openstreetmap.org">OpenStreetMap project</a>.
+(Aside: this is a great project, so if you're interested in mapping, join
+up and help add to the public map!) You no longer need your own big set
+of map data; just set up an OSM Map Collection with appropriate download
+URL, point at a longitude/latitude and specify the zoom level, and pytopo
+will download the tiles you need. These are cached forever (unless you delete
+them yourself), so once you've downloaded an area you're good to go offline
+and your maps will still work.
 
 <p>
-Or get the current SVN version:
+If you feel experimental, you can get the current SVN version:
 <b><a href="http://code.google.com/p/pytopo/">PyTopo is hosted
 on Google Code</a></b>.
 
 <h2>Using PyTopo</h2>
 <p>
-<b>Begin</b> by creating a file named <i>.pytopo</i> in your home directory,
-in which you define a list of named coordinates, and specify some other
-parameters such as location of the map data and preferred window size.
-Read the comments at the beginning of the <i>pytopo</i> script for
-samples of the .pytopo file.
+The first time you run pytopo, it will create a configuration file,
+typically <i>~/.config/pytopo/pytopo.sites</i> (if it can't create that
+it will fall back to <i>~/.pytopo</i> instead).
+<p>
+You might want to take a look at the file: this is where you can add
+additional map collections or sites you visit frequently.
+See the <a href="fileformats.html">PyTopo File Formats</a> page
+for more details.
 
 <h3>Key bindings</h3>
 <table>
@@ -77,42 +84,40 @@ samples of the .pytopo file.
 clicked, as well as the distance and bearing from the last clicked
 point.
 
+<p>
+<b>Note that dragging in the map doesn't move the map.</b>
+You need to use arrow keys to move around.
+I do plan to implement dragging at some point, and I don't think
+it's that hard; I've just been more concerned about getting the OSM
+collections working first.
+
 <h3>Usage (commandline arguments)</h3>
 <pre>
-Usage: pytopo [-t trackfile] site_name
-       pytopo [-t trackfile] start_lat start_long collection
+Usage: pytopo [trackfile...] site_name
+       pytopo [trackfile...] start_lat start_long collection
        pytopo -p
 Use degrees.decimal_minutes format for coordinates.
 Set up site names in ~/.pytopo
 Print list of known sites with pytopo -p
 
-Track files may contain track points and/or waypoints;
+Track files are GPX files which may contain track points and/or waypoints;
 multiple track files are allowed.
 </pre>
 
 <h2>Bugs/Wishlist</h2>
 <p>
-I'm working on a new OSMMapCollection format that uses tiles
-downloaded from OpenStreetMap.org (for instance, by TangoGPS);
-this code is included in PyTopo 0.8 but is not yet stable nor
-documented, so if you use it you'll certainly see some bugs.
-I didn't want to hold 0.8 just for that, so expect better OSM support
-in PyTopo 0.9.
+Dragging in the map should move the map, since most people expect
+maps to work that way now.
 <p>
-Track logs (a new feature in 0.8) are also not fully working: they
-may be off by a bit, if the coordinate system ("datum") your GPS
-is using differs from the datum of your maps (which is likely,
-especially with Topo!) data. I'm working on fixing that properly --
-darnit, that may require yet another format change since
-MapCollections may need to specify that -- but the fix probably
-won't come until 0.9.
+Track logs don't always line up exactly with Topo! map collections;
+I think the Topo! maps may use a different "datum" (coordinate system)
+from the WGS 84 that most GPS devices use. They should line up with
+OSM map collections.
 
-<h2>Getting Map Data</h2>
+<h2>Preloaded Map Data</h2>
 <p>
-PyTopo assumes that you already have maps locally, on disk or CD,
-in a supported image format,
-named according to the <i>Topo!</i> naming conventions.
-(PyTopo 0.5 adds support for other naming conventions as well.)
+Aside from OpenStreetMap data, pytopo can use local map data
+on disk or CD.
 <p>
 The <i>Topo!</i> local area and specific park map packages
 sold in camping/hiking stores
@@ -132,8 +137,6 @@ has analyzed the format and has written an extractor</a>,
 and he also has <a href="http://cholla.mmto.org/gtopo/">a C GTK
 viewer</a> for this format. (Eventually I hope to integrate
 direct support for them into pytopo as well.)
-<p>
-Just to be clear: I am not distributing map data.
 
 <h3>Making Your Own Map Collections</h3>
 <p>
@@ -183,18 +186,18 @@ combines the maplets into one complete USGS 7.5-minute map.
 <p>
 <h2>Is it Only For Linux?</h2>
 PyTopo should run fine on any system which has Python, gtk,
-gdk-pixbuf, and PyGTK. If it doesn't work, please let me know.
+gdk-pixbuf, and PyGTK. I've tried to make the code as portable as
+I can, but I've only tested it on Linux.
+If it doesn't work for you, please let me know.
 
 <h2>Coming Soon</h2>
 <i>(Stuff I want that should be easy to implement or is already
     in progress.)</i>
 <ul>
-<li>New Collection class for tiles downloaded from OpenStreetMap.
-<li>Downloading its own tiles from OSM to save locally.
-<li>Zoom farther out or in (i.e. scale the map images rather
-    than always displaying them at 1:1).
 <li>Drag scrolling, including diagonal scrolling, rather than
     moving only with arrow keys by multiples of a whole maplet.
+<li>Zoom farther out or in (i.e. scale the map images rather
+    than always displaying them at 1:1).
 </ul>
 
 <h2>Wishlist</h2>
@@ -205,17 +208,29 @@ map data would be an excellent approach.)</i>
 <ul>
 <li>Draw maps from non-tiled openstreetmap vector data.
 <li>Combine with elevation data to make pretty maps.
-    (The limiting factor here is getting some elevation data and
-    figuring out the format.)
-<li>Flip back and forth between two sets of maps.
-    (Limiting factor: getting other set of maps in digital format,
-    e.g.  geologic maps or road maps.)
-<li>Better control over projections and datum (PyTopo isn't smart
-    about those at all).
+    (The limiting factor here is finding an open source of elevation data
+    that pytopo can read easily.)
+<li>Flip back and forth between two sets of maps of the same area,
+    e.g. road map/topographic map/geologic map.
+    (Limiting factor: getting enough useful map data, preferably geologic,
+    to make it worth putting in the work.)
+<li>Better control over projections and datum -- PyTopo isn't smart
+    about those at all.
 </ul>
 
 <h2>Change Log</h2>
 <dl>
+
+<dt>0.9, October 30, 2010
+<dd>
+New format! OSMMapCollection handles OpenStreetMap tiles, including
+(optionally) downloading them for you.<br>
+Figure out trackpoint files from context -- no need to use -t any more.
+So now you can run pytopo *.gpx site<br>
+If there's no config file initially, create a default one using tiles
+from the default OSM website and a few major cities.<br>
+More flexible handling of initial window width.
+
 <dt>0.8, June 20, 2009
 <dd>Support track/waypoint files;<br>
     support worldwide coordinates by using negative longitudes when

@@ -21,11 +21,14 @@ It parses track log files, in gpx format, and gives you a graph
 and a few statistics.
 <p>
 It uses pylab for plotting, which uses matplotlib; you'll need
-the python-matplotlib package installed (or its equivalent).
+the python-matplotlib package installed (or its equivalent)
+to see the graphs. New in 0.3: ellie can print stats on total
+climb, distance traveled, moving time and stopped time even if
+pylab isn't installed.
 
 <h2>Download</h2>
 <p>
-Get it here: <a href="ellie-0.2">ellie v. 0.2</a>.
+Get it here: <a href="ellie-0.3">ellie v. 0.3</a>.
 
 <h2>Usage</h2>
 <p>
@@ -43,12 +46,17 @@ much need to do more?)
 <h2>Changelog</h2>
 <dl>
 
-<dt> 0.1:
-<dd>First release.
+<dt>10/30/2010, 0.3:
+<dd>
+Give an estimate for total distance traveled, moving time and stopped time;
+if pylab isn't installed so we can't plot, print the stats anyway.
 
 <dt>3/18/2009, 0.2:
 <dd>Fixed meters/feet confusion. Smarter total climb code: don't
 count little blips like taking the GPS out of its case to read it.
+
+<dt> 0.1:
+<dd>First release.
 
 </dl>
 
