@@ -28,6 +28,9 @@ You must have at least one collection in order to use pytopo
 Define your collections like this:
 <pre>
 Collections = [
+    OSMMapCollection( "openstreetmap", "~/Maps/openstreetmap",
+                      ".png", 256, 256, 10,
+                      "http://a.tile.openstreetmap.org" ),
     Topo1MapCollection( "deathvalley", "/home/yourname/Maps/dvl_data",
                         7.5, 266, 328 ),
     Topo2MapCollection( "kingscyn", "/home/yourname/Maps/kingscyn", "topo",
@@ -38,17 +41,27 @@ Collections = [
                           2, True, False )
 ]
 </pre>
-This defines three collections. The first one is called "deathvalley",
+
+<p>
+This defines four collections. The first is the default OpenStreetMap
+file set. If you specify a URL, as in this example, pytopo will download
+any tiles it needs. If you already have tiles and want to work offline,
+you can disable downloading by making this URL blank.
+OpenStreetMap has several different tile sets, so you can
+change the URL to use a different one if you prefer.
+
+<p>
+The second one is called "deathvalley",
 stored in the directory named <i>/home/yourname/Maps/dvl_data</i>,
 and uses the format <i>Topo1MapCollection</i> -- the simple format used
 in Topo! regional CD sets. The filenames already have latitude
 and longitude encoded into them, but you do need to specify the size.
 <p>
-The second collection is a different sort of Topo! format, one
+The third collection is a different sort of Topo! format, one
 with filenames beginning with "topo" and much wider and shorter jpeg
 images.
 <p>
-The third collection, called "pa-geo" and stored
+The last collection, called "pa-geo" and stored
 in <i>/home/yourname/Maps/pa-geo</i>, is more complicated.
 <i>GenericMapCollection</i> is a much more general format
 suitable for map collections you create yourself.
@@ -117,16 +130,24 @@ Example:
 <p>
 You can customize pytopo by changing the values of these variables:
 
+<p>
+If you don't like the default window size, you can specify a different one:
+<pre>
+init_width = 1200
+init_height = 800
+</pre>
+
+<p>
+It's possible to tell pytopo to save the map you're currently viewing,
+for instance, so you could edit it or print it out. But this code
+doesn't get tested much and may be broken. 
+If it does work, you can control where it saves:
 <pre>
 # Where to save generated maps. The default is fine for most people.
 MapSaveDir = os.environ["HOME"] + "/Topo/"
 <b>Note:</b> Saving maps may be buggy. I haven't tested it in
 quite a long time.
 </pre>
-
-<p>
-Adding more customizable variables to this file is another feature
-coming in version 0.9.
 
 <hr>
 <a href="index.html">PyTopo</a><br>
