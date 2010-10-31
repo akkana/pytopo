@@ -63,6 +63,11 @@ By default, pytopo will download OpenStreetMap tiles to ~/Maps.
 Of course, you can change that.
 See the <a href="fileformats.html">PyTopo File Formats</a> page
 for more details.
+<p>
+<code>pytopo -p</code> will print out a list of known sites. 
+With the initial default configuration you'll just have a few cities like 
+san-francisco, new-york, london, sydney;
+this is mostly to show you how to add your own points of interest.
 
 <h3>Key bindings</h3>
 <table>
@@ -106,15 +111,22 @@ Track files are GPX files which may contain track points and/or waypoints;
 multiple track files are allowed.
 </pre>
 
-<h2>Bugs/Wishlist</h2>
-<p>
-Dragging in the map should move the map, since most people expect
-maps to work that way now.
-<p>
-Track logs don't always line up exactly with Topo! map collections;
-I think the Topo! maps may use a different "datum" (coordinate system)
-from the WGS 84 that most GPS devices use. They should line up with
-OSM map collections.
+<h2>Screenshots</h2>
+(Click to see larger image)
+<table>
+<tr>
+<td>
+<a href="screenshots/castlepks-ss.jpg">
+<img align=left src="screenshots/castlepks-ssT.jpg" width=259 height=204
+ border=0 alt="[Castle Peaks/OpenCycleMap screenshot]"></a>
+<td>
+<a href="screenshots/lexington-ss.jpg">
+<img align=left src="screenshots/lexington-ssT.jpg" width=259 height=190
+ border=0 alt="[Trails above Lexington reservoir/USGS screenshot]"></a>
+<tr>
+<td>Castle Peaks in Mojave National Preserve, using OpenCycleMap data
+<td>Trails above Lexington reservoir near Los Gatos, using USGS/Topo! dara
+</table>
 
 <h2>Preloaded Map Data</h2>
 <p>
@@ -196,18 +208,22 @@ If it doesn't work for you, please let me know.
 <i>(Stuff I want that should be easy to implement or is already
     in progress.)</i>
 <ul>
-<li>Drag scrolling, including diagonal scrolling, rather than
-    moving only with arrow keys by multiples of a whole maplet.
+<li>Navigating by dragging with the mouse, like people expect these days,
+    rather than moving only with arrow keys by multiples of a whole maplet.
 <li>Zoom farther out or in (i.e. scale the map images rather
     than always displaying them at 1:1).
 </ul>
 
-<h2>Wishlist</h2>
+<h2>Bugs / Wishlist</h2>
 <i>(Stuff that would be nifty, but is either difficult,
 or requires additional map data that I'd have to pay for.
 If you want something on this list, bribing me with interesting
 map data would be an excellent approach.)</i>
 <ul>
+<li>Track logs don't always line up exactly with Topo! map collections;
+    I think the Topo! maps may use a different "datum" (coordinate system)
+    from the WGS 84 that most GPS devices use. They should line up with
+    OSM map collections.
 <li>Draw maps from non-tiled openstreetmap vector data.
 <li>Combine with elevation data to make pretty maps.
     (The limiting factor here is finding an open source of elevation data
