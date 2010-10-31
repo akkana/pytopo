@@ -189,6 +189,20 @@ map coordinates and need a starting place. Should probably remove it.
     def zoom(self, amount, latitude=45) :
         return
 
+    # Does the collection have its map files in place?
+    def exists(self) :
+        self.location = self.sub_tilde(self.location)
+        return os.access(self.location, os.X_OK)
+
+    @staticmethod
+    def sub_tilde(name) :
+        # config.get alas doesn't substitute $HOME or ~
+        if name[0:2] == "~/" :
+            name = os.path.join(os.environ['HOME'], name[2:])
+        elif name[0:6] == "$HOME/" :
+            name = os.path.join(os.environ['HOME'], name[6:])
+        return name
+
 class TiledMapCollection(MapCollection) :
 
     """Code common to map collections that have raster tiles of a fixed size.
@@ -492,15 +506,6 @@ class OSMMapCollection(TiledMapCollection) :
 
         # Call zoom so we set all scales appropriately:
         self.zoom(0)
-
-    @staticmethod
-    def sub_tilde(name) :
-        # config.get alas doesn't substitute $HOME or ~
-        if name[0:2] == "~/" :
-            name = os.path.join(os.environ['HOME'], name[2:])
-        elif name[0:6] == "$HOME/" :
-            name = os.path.join(os.environ['HOME'], name[6:])
-        return name
 
     # Utilities for mapping tiles to/from degrees.
     # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
@@ -1647,7 +1652,7 @@ class PyTopo :
         collection = None
         for coll in self.Collections :
             if collname == coll.name :
-                if not os.access(coll.location, os.X_OK) :
+                if not coll.exists() :
                     PyTopo.ErrorOut("Can't access location " + coll.location +
                                     " for collection " + collname)
                 collection = coll
