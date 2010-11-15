@@ -222,12 +222,12 @@ TiledMapCollection classes must implement
         self.download_func = None
         self.download_failures = 0
 
-    def draw_map(self, center_lon, center_lat, drawable) :
-        """Draw maplets at the specified coordinates, to fill the drawable."""
+    def draw_map(self, center_lon, center_lat, mapwin) :
+        """Draw maplets at the specified coordinates, to fill the mapwin."""
         global Debug
 
         # Get the current window size:
-        win_width, win_height = drawable.get_size()
+        win_width, win_height = mapwin.get_size()
         if (Debug) :
             print "Window is", win_width, "x", win_height
 
@@ -318,10 +318,10 @@ TiledMapCollection classes must implement
                 if type(pixbuf) == types.TupleType :
                     self.download_tiles.insert(0, (pixbuf[0], pixbuf[1],
                                                    x, y, x_off, y_off,
-                                                   drawable))
+                                                   mapwin))
                     pixbuf = None
 
-                w, h = self.draw_one_tile(pixbuf, drawable, x, y, x_off, y_off)
+                w, h = self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
                 # You may ask, why not just do this subtraction before
                 # draw_pixbuf so we don't have to subtract w and h twice?
                 # Alas, we may not have the real w and h until we've done
@@ -352,7 +352,8 @@ TiledMapCollection classes must implement
         if len(self.download_tiles) > 0 and self.download_func == None :
             gobject.timeout_add(300, self.download_more)
 
-    def draw_one_tile(self, pixbuf, drawable, x, y, x_off, y_off) :
+    def draw_one_tile(self, pixbuf, mapwin, x, y, x_off, y_off) :
+        """Draw a single tile, perhaps after downloading it."""
         if pixbuf != None :
             w = pixbuf.get_width() - x_off
             h = pixbuf.get_height() - y_off
@@ -366,9 +367,9 @@ TiledMapCollection classes must implement
             # transparent areas. Don't do that.
             if (pixbuf.get_width() < self.img_width or
                 pixbuf.get_height() < self.img_height) :
-                drawable.set_bg_color()
-                drawable.draw_rectangle(1, x, y,
-                                        self.img_width, self.img_height)
+                mapwin.set_bg_color()
+                mapwin.draw_rectangle(1, x, y,
+                                      self.img_width, self.img_height)
                 if (Debug) :
                     print "Filling in background:", x, y,
                     print self.img_width, self.img_height
@@ -380,7 +381,7 @@ TiledMapCollection classes must implement
             #     print "at", x, y, "offset", x_off, y_off,
             #     print "size", w, h
 
-            drawable.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
+            mapwin.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
 
             # Make sure the pixbuf goes out of scope properly:
             pixbuf = 0
@@ -388,17 +389,17 @@ TiledMapCollection classes must implement
             # if (Debug) :
             #     print "No maplet for", curlon, curlat,
             #     print "at", x, y, "offset", x_off, y_off
-            drawable.set_bg_color()
+            mapwin.set_bg_color()
             w = self.img_width - x_off
             h = self.img_height - y_off
-            drawable.draw_rectangle(1, x, y, w, h)
+            mapwin.draw_rectangle(1, x, y, w, h)
 
         # Useful when testing:
         if (Debug) :
-            drawable.set_grid_color()
-            drawable.draw_rectangle(0, x, y, w, h)
-            drawable.draw_line(x, y, x+w, y+h)
-            drawable.set_bg_color()
+            mapwin.set_grid_color()
+            mapwin.draw_rectangle(0, x, y, w, h)
+            mapwin.draw_line(x, y, x+w, y+h)
+            mapwin.set_bg_color()
         return w, h
 
     def download_finished(self, path) :
@@ -426,9 +427,12 @@ TiledMapCollection classes must implement
         self.download_failures += 1
 
         # Draw it on the map:
-        url, path, x, y, x_off, y_off, drawable = self.download_tiles.pop()
+        url, path, x, y, x_off, y_off, mapwin = self.download_tiles.pop()
         pixbuf = gtk.gdk.pixbuf_new_from_file(path)
-        self.draw_one_tile(pixbuf, drawable, x, y, x_off, y_off)
+        self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
+
+        # Redraw any trackpoints, since they might have been overwritten:
+        mapwin.draw_trackpoints()
 
         # It's okay to start a new download now:
         self.download_func = None
@@ -456,7 +460,7 @@ TiledMapCollection classes must implement
             self.download_func = None
             return False
 
-        url, path, x, y, x_off, y_off, drawable = self.download_tiles[-1]
+        url, path, x, y, x_off, y_off, mapwin = self.download_tiles[-1]
         # Don't actually pop() it until it has downloaded.
         #urllib.urlretrieve(url, path)
         self.download_func = start_job(download_job(url, path,
@@ -1307,7 +1311,7 @@ that are expected by the MapCollection classes:
     # Draw maplets to fill the window, centered at center_lon, center_lat
     #
     def draw_map(self) :
-        """Redraw the map."""
+        """Redraw the map, centered at center_lon, center_lat."""
         global Debug
 
         if self.Collection == None :
@@ -1322,6 +1326,9 @@ that are expected by the MapCollection classes:
             print MapUtils.DecDegToDegMinStr(self.center_lat)
         self.Collection.draw_map(self.center_lon, self.center_lat, self)
 
+        self.draw_trackpoints()
+
+    def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
         if self.trackpoints != None :   # may be trackpoints or waypoints
             win_width, win_height = self.drawing_area.window.get_size()
@@ -1608,6 +1615,7 @@ class PyTopo :
         self.KnownSites = []
         self.init_width = 800
         self.init_height = 600
+        self.default_collection = None
 
     @staticmethod
     def Usage() :
@@ -1770,6 +1778,9 @@ class PyTopo :
             PyTopo.Usage()
 
         # Now we've parsed all the arguments.
+        # If we didn't get a collection, use the default, if any:
+        if not mapwin.Collection and self.default_collection :
+            mapwin.Collection = self.FindCollection(self.default_collection)
 
         # If we have a collection and a track but no center point,
         # center it on the trackpoints:
@@ -1852,6 +1863,7 @@ class PyTopo :
         self.KnownSites = locals['KnownSites']
         self.init_width = locals["init_width"]
         self.init_height = locals["init_height"]
+        self.default_collection = locals["defaultCollection"]
 
     def create_initial_config(self) :
         """Make an initial configuration file.
