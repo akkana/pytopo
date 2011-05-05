@@ -1669,6 +1669,83 @@ class PyTopo :
                 return collection
         return collection
 
+    def MenuWindow(self, mapwin) :
+        dialog = gtk.Dialog("Choose a starting point", None, 0,
+                            (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
+                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+        dialog.connect('destroy', lambda win: gtk.main_quit())
+
+        sw = gtk.ScrolledWindow()
+        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+
+        # List store will hold name, collection-name and site object
+        store = gtk.ListStore(str, str, object)
+
+        # Create the list
+        for site in self.KnownSites :
+            print "Adding", site[0], site[3], site
+            store.append([site[0], site[3], site])
+
+        # http://pygtk.org/pygtk2tutorial/ch-TreeViewWidget.html
+        # Make a treeview from the list:
+        treeView = gtk.TreeView(store)
+
+        renderer = gtk.CellRendererText()
+        column = gtk.TreeViewColumn("Location", renderer, text=0)
+        column.pack_start(renderer, True)
+        #column.set_resizable(True)
+        treeView.append_column(column)
+        renderer = gtk.CellRendererText()
+        column = gtk.TreeViewColumn("Collection", renderer, text=1)
+        column.pack_start(renderer, False)
+        treeView.append_column(column)
+
+        #store.set_sort_column_id(0, gtk.SORT_ASCENDING)
+
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw.add(treeView)
+        sw.set_size_request(400, 300)
+
+        dialog.vbox.pack_start(sw, expand=False)
+
+        dialog.show_all()
+    
+        response = dialog.run()
+        if response == gtk.RESPONSE_OK:
+            selection = treeView.get_selection()
+            model, iter = selection.get_selected()
+            if iter :
+                #locname = store.get_value(iter, 0)
+                #collname = store.get_value(iter, 1)
+                site = store.get_value(iter, 2)
+                self.UseSite(site, mapwin)
+                dialog.hide()
+                return
+        PyTopo.Usage()
+
+    def ChooseLocation(self, combobox) :
+        model = combobox.get_model()
+        index = combobox.get_active()
+        print "Chose", model[index][0]
+
+    def UseSite(self, site, mapwin) :
+        collection = self.FindCollection(site[3])
+        if not collection :
+            return False
+        mapwin.Collection = collection
+
+        # site[1] and site[2] are the long and lat in deg.minutes
+        #print site[0], site[1], site[2]
+        mapwin.center_lon = MapUtils.DegMinToDecDeg(site[1])
+        mapwin.center_lat = MapUtils.DegMinToDecDeg(site[2])
+        #print "Center in decimal degrees:", centerLon, centerLat
+        if (Debug) :
+            print site[0] + ":", \
+                MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
+                MapUtils.DecDegToDegMinStr(mapwin.center_lat)
+        return True
+
     def ParseArgs(self, mapwin, args) :
         """Parse runtime arguments."""
         global VersionString
@@ -1679,6 +1756,7 @@ class PyTopo :
 
         arg0 = args[0]
         args = args[1:]
+
         while len(args) > 0 :
             if args[0][0] == '-' and not args[0][1].isdigit() :
                 if args[0] == "-v" or args[0] == "--version" :
@@ -1735,20 +1813,8 @@ class PyTopo :
             # Try to match a known site:
             for site in self.KnownSites :
                 if args[0] == site[0] :
-                    collection = self.FindCollection(site[3])
-                    if not collection :
+                    if not self.UseSite(site, mapwin) :
                         continue
-                    mapwin.Collection = collection
-    
-                    # site[1] and site[2] are the long and lat in deg.minutes
-                    #print site[0], site[1], site[2]
-                    mapwin.center_lon = MapUtils.DegMinToDecDeg(site[1])
-                    mapwin.center_lat = MapUtils.DegMinToDecDeg(site[2])
-                    #print "Center in decimal degrees:", centerLon, centerLat
-                    if (Debug) :
-                        print site[0] + ":", \
-                            MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
-                            MapUtils.DecDegToDegMinStr(mapwin.center_lat)
                     break
     
             if mapwin.Collection and mapwin.center_lon and mapwin.center_lat :
@@ -1799,7 +1865,8 @@ class PyTopo :
             return
 
         # Didn't match any known run mode:
-        PyTopo.Usage()
+        # start in GUI mode choosing a location:
+        self.MenuWindow(mapwin)
 
 # Check for a user config file named .pytopo
 # in either $HOME/.config/pytopo or $HOME.
@@ -1896,6 +1963,8 @@ Collections = [
                       ".png", 256, 256, 10,
                       "http://a.tile.openstreetmap.org" ),
     ]
+
+defaultCollection = "openstreetmap"
 
 KnownSites = [
     # Some base values to get new users started.
