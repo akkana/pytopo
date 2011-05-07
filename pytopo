@@ -4,7 +4,7 @@
 # to generate a map at the specified coordinates.
 # Home page: http://shallowsky.com/software/topo/
 
-# Copyright 2005 - 2009 by Akkana Peck, akkana@shallowsky.com
+# Copyright 2005 - 2011 by Akkana Peck, akkana@shallowsky.com
 # Please feel free to use, distribute or modify this program
 # under the terms of the GPL v2 or, at your option, a later GPL version.
 # I'd appreciate hearing about it if you make any changes.
@@ -13,6 +13,10 @@
 # but take inputs in deg.decimal_minutes.
 
 """
+1.0 Release notes:
+
+PyTopo now supports dragging the map! Wahoo!
+
 0.9 Release notes:
 
 NEW FORMAT
@@ -46,7 +50,7 @@ TODO: allow configuration of colors, line thickness etc.
 
 """
 
-VersionString = "PyTopo Version 0.9 by Akkana Peck"
+VersionString = "PyTopo Version 1.0 by Akkana Peck"
 
 import sys, os, math, gtk, gobject, gc
 HaveDOM = True
