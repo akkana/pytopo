@@ -1260,6 +1260,7 @@ that are expected by the MapCollection classes:
 
         self.click_last_long = 0
         self.click_last_lat = 0
+        self.is_dragging = False
 
         self.bg_color = gtk.gdk.color_parse("black")
         self.track_color = gtk.gdk.color_parse("magenta")
@@ -1286,11 +1287,14 @@ that are expected by the MapCollection classes:
         self.drawing_area.show()
 
         self.drawing_area.set_events(gtk.gdk.EXPOSURE_MASK |
+                                     gtk.gdk.POINTER_MOTION_MASK |
+                                     gtk.gdk.POINTER_MOTION_HINT_MASK |
                                      gtk.gdk.BUTTON_PRESS_MASK |
                                      gtk.gdk.BUTTON_RELEASE_MASK )
 
         self.drawing_area.connect("expose-event", self.expose_event)
         self.drawing_area.connect("button-release-event", self.button_event)
+        self.drawing_area.connect("motion_notify_event", self.drag_event)
 
         # The default focus in/out handlers on drawing area cause
         # spurious expose events.  Trap the focus events, to block that:
@@ -1479,15 +1483,6 @@ that are expected by the MapCollection classes:
         """Callback when the user types q."""
         self.GracefulExit()
 
-#     def key_scroll(self, accelgroup, win, key, accel) :
-#         #print args
-#         #print gtk.keysyms.h
-#         if key == gtk.keysyms.h :
-#             print "It was an h"
-#         else :
-#             print "key_scroll, not an h"
-#         return True
-
     def key_press_event(self, widget, event) :
         """Handle any key press."""
         if event.string == "q" :
@@ -1529,13 +1524,46 @@ that are expected by the MapCollection classes:
                 self.center_lat + \
                     float(win_height/2 - y) / self.Collection.yscale)
 
+    def drag_event(self, widget, event) :
+        """Move the map as the user drags."""
+        # The GTK documentation @ 24.2.1
+        # http://www.pygtk.org/pygtk2tutorial/sec-EventHandling.html
+        # says the first event is a real motion event and subsequent
+        # ones are hints; but in practice, nothing but hints are
+        # ever sent.
+        if event.is_hint:
+            x, y, state = event.window.get_pointer()
+        else:
+            x = event.x
+            y = event.y
+            state = event.state
+        if not state & gtk.gdk.BUTTON1_MASK :
+            return
+        if not self.is_dragging :
+            self.x_start_drag = x
+            self.y_start_drag = y
+            self.is_dragging = True
+        self.move_to(x, y)
+        return True
+
+    def move_to(self, x, y) :
+        dx = x - self.x_start_drag
+        dy = y - self.y_start_drag
+        self.center_lon -= dx / self.Collection.xscale
+        self.center_lat += dy / self.Collection.yscale
+        self.draw_map()
+        # Reset the drag coordinates now that we're there
+        self.x_start_drag = x
+        self.y_start_drag = y
+
     def button_event(self, widget, event) :
-        """Handle button pushes."""
-        #if (event.state == 0) :
-        #    if (event.button != 1) :
-        #        return
-        #    #print "Button 1 release"
-        #    return
+        """Handle button releases (not presses, we're not catching those."""
+
+        if self.is_dragging:
+            self.is_dragging = False
+            x, y, state = event.window.get_pointer()
+            self.move_to(x, y)
+            return True
 
         if event.button == 1 :
             global Debug
@@ -1557,6 +1585,7 @@ that are expected by the MapCollection classes:
             # enough to ignore.)
             # So use the current image aspect ratio to convert from angles
             # to pixels, then we'll convert from there to miles/km.
+            # XXX This is probably still fairly inaccurate, check!
             if self.click_last_long != 0 and self.click_last_lat != 0 :
                 xdiff = (cur_long - self.click_last_long)
                 ydiff = (cur_lat - self.click_last_lat)
@@ -1579,18 +1608,6 @@ that are expected by the MapCollection classes:
 
         return True
 
-#     def motion_notify_event(widget, event) :
-#         global xfrac
-#         if event.is_hint:
-#             x, y, state = event.window.get_pointer()
-#         else:
-#             x = event.x; y = event.y
-#             state = event.state
-#         if state & gtk.gdk.BUTTON1_MASK and pixmap != None:
-#             xfrac = event.x / w
-#         return True
-
-    #def null_event(widget, event) :
     def nop(*args) :
         "Do nothing."
         return True
@@ -1684,7 +1701,6 @@ class PyTopo :
 
         # Create the list
         for site in self.KnownSites :
-            print "Adding", site[0], site[3], site
             store.append([site[0], site[3], site])
 
         # http://pygtk.org/pygtk2tutorial/ch-TreeViewWidget.html
@@ -1693,12 +1709,12 @@ class PyTopo :
 
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Location", renderer, text=0)
-        column.pack_start(renderer, True)
+        #column.pack_start(renderer, True)
         #column.set_resizable(True)
         treeView.append_column(column)
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Collection", renderer, text=1)
-        column.pack_start(renderer, False)
+        #column.pack_start(renderer, False)
         treeView.append_column(column)
 
         #store.set_sort_column_id(0, gtk.SORT_ASCENDING)
