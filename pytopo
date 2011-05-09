@@ -1297,6 +1297,7 @@ that are expected by the MapCollection classes:
                                      gtk.gdk.BUTTON_RELEASE_MASK )
 
         self.drawing_area.connect("expose-event", self.expose_event)
+        self.drawing_area.connect("button-press-event", self.doubleclick_event)
         self.drawing_area.connect("button-release-event", self.button_event)
         self.drawing_area.connect("motion_notify_event", self.drag_event)
 
@@ -1335,6 +1336,8 @@ that are expected by the MapCollection classes:
         self.Collection.draw_map(self.center_lon, self.center_lat, self)
 
         self.draw_trackpoints()
+
+        self.draw_zoom_control()
 
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
@@ -1378,6 +1381,53 @@ that are expected by the MapCollection classes:
                     if x >= 0 and x < win_width and y >= 0 and y < win_height :
                         self.draw_string(x, y, pt[2])
                         self.draw_rectangle(True, x-3, y-3, 6, 6)
+
+    def draw_zoom_control(self) :
+        """Draw some zoom controls in case we're running on a tablet
+           and have no keyboard to zoom or move around
+        """
+        win_width, win_height = self.drawing_area.window.get_size()
+        self.zoomBtnSize = int(win_width / 25)
+        self.zoom_X1 = 8
+        self.zoom_in_Y1 = 10
+        self.zoom_out_Y1 = self.zoom_in_Y1 + self.zoomBtnSize * 2
+        textoffset = self.zoomBtnSize / 5
+
+        self.xgc.line_width = 3
+        # Draw the boxes
+        self.draw_rectangle(False, self.zoom_X1, self.zoom_in_Y1,
+                            self.zoomBtnSize, self.zoomBtnSize)
+        self.draw_rectangle(False, self.zoom_X1, self.zoom_out_Y1,
+                            self.zoomBtnSize, self.zoomBtnSize)
+
+        midpointx = self.zoom_X1 + self.zoomBtnSize/2
+        # Draw the -
+        midpointy = self.zoom_out_Y1 + self.zoomBtnSize/2
+        self.draw_line(self.zoom_X1 + textoffset, midpointy,
+                       self.zoom_X1 + self.zoomBtnSize - textoffset, midpointy)
+
+        # Draw the +
+        midpointy = self.zoom_in_Y1 + self.zoomBtnSize/2
+        self.draw_line(self.zoom_X1 + textoffset, midpointy,
+                       self.zoom_X1 + self.zoomBtnSize - textoffset, midpointy)
+        self.draw_line(midpointx, self.zoom_in_Y1 + textoffset,
+                       midpointx,
+                       self.zoom_in_Y1 + self.zoomBtnSize - textoffset)
+
+    def was_click_in_zoom(self, x, y) :
+        """Do the coordinates fall within the zoom in or out buttons?
+           Returns 0 for none, 1 for zoom in, -1 for zoom out.
+        """
+        if x < self.zoom_X1 or x > self.zoom_X1 + self.zoomBtnSize :
+            return 0
+        if y < self.zoom_in_Y1 or y > self.zoom_out_Y1 + self.zoomBtnSize :
+            return 0
+        if y < self.zoom_in_Y1 + self.zoomBtnSize :
+            return 1
+        if y > self.zoom_out_Y1 :
+            return -1
+        # Must be between buttons
+        return 0
 
     #
     # Drawing-related routines:
@@ -1530,6 +1580,13 @@ that are expected by the MapCollection classes:
 
     def drag_event(self, widget, event) :
         """Move the map as the user drags."""
+
+        # On a tablet (at least the ExoPC), almost every click registers
+        # as a drag. So if a drag starts in the zoom control area,
+        # it was probably really meant to be a single click.
+        if self.was_click_in_zoom(event.x, event.y) :
+            return False;
+
         # The GTK documentation @ 24.2.1
         # http://www.pygtk.org/pygtk2tutorial/sec-EventHandling.html
         # says the first event is a real motion event and subsequent
@@ -1542,7 +1599,7 @@ that are expected by the MapCollection classes:
             y = event.y
             state = event.state
         if not state & gtk.gdk.BUTTON1_MASK :
-            return
+            return False
         if not self.is_dragging :
             self.x_start_drag = x
             self.y_start_drag = y
@@ -1560,10 +1617,28 @@ that are expected by the MapCollection classes:
         self.x_start_drag = x
         self.y_start_drag = y
 
+    def doubleclick_event(self, widget, event) :
+        """Zoom in if we get a double-click."""
+
+        # Was it a double click?
+        if event.type != gtk.gdk._2BUTTON_PRESS :
+            return False
+
+        win_width, win_height = self.drawing_area.window.get_size()
+        cur_long, cur_lat = self.xy2coords(event.x, event.y,
+                                           win_width, win_height)
+
+        self.center_lon = cur_long
+        self.center_lat = cur_lat
+        self.Collection.zoom(1)
+        self.draw_map()
+        return True
+
     def button_event(self, widget, event) :
         """Handle button releases (not presses, we're not catching those."""
 
         if self.is_dragging:
+            print "Already dragging"
             self.is_dragging = False
             x, y, state = event.window.get_pointer()
             self.move_to(x, y)
@@ -1571,6 +1646,12 @@ that are expected by the MapCollection classes:
 
         if event.button == 1 :
             global Debug
+
+            zoom =  self.was_click_in_zoom(event.x, event.y)
+            if zoom :
+                self.Collection.zoom(zoom)
+                self.draw_map()
+                return True
 
             win_width, win_height = self.drawing_area.window.get_size()
             cur_long, cur_lat = self.xy2coords(event.x, event.y,
