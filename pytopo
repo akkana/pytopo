@@ -222,7 +222,7 @@ TiledMapCollection classes must implement
 
         # For collections that support downloading new tiles,
         # keep a list of tiles that still need downloading:
-        self.download_tiles = []
+        self.download_tiles = DownloadTileQueue()
         self.download_func = None
         self.download_failures = 0
 
@@ -320,9 +320,10 @@ TiledMapCollection classes must implement
                 # If the pixbuf wasn't available, the collection may return
                 # a URL to be downloaded. Check for that:
                 if type(pixbuf) == types.TupleType :
-                    self.download_tiles.insert(0, (pixbuf[0], pixbuf[1],
-                                                   x, y, x_off, y_off,
-                                                   mapwin))
+                    # Make sure it's not not already queued for download:
+                    self.download_tiles.push(pixbuf[0], pixbuf[1],
+                                             x, y, x_off, y_off,
+                                             mapwin)
                     pixbuf = None
 
                 w, h = self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
@@ -423,12 +424,13 @@ TiledMapCollection classes must implement
                 # Clear self.download_tiles, so that if the net returns
                 # we'll start on new stuff, not old stuff.
                 # Not clear if this is the right thing to do or not.
-                self.download_tiles = []
+                self.download_tiles = DownloadTileQueue()
+                self.download_failures = 0
                 return
 
         # Otherwise, we got a path for a successful tile download.
         # Reset the failure counter:
-        self.download_failures += 1
+        #self.download_failures += 1
 
         # Draw it on the map:
         url, path, x, y, x_off, y_off, mapwin = self.download_tiles.pop()
@@ -464,7 +466,7 @@ TiledMapCollection classes must implement
             self.download_func = None
             return False
 
-        url, path, x, y, x_off, y_off, mapwin = self.download_tiles[-1]
+        url, path, x, y, x_off, y_off, mapwin = self.download_tiles.peek()
         # Don't actually pop() it until it has downloaded.
         #urllib.urlretrieve(url, path)
         self.download_func = start_job(download_job(url, path,
@@ -1228,6 +1230,34 @@ class MapUtils :
 
 # End of "MapUtils" pseudo-class.
 
+class DownloadTileQueue :
+    def __init__(self) :
+        self.queue = []    # Will be a list
+
+    def __len__(self) :
+        return len(self.queue)
+
+    def push(self, url, path, x, y, x_off, y_off, mapwin) :
+        """Push details for a new tile onto the queue if not already there,
+           or replace XY info if already there -- the map must have moved.
+        """
+        for q in self.queue :
+            if q[1] == path :  # Are paths the same?
+                # Replace XY info
+                q[2] = x
+                q[3] = y
+                q[4] = x_off
+                q[5] = y_off
+                return
+        if path :
+            self.queue.insert(0, [url, path, x, y, x_off, y_off, mapwin])
+
+    def pop(self) :
+        return self.queue.pop()
+
+    def peek(self) :
+        return self.queue[-1]
+
 class MapWindow() :
 
     """The PyTopo UI: the map window.
@@ -1272,7 +1302,6 @@ that are expected by the MapCollection classes:
         # Grid color is only needed when Debug,
         # but this is called before ParseArgs so we don't know Debug.
         self.grid_color = gtk.gdk.color_parse("green")
-
     def show_window(self, init_width, init_height) :
         """Create the initial window."""
         win = gtk.Window()
@@ -1638,7 +1667,6 @@ that are expected by the MapCollection classes:
         """Handle button releases (not presses, we're not catching those."""
 
         if self.is_dragging:
-            print "Already dragging"
             self.is_dragging = False
             x, y, state = event.window.get_pointer()
             self.move_to(x, y)
@@ -1771,11 +1799,12 @@ class PyTopo :
                 return collection
         return collection
 
-    def MenuWindow(self, mapwin) :
+    def InitialSelectionWindow(self, mapwin) :
         dialog = gtk.Dialog("Choose a starting point", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
         dialog.connect('destroy', lambda win: gtk.main_quit())
+        dialog.set_size_request(400, 300)
 
         sw = gtk.ScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
@@ -1806,9 +1835,8 @@ class PyTopo :
 
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.add(treeView)
-        sw.set_size_request(400, 300)
 
-        dialog.vbox.pack_start(sw, expand=False)
+        dialog.vbox.pack_start(sw, expand=True)
 
         dialog.show_all()
     
@@ -1967,7 +1995,7 @@ class PyTopo :
 
         # Didn't match any known run mode:
         # start in GUI mode choosing a location:
-        self.MenuWindow(mapwin)
+        self.InitialSelectionWindow(mapwin)
 
 # Check for a user config file named .pytopo
 # in either $HOME/.config/pytopo or $HOME.
@@ -2144,6 +2172,7 @@ def threaded_task(function, *args, **kwargs):
 def download_job(url, localpath, callback):
     global Debug
     def download(url, localpath, callback):
+        print "Downloading", url
         try :
             urllib.urlretrieve(url, localpath)
             return localpath
