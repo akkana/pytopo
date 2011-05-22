@@ -1273,6 +1273,7 @@ that are expected by the MapCollection classes:
 """
 
     def __init__(self) :
+        """Initialize variables, but don't create the widow yet."""
         # The current map collection being used:
         self.Collection = None
 
@@ -1302,6 +1303,7 @@ that are expected by the MapCollection classes:
         # Grid color is only needed when Debug,
         # but this is called before ParseArgs so we don't know Debug.
         self.grid_color = gtk.gdk.color_parse("green")
+
     def show_window(self, init_width, init_height) :
         """Create the initial window."""
         win = gtk.Window()
@@ -1311,13 +1313,10 @@ that are expected by the MapCollection classes:
 
         vbox = gtk.VBox(spacing=3)
         win.add(vbox)
-        vbox.show()
 
         self.drawing_area = gtk.DrawingArea()
-        # XXX remove hardwired image size numbers
         self.drawing_area.set_size_request(init_width, init_height)
         vbox.pack_start(self.drawing_area)
-        self.drawing_area.show()
 
         self.drawing_area.set_events(gtk.gdk.EXPOSURE_MASK |
                                      gtk.gdk.POINTER_MOTION_MASK |
@@ -1326,7 +1325,7 @@ that are expected by the MapCollection classes:
                                      gtk.gdk.BUTTON_RELEASE_MASK )
 
         self.drawing_area.connect("expose-event", self.expose_event)
-        self.drawing_area.connect("button-press-event", self.doubleclick_event)
+        self.drawing_area.connect("button-press-event", self.mousepress_event)
         self.drawing_area.connect("button-release-event", self.button_event)
         self.drawing_area.connect("motion_notify_event", self.drag_event)
 
@@ -1342,7 +1341,7 @@ that are expected by the MapCollection classes:
         self.drawing_area.set_flags(gtk.CAN_FOCUS)
         self.drawing_area.connect("key-press-event", self.key_press_event)
 
-        win.show()
+        win.show_all()
         gtk.main()
 
     #
@@ -1366,7 +1365,7 @@ that are expected by the MapCollection classes:
 
         self.draw_trackpoints()
 
-        self.draw_zoom_control()
+        #self.draw_zoom_control()
 
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
@@ -1413,7 +1412,8 @@ that are expected by the MapCollection classes:
 
     def draw_zoom_control(self) :
         """Draw some zoom controls in case we're running on a tablet
-           and have no keyboard to zoom or move around
+           and have no keyboard to zoom or move around.
+           Also draw any other controls we might need.
         """
         win_width, win_height = self.drawing_area.window.get_size()
         self.zoomBtnSize = int(win_width / 25)
@@ -1457,6 +1457,33 @@ that are expected by the MapCollection classes:
             return -1
         # Must be between buttons
         return 0
+
+    def context_menu(self, event) :
+        menu = gtk.Menu()    # Don't need to show menus
+
+        # Create the menu items
+        #open_item = gtk.MenuItem("Go to new location")
+        #save_item = gtk.MenuItem("Save this location")
+        quit_item = gtk.MenuItem("Quit")
+
+        # Add them to the menu
+        #menu.append(open_item)
+        #menu.append(save_item)
+        menu.append(quit_item)
+
+        # Attach the callback functions to the activate signal
+        #open_item.connect_object("activate", self.ChangeLocation, "open")
+        #save_item.connect_object("activate", self.SaveLocation, "save")
+
+        # We can attach the Quit menu item to our exit function
+        quit_item.connect_object ("activate", self.GracefulExit, "quit")
+
+        # We do need to show menu items
+        #open_item.show()
+        #save_item.show()
+        quit_item.show()
+
+        menu.popup(None, None, None, event.button, event.time)
 
     #
     # Drawing-related routines:
@@ -1558,8 +1585,8 @@ that are expected by the MapCollection classes:
         #x, y, w, h = event.area
 
         self.draw_map()
+        self.draw_zoom_control()
 
-        #widget.queue_draw()
         return True
 
     def key_quit(self, *args) :
@@ -1597,6 +1624,7 @@ that are expected by the MapCollection classes:
             return False
 
         self.draw_map()
+        self.draw_zoom_control()
         return True
 
     def xy2coords(self, x, y, win_width, win_height) :
@@ -1646,13 +1674,19 @@ that are expected by the MapCollection classes:
         self.x_start_drag = x
         self.y_start_drag = y
 
-    def doubleclick_event(self, widget, event) :
-        """Zoom in if we get a double-click."""
+    def mousepress_event(self, widget, event) :
+        """Handle mouse button presses"""
+
+        # Was it a right click?
+        if event.button == 3 :
+            self.context_menu(event)
+            return
 
         # Was it a double click?
         if event.type != gtk.gdk._2BUTTON_PRESS :
             return False
 
+        # Zoom in if we get a double-click.
         win_width, win_height = self.drawing_area.window.get_size()
         cur_long, cur_lat = self.xy2coords(event.x, event.y,
                                            win_width, win_height)
@@ -1661,6 +1695,7 @@ that are expected by the MapCollection classes:
         self.center_lat = cur_lat
         self.Collection.zoom(1)
         self.draw_map()
+        self.draw_zoom_control()
         return True
 
     def button_event(self, widget, event) :
@@ -1670,6 +1705,7 @@ that are expected by the MapCollection classes:
             self.is_dragging = False
             x, y, state = event.window.get_pointer()
             self.move_to(x, y)
+            self.draw_zoom_control()
             return True
 
         if event.button == 1 :
@@ -1679,6 +1715,7 @@ that are expected by the MapCollection classes:
             if zoom :
                 self.Collection.zoom(zoom)
                 self.draw_map()
+                self.draw_zoom_control()
                 return True
 
             win_width, win_height = self.drawing_area.window.get_size()
@@ -1725,8 +1762,10 @@ that are expected by the MapCollection classes:
         "Do nothing."
         return True
 
-    def GracefulExit(self) :
-        "Clean up the window and exit."
+    def GracefulExit(self, extra=None) :
+        """Clean up the window and exit.
+           The "extra" argument is so it can be calld from GTK callbacks.
+        """
         gtk.main_quit()
         # The python profilers don't work if you call sys.exit here:
         # sys.exit(0)
@@ -1799,7 +1838,7 @@ class PyTopo :
                 return collection
         return collection
 
-    def InitialSelectionWindow(self, mapwin) :
+    def SelectionWindow(self, mapwin) :
         dialog = gtk.Dialog("Choose a starting point", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -1852,6 +1891,9 @@ class PyTopo :
                 dialog.hide()
                 return
         PyTopo.Usage()
+
+    def ChangeLocation(self, widget) :
+        self.ChooseLocation
 
     def ChooseLocation(self, combobox) :
         model = combobox.get_model()
