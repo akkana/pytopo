@@ -1365,7 +1365,8 @@ that are expected by the MapCollection classes:
 
         self.draw_trackpoints()
 
-        #self.draw_zoom_control()
+        if not self.is_dragging :
+            self.draw_zoom_control()
 
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
@@ -1585,7 +1586,6 @@ that are expected by the MapCollection classes:
         #x, y, w, h = event.area
 
         self.draw_map()
-        self.draw_zoom_control()
 
         return True
 
@@ -1624,7 +1624,6 @@ that are expected by the MapCollection classes:
             return False
 
         self.draw_map()
-        self.draw_zoom_control()
         return True
 
     def xy2coords(self, x, y, win_width, win_height) :
@@ -1695,7 +1694,6 @@ that are expected by the MapCollection classes:
         self.center_lat = cur_lat
         self.Collection.zoom(1)
         self.draw_map()
-        self.draw_zoom_control()
         return True
 
     def button_event(self, widget, event) :
@@ -1705,7 +1703,6 @@ that are expected by the MapCollection classes:
             self.is_dragging = False
             x, y, state = event.window.get_pointer()
             self.move_to(x, y)
-            self.draw_zoom_control()
             return True
 
         if event.button == 1 :
@@ -1715,7 +1712,6 @@ that are expected by the MapCollection classes:
             if zoom :
                 self.Collection.zoom(zoom)
                 self.draw_map()
-                self.draw_zoom_control()
                 return True
 
             win_width, win_height = self.drawing_area.window.get_size()
