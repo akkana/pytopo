@@ -59,7 +59,7 @@ try :
 except ImportError, e:
     HaveDOM = False
 
-import types, urllib
+import types, urllib, re
 
 #import pdb
 
@@ -1156,17 +1156,27 @@ class MapUtils :
     @staticmethod
     def DecDegToDegMin(coord) :
         """Convert decimal degrees to degrees.minutes"""
+        if coord < 0 :
+            sgn = -1
+            coord = -coord
+        else :
+            sgn = 1
         deg = MapUtils.intTrunc(coord)
         min = abs(coord - deg) * .6
-        return deg + min
+        return sgn * (deg + min)
 
     @staticmethod
     def DecDegToDegMinStr(coord) :
         """Convert decimal degrees to a nice degrees/minutes string"""
+        if coord < 0 :
+            sgnstr = '-'
+            coord = -coord
+        else :
+            sgnstr = ''
         deg = MapUtils.intTrunc(coord)
         min = abs(coord - deg) * 60.
         min = MapUtils.TruncateToFrac(min, .01)
-        return str(deg) + "^" + str(min) + "'"
+        return sgnstr + str(deg) + "^" + str(min) + "'"
 
     @staticmethod
     def angle_to_bearing(angle) :
@@ -1272,8 +1282,13 @@ that are expected by the MapCollection classes:
    draw_line(x, y, width, height)
 """
 
-    def __init__(self) :
+    def __init__(self, _controller) :
         """Initialize variables, but don't create the widow yet."""
+
+        # Save a reference to the PyTopo object that created this window.
+        # We'll need it to change locations, collections etc.
+        self.controller = _controller
+
         # The current map collection being used:
         self.Collection = None
 
@@ -1353,6 +1368,9 @@ that are expected by the MapCollection classes:
 
         if self.Collection == None :
             print "No collection!"
+            return
+        if not self.drawing_area :
+            # Not initialized yet, not ready to draw a map
             return
 
         # XXX Collection.draw_map wants center, but we only have lower right.
@@ -1463,28 +1481,73 @@ that are expected by the MapCollection classes:
         menu = gtk.Menu()    # Don't need to show menus
 
         # Create the menu items
-        #open_item = gtk.MenuItem("Go to new location")
-        #save_item = gtk.MenuItem("Save this location")
+        open_item = gtk.MenuItem("Go to new location")
+        save_item = gtk.MenuItem("Save this location")
         quit_item = gtk.MenuItem("Quit")
 
         # Add them to the menu
-        #menu.append(open_item)
-        #menu.append(save_item)
+        menu.append(open_item)
+        menu.append(save_item)
         menu.append(quit_item)
 
         # Attach the callback functions to the activate signal
-        #open_item.connect_object("activate", self.ChangeLocation, "open")
-        #save_item.connect_object("activate", self.SaveLocation, "save")
+        open_item.connect_object("activate", self.change_location, "open")
+        save_item.connect_object("activate", self.save_location, "save")
 
         # We can attach the Quit menu item to our exit function
         quit_item.connect_object ("activate", self.GracefulExit, "quit")
 
         # We do need to show menu items
-        #open_item.show()
-        #save_item.show()
+        open_item.show()
+        save_item.show()
         quit_item.show()
 
         menu.popup(None, None, None, event.button, event.time)
+
+    def change_location(self, widget) :
+        if not self.controller.SelectionWindow(self) :
+            self.GracefulExit()
+
+    def save_location(self, widget) :
+        dialog = gtk.Dialog("Choose a starting point", None, 0,
+                            (gtk.STOCK_CANCEL, gtk.RESPONSE_NONE,
+                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+        dialog.vbox.set_spacing(10)
+
+        prompt = gtk.Label("Please specify a name:")
+        dialog.vbox.pack_start(prompt, expand=False)
+        nametext = gtk.Entry()
+        dialog.vbox.pack_start(nametext, expand=True)
+        comment = gtk.Label("")
+        dialog.vbox.pack_start(comment, expand=False)
+
+        dialog.show_all()
+
+        while True :
+            response = dialog.run()
+            if response == gtk.RESPONSE_OK:
+                name = nametext.get_text().strip()
+                if not name :
+                    comment.set_text("Name can't be empty")
+                    continue
+                try :
+                    savefilename = os.path.join(self.controller.config_dir,
+                                                "saved.sites")
+                    savefile = open(savefilename, "a")
+                except :
+                    comment.set_text("Couldn't save to " + savefilename)
+                    continue
+                print >>savefile, '[ "%s", %f, %f, "%s" ]' % \
+                    (name,
+                     MapUtils.DecDegToDegMin(self.center_lon),
+                     MapUtils.DecDegToDegMin(self.center_lat),
+                     self.Collection.name)
+                savefile.close()
+                dialog.destroy()
+                return True
+            else :
+                dialog.destroy()
+                return True
 
     #
     # Drawing-related routines:
@@ -1763,11 +1826,10 @@ that are expected by the MapCollection classes:
            The "extra" argument is so it can be calld from GTK callbacks.
         """
         gtk.main_quit()
-        # The python profilers don't work if you call sys.exit here:
-        # sys.exit(0)
-
-
+        # The python profilers don't work if you call sys.exit here.
+#
 # End of MapWindow class
+#
 
 class PyTopo :
 
@@ -1838,7 +1900,7 @@ class PyTopo :
         dialog = gtk.Dialog("Choose a starting point", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
-        dialog.connect('destroy', lambda win: gtk.main_quit())
+        #dialog.connect('destroy', lambda win: gtk.main_quit())
         dialog.set_size_request(400, 300)
 
         sw = gtk.ScrolledWindow()
@@ -1885,16 +1947,8 @@ class PyTopo :
                 site = store.get_value(iter, 2)
                 self.UseSite(site, mapwin)
                 dialog.hide()
-                return
-        PyTopo.Usage()
-
-    def ChangeLocation(self, widget) :
-        self.ChooseLocation
-
-    def ChooseLocation(self, combobox) :
-        model = combobox.get_model()
-        index = combobox.get_active()
-        print "Chose", model[index][0]
+                return True
+        return False
 
     def UseSite(self, site, mapwin) :
         collection = self.FindCollection(site[3])
@@ -1911,6 +1965,7 @@ class PyTopo :
             print site[0] + ":", \
                 MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
                 MapUtils.DecDegToDegMinStr(mapwin.center_lat)
+        mapwin.draw_map()
         return True
 
     def ParseArgs(self, mapwin, args) :
@@ -1944,7 +1999,7 @@ class PyTopo :
                         PyTopo.ErrorOut("I can't find a map collection called "
                                         + args[1])
                     # Start initially at top left, but subsequent args
-                    # map change this:
+                    # may change this:
                     mapwin.center_lon, mapwin.center_lat = \
                         mapwin.Collection.get_top_left()
                     if (Debug) :
@@ -2033,7 +2088,8 @@ class PyTopo :
 
         # Didn't match any known run mode:
         # start in GUI mode choosing a location:
-        self.InitialSelectionWindow(mapwin)
+        if not self.SelectionWindow(mapwin) :
+            self.Usage()
 
 # Check for a user config file named .pytopo
 # in either $HOME/.config/pytopo or $HOME.
@@ -2057,7 +2113,8 @@ class PyTopo :
         found either in $HOME/.config/pytopo/ or $HOME/pytopo.
         """
         home = os.environ["HOME"]
-        userfile = os.path.join(home, ".config", "pytopo", "pytopo.sites")
+        self.config_dir = os.path.join(home, ".config", "pytopo",)
+        userfile = os.path.join(self.config_dir, "pytopo.sites")
         if not os.access(userfile, os.R_OK) :
             if Debug :
                 print "Couldn't open", userfile
@@ -2098,6 +2155,28 @@ class PyTopo :
         self.init_width = locals["init_width"]
         self.init_height = locals["init_height"]
         self.default_collection = locals["defaultCollection"]
+
+    def read_saved_sites(self) :
+        """Read previously saved (favorite) sites."""
+        savefilename = os.path.join(self.config_dir, "saved.sites")
+        try :
+            savefile = open(savefilename, "r")
+        except :
+            return
+
+        # A line typically looks like this:
+        r = re.compile('\[ *"([^"]*)", ([-0-9\.]*), ([-0-9\.]*), "([^"]*)" *\]')
+        for line in savefile :
+            # [ "cima dome", -115.581186, 35.291856, "opencyclemap" ]
+            match = r.search(line)
+            if match :
+                if Debug :
+                    print "Adding",match.group(1), match.group(2), \
+                        match.group(3), match.group(4), "to KnownSites"
+                self.KnownSites.append( [ match.group(1),
+                                          float(match.group(2)),
+                                          float(match.group(3)),
+                                          match.group(4) ] )
 
     def create_initial_config(self) :
         """Make an initial configuration file.
@@ -2155,9 +2234,10 @@ You can add new sites and collections there; see the instructions at
     def main(self, pytopo_args) :
         """main execution routine for pytopo."""
         self.exec_config_file()
+        self.read_saved_sites()
         gc.enable()
 
-        mapwin = MapWindow()
+        mapwin = MapWindow(self)
 
         self.ParseArgs(mapwin, pytopo_args)
 
@@ -2174,7 +2254,10 @@ You can add new sites and collections there; see the instructions at
 
         mapwin.show_window(self.init_width, self.init_height)
 
+#####################################################################
+# Some global routines that really should get moved into a class:
 #
+
 # A relatively clean way of downloading files in a separate thread.
 # http://code.activestate.com/recipes/577129-run-asynchronous-tasks-using-coroutines/
 #
@@ -2210,7 +2293,8 @@ def threaded_task(function, *args, **kwargs):
 def download_job(url, localpath, callback):
     global Debug
     def download(url, localpath, callback):
-        print "Downloading", url
+        if Debug :
+            print "Downloading", url
         try :
             urllib.urlretrieve(url, localpath)
             return localpath
