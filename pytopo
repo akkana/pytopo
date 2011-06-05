@@ -434,8 +434,12 @@ TiledMapCollection classes must implement
 
         # Draw it on the map:
         url, path, x, y, x_off, y_off, mapwin = self.download_tiles.pop()
-        pixbuf = gtk.gdk.pixbuf_new_from_file(path)
-        self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
+        try :
+            pixbuf = gtk.gdk.pixbuf_new_from_file(path)
+            self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
+        except Exeption, e:
+            print "Couldn't draw tile:", e
+            self.download_failures += 1
 
         # Redraw any trackpoints, since they might have been overwritten:
         mapwin.draw_trackpoints()
@@ -1319,6 +1323,9 @@ that are expected by the MapCollection classes:
         # but this is called before ParseArgs so we don't know Debug.
         self.grid_color = gtk.gdk.color_parse("green")
 
+        # The timeout for long press events
+        self.press_timeout = None
+
     def show_window(self, init_width, init_height) :
         """Create the initial window."""
         win = gtk.Window()
@@ -1340,8 +1347,8 @@ that are expected by the MapCollection classes:
                                      gtk.gdk.BUTTON_RELEASE_MASK )
 
         self.drawing_area.connect("expose-event", self.expose_event)
-        self.drawing_area.connect("button-press-event", self.mousepress_event)
-        self.drawing_area.connect("button-release-event", self.button_event)
+        self.drawing_area.connect("button-press-event", self.mousepress)
+        self.drawing_area.connect("button-release-event", self.mouserelease)
         self.drawing_area.connect("motion_notify_event", self.drag_event)
 
         # The default focus in/out handlers on drawing area cause
@@ -1502,11 +1509,19 @@ that are expected by the MapCollection classes:
         save_item.show()
         quit_item.show()
 
-        menu.popup(None, None, None, event.button, event.time)
+        if event :
+            button = event.button
+            t = event.time
+        else :
+            button = 3
+            t = 0
+            # There's no documentation on what event.time is: it's
+            # "the time of the event in milliseconds" -- but since when?
+            # Not since the epoch.
+        menu.popup(None, None, None, button, t)
 
     def change_location(self, widget) :
-        if not self.controller.SelectionWindow(self) :
-            self.GracefulExit()
+        self.controller.SelectionWindow(self)
 
     def save_location(self, widget) :
         dialog = gtk.Dialog("Choose a starting point", None, 0,
@@ -1700,6 +1715,10 @@ that are expected by the MapCollection classes:
     def drag_event(self, widget, event) :
         """Move the map as the user drags."""
 
+        if self.press_timeout :
+            gobject.source_remove(self.press_timeout)
+            self.press_timeout = None
+
         # On a tablet (at least the ExoPC), almost every click registers
         # as a drag. So if a drag starts in the zoom control area,
         # it was probably really meant to be a single click.
@@ -1736,16 +1755,20 @@ that are expected by the MapCollection classes:
         self.x_start_drag = x
         self.y_start_drag = y
 
-    def mousepress_event(self, widget, event) :
+    def mousepress(self, widget, event) :
         """Handle mouse button presses"""
+
+        if self.press_timeout :
+            gobject.source_remove(self.press_timeout)
 
         # Was it a right click?
         if event.button == 3 :
             self.context_menu(event)
             return
 
-        # Was it a double click?
+        # If it wasn't a double click, set a timeout for LongPress
         if event.type != gtk.gdk._2BUTTON_PRESS :
+            self.press_timeout = gobject.timeout_add(1000, self.longpress)
             return False
 
         # Zoom in if we get a double-click.
@@ -1759,8 +1782,19 @@ that are expected by the MapCollection classes:
         self.draw_map()
         return True
 
-    def button_event(self, widget, event) :
-        """Handle button releases (not presses, we're not catching those."""
+    def longpress(self) :
+        if self.press_timeout :
+            gobject.source_remove(self.press_timeout)
+        self.context_menu(None)
+        return True
+
+    def mouserelease(self, widget, event) :
+        """Handle button releases."""
+
+        if self.press_timeout :
+            gobject.source_remove(self.press_timeout)
+            self.press_timeout = None
+            return False
 
         if self.is_dragging:
             self.is_dragging = False
@@ -1946,8 +1980,10 @@ class PyTopo :
                 #collname = store.get_value(iter, 1)
                 site = store.get_value(iter, 2)
                 self.UseSite(site, mapwin)
-                dialog.hide()
+                dialog.destroy()
                 return True
+        else :
+            dialog.destroy()
         return False
 
     def UseSite(self, site, mapwin) :
