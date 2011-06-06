@@ -516,6 +516,7 @@ class OSMMapCollection(TiledMapCollection) :
         # If we're download-capable, we'd better have a directory
         # to download to, so make it if it's not there already:
         if self.download_url and not os.access(self.location, os.W_OK) :
+            # XXX wrap in a try, show user-visible error dialog!
             os.makedirs(self.location)
 
         # Call zoom so we set all scales appropriately:
