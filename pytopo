@@ -1300,6 +1300,12 @@ that are expected by the MapCollection classes:
         self.center_lon = 0
         self.center_lat = 0
         self.trackpoints = None
+        
+        self.pin = gtk.gdk.pixbuf_new_from_file("pin.png")
+        self.pin_lon = 0
+        self.pin_lat = 0
+        self.pin_xoff = -4
+        self.pin_yoff = -12
 
         # Print distances in metric?
         # This should be set externally!
@@ -1393,6 +1399,14 @@ that are expected by the MapCollection classes:
 
         if not self.is_dragging :
             self.draw_zoom_control()
+        
+        # draw pin
+        win_width, win_height = self.drawing_area.window.get_size()
+        pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat, 
+        win_width, win_height)
+        
+        self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
+        pin_y+self.pin_yoff,-1,-1)
 
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
@@ -1490,23 +1504,27 @@ that are expected by the MapCollection classes:
 
         # Create the menu items
         open_item = gtk.MenuItem("Go to new location")
+        pin_item = gtk.MenuItem("Pin this location")
         save_item = gtk.MenuItem("Save this location")
         quit_item = gtk.MenuItem("Quit")
 
         # Add them to the menu
         menu.append(open_item)
+        menu.append(pin_item)
         menu.append(save_item)
         menu.append(quit_item)
 
         # Attach the callback functions to the activate signal
-        open_item.connect_object("activate", self.change_location, "open")
-        save_item.connect_object("activate", self.save_location, "save")
+        open_item.connect("activate", self.change_location)
+        pin_item.connect("activate", self.set_pin_by_mouse)
+        save_item.connect("activate", self.save_location)
 
         # We can attach the Quit menu item to our exit function
         quit_item.connect_object ("activate", self.GracefulExit, "quit")
 
         # We do need to show menu items
         open_item.show()
+        pin_item.show()
         save_item.show()
         quit_item.show()
 
@@ -1523,6 +1541,16 @@ that are expected by the MapCollection classes:
 
     def change_location(self, widget) :
         self.controller.SelectionWindow(self)
+
+    def set_pin_by_mouse(self, widget) :
+        """Set the pin at the current mouse location"""
+        x, y, state = self.drawing_area.window.get_pointer()
+        win_width, win_height = self.drawing_area.window.get_size()
+        self.pin_lon, self.pin_lat = self.xy2coords(x, y, win_width, win_height)
+
+    def set_pin_to_center(self, widget) :
+        """Set the pin at the current center point"""
+        self.pin_lon, self.pin_lat = self.center_lon, self.center_lat
 
     def save_location(self, widget) :
         dialog = gtk.Dialog("Choose a starting point", None, 0,
@@ -1676,7 +1704,7 @@ that are expected by the MapCollection classes:
         """Handle any key press."""
         if event.string == "q" :
             self.GracefulExit()
-        if event.string == "+" or event.string == "=" :
+        elif event.string == "+" :
             self.Collection.zoom(1)
         elif event.string == "-" :
             self.Collection.zoom(-1)
@@ -1692,9 +1720,16 @@ that are expected by the MapCollection classes:
         elif event.keyval == gtk.keysyms.Down :
             self.center_lat -= \
                 float(self.Collection.img_height) / self.Collection.yscale
+        elif event.keyval == gtk.keysyms.space :
+            self.center_lon, self.center_lat = self.pin_lon, self.pin_lat
+            pass
         elif event.keyval == gtk.keysyms.l and \
                  event.state == gtk.gdk.CONTROL_MASK :
             pass    # Just fall through to draw_map()
+        elif event.string == "m" :
+            if PyTopo.SelectionWindow(p, self) :
+                self.set_pin()
+                pass
         elif event.string == "s" :
             self.save_as()
             return True
@@ -1712,7 +1747,14 @@ that are expected by the MapCollection classes:
                     float(win_width/2 - x) / self.Collection.xscale,
                 self.center_lat + \
                     float(win_height/2 - y) / self.Collection.yscale)
-
+	
+    def coords2xy(self, lon, lat, win_width, win_height) :
+        """Convert lon/lat to pixels."""
+        return (int((lon - self.center_lon) * self.Collection.xscale 
+                    + win_width/2),
+                int((self.center_lat - lat) * self.Collection.yscale 
+                    + win_height/2) )
+	
     def drag_event(self, widget, event) :
         """Move the map as the user drags."""
 
@@ -1791,11 +1833,11 @@ that are expected by the MapCollection classes:
 
     def mouserelease(self, widget, event) :
         """Handle button releases."""
-
+        
         if self.press_timeout :
             gobject.source_remove(self.press_timeout)
             self.press_timeout = None
-            return False
+            #return False
 
         if self.is_dragging:
             self.is_dragging = False
@@ -1849,6 +1891,10 @@ that are expected by the MapCollection classes:
                 print "Bearing:", angle, "=", MapUtils.angle_to_quadrant(angle)
             self.click_last_long = cur_long
             self.click_last_lat = cur_lat
+            
+            self.pin_lon, self.pin_lat = self.xy2coords(event.x, event.y, 
+                                                        win_width, win_height)
+            self.draw_map()
 
         return True
 
@@ -1932,7 +1978,7 @@ class PyTopo :
         return collection
 
     def SelectionWindow(self, mapwin) :
-        dialog = gtk.Dialog("Choose a starting point", None, 0,
+        dialog = gtk.Dialog("Choose a point", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
         #dialog.connect('destroy', lambda win: gtk.main_quit())
@@ -1997,6 +2043,8 @@ class PyTopo :
         #print site[0], site[1], site[2]
         mapwin.center_lon = MapUtils.DegMinToDecDeg(site[1])
         mapwin.center_lat = MapUtils.DegMinToDecDeg(site[2])
+        mapwin.pin_lon = mapwin.center_lon
+        mapwin.pin_lat = mapwin.center_lat
         #print "Center in decimal degrees:", centerLon, centerLat
         if (Debug) :
             print site[0] + ":", \
@@ -2048,10 +2096,10 @@ class PyTopo :
     
                 elif args[0] == "-d" :
                     Debug = True
-                elif args[0] == "-t" and len(args) > 2:
+                elif args[0] == "-t" and len(args) > 1:
                     if mapwin.trackpoints == None :
                         mapwin.trackpoints = TrackPoints()
-                    mapwin.trackpoints.readTrackFile(args[2])
+                    mapwin.trackpoints.readTrackFile(args[1])
                     args = args[1:]
                 else :
                     PyTopo.ErrorOut("Unknown flag " + args[0])
@@ -2345,5 +2393,6 @@ def download_job(url, localpath, callback):
 
 # Conditional main:
 if __name__ == "__main__" :
-    PyTopo().main(sys.argv)
+	p = PyTopo()
+	p.main(sys.argv)
 
