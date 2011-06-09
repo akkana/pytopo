@@ -340,7 +340,7 @@ TiledMapCollection classes must implement
                 print " "
                 print "New row: adding y =", h,
                 print "Subtracting lat", float(h) / self.yscale
-                
+
             cur_y += h
             curlat -= float(h) / self.yscale
             #curlat -= float(self.img_height) / self.yscale
@@ -674,7 +674,7 @@ class GenericMapCollection(TiledMapCollection) :
         numdigits  -- number of digits in x and y file specifiers
         usedash    -- Boolean, use a dash between x and y in filenames?
         latfirst   -- Boolean, is latitude the first of the two numbers?
-        
+
         """
         TiledMapCollection.__init__(self, _name, _location,
                                     _img_width, _img_height, )
@@ -855,7 +855,7 @@ class TopoMapCollection(TiledMapCollection) :
         # Latitude decreases downward:
         y_off = int((MapUtils.TruncateToFrac(latitude, self.frac) +
                      self.frac - latitude - self.latCorrection) * self.yscale)
-                     
+
         if (Debug) :
             print "truncated", MapUtils.DecDegToDegMinStr(latitude), "to",
             print MapUtils.DecDegToDegMinStr(MapUtils.TruncateToFrac(latitude,
@@ -988,7 +988,7 @@ class TopoMapCollection(TiledMapCollection) :
         longOffset = MapUtils.intTrunc(longMinDiff * 10 / self.series)
 
         # Now calculate the current filename.
-	# Note that series is either 7.5 or 15
+    # Note that series is either 7.5 or 15
         if (self.series > 13) :
             fileprefix = "024t"
             numcharts = 5
@@ -1300,7 +1300,7 @@ that are expected by the MapCollection classes:
         self.center_lon = 0
         self.center_lat = 0
         self.trackpoints = None
-        
+
         self.pin = gtk.gdk.pixbuf_new_from_file("pin.png")
         self.pin_lon = 0
         self.pin_lat = 0
@@ -1399,12 +1399,12 @@ that are expected by the MapCollection classes:
 
         if not self.is_dragging :
             self.draw_zoom_control()
-        
+
         # draw pin
         win_width, win_height = self.drawing_area.window.get_size()
-        pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat, 
+        pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat,
         win_width, win_height)
-        
+
         self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
         pin_y+self.pin_yoff,-1,-1)
 
@@ -1463,6 +1463,8 @@ that are expected by the MapCollection classes:
         self.zoom_out_Y1 = self.zoom_in_Y1 + self.zoomBtnSize * 2
         textoffset = self.zoomBtnSize / 5
 
+        self.xgc.line_style = gtk.gdk.LINE_SOLID
+        self.set_bg_color()
         self.xgc.line_width = 3
         # Draw the boxes
         self.draw_rectangle(False, self.zoom_X1, self.zoom_in_Y1,
@@ -1636,7 +1638,7 @@ that are expected by the MapCollection classes:
         import pango
         layout = self.drawing_area.create_pango_layout (str);
         fontdesc = pango.FontDescription("Sans Bold 12")
-        layout.set_font_description (fontdesc); 
+        layout.set_font_description (fontdesc);
         self.drawing_area.window.draw_layout(self.xgc, x, y, layout);
 
     # Save the current map as something which could be gimped or printed.
@@ -1747,14 +1749,14 @@ that are expected by the MapCollection classes:
                     float(win_width/2 - x) / self.Collection.xscale,
                 self.center_lat + \
                     float(win_height/2 - y) / self.Collection.yscale)
-	
+
     def coords2xy(self, lon, lat, win_width, win_height) :
         """Convert lon/lat to pixels."""
-        return (int((lon - self.center_lon) * self.Collection.xscale 
+        return (int((lon - self.center_lon) * self.Collection.xscale
                     + win_width/2),
-                int((self.center_lat - lat) * self.Collection.yscale 
+                int((self.center_lat - lat) * self.Collection.yscale
                     + win_height/2) )
-	
+
     def drag_event(self, widget, event) :
         """Move the map as the user drags."""
 
@@ -1833,7 +1835,7 @@ that are expected by the MapCollection classes:
 
     def mouserelease(self, widget, event) :
         """Handle button releases."""
-        
+
         if self.press_timeout :
             gobject.source_remove(self.press_timeout)
             self.press_timeout = None
@@ -1891,8 +1893,8 @@ that are expected by the MapCollection classes:
                 print "Bearing:", angle, "=", MapUtils.angle_to_quadrant(angle)
             self.click_last_long = cur_long
             self.click_last_lat = cur_lat
-            
-            self.pin_lon, self.pin_lat = self.xy2coords(event.x, event.y, 
+
+            self.pin_lon, self.pin_lat = self.xy2coords(event.x, event.y,
                                                         win_width, win_height)
             self.draw_map()
 
@@ -2017,7 +2019,7 @@ class PyTopo :
         dialog.vbox.pack_start(sw, expand=True)
 
         dialog.show_all()
-    
+
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
             selection = treeView.get_selection()
@@ -2093,7 +2095,7 @@ class PyTopo :
                             MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
                             ", ", MapUtils.DecDegToDegMinStr(mapwin.center_lat)
                     args = args[1:]
-    
+
                 elif args[0] == "-d" :
                     Debug = True
                 elif args[0] == "-t" and len(args) > 1:
@@ -2116,18 +2118,18 @@ class PyTopo :
                 mapwin.trackpoints.readTrackFile(args[0])
                 args = args[1:]
                 continue
-    
+
             # Try to match a known site:
             for site in self.KnownSites :
                 if args[0] == site[0] :
                     if not self.UseSite(site, mapwin) :
                         continue
                     break
-    
+
             if mapwin.Collection and mapwin.center_lon and mapwin.center_lat :
                 args = args[1:]
                 continue
-    
+
             # Doesn't match a known site. Maybe the args are coordinates?
             try :
                 print "Looking for coordinate args in", args
@@ -2140,7 +2142,7 @@ class PyTopo :
                     args = args[2:]
                     continue
                 print "Didn't find any"
-    
+
             except ValueError, e :
                 print "Couldn't parse coordinates"
                 PyTopo.Usage()
@@ -2357,12 +2359,12 @@ def start_job(generator):
                 return
             new_task(_task_return)
         # make sure the generator is advanced in the main thread
-        gobject.idle_add(_advance_generator)            
+        gobject.idle_add(_advance_generator)
     _task_return(None)
     return generator
 
 import threading
-gobject.threads_init()  
+gobject.threads_init()
 
 def threaded_task(function, *args, **kwargs):
     """Run function(*args, **kwargs) inside a thread and return the result."""
@@ -2393,6 +2395,6 @@ def download_job(url, localpath, callback):
 
 # Conditional main:
 if __name__ == "__main__" :
-	p = PyTopo()
-	p.main(sys.argv)
+    p = PyTopo()
+    p.main(sys.argv)
 
