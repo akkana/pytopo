@@ -1410,9 +1410,6 @@ that are expected by the MapCollection classes:
         pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat,
         win_width, win_height)
 
-        self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
-        pin_y+self.pin_yoff,-1,-1)
-
         if self.pin :
             self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
                              pin_y+self.pin_yoff,-1,-1)
