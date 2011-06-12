@@ -674,7 +674,6 @@ class GenericMapCollection(TiledMapCollection) :
         numdigits  -- number of digits in x and y file specifiers
         usedash    -- Boolean, use a dash between x and y in filenames?
         latfirst   -- Boolean, is latitude the first of the two numbers?
-
         """
         TiledMapCollection.__init__(self, _name, _location,
                                     _img_width, _img_height, )
@@ -988,7 +987,7 @@ class TopoMapCollection(TiledMapCollection) :
         longOffset = MapUtils.intTrunc(longMinDiff * 10 / self.series)
 
         # Now calculate the current filename.
-    # Note that series is either 7.5 or 15
+        # Note that series is either 7.5 or 15
         if (self.series > 13) :
             fileprefix = "024t"
             numcharts = 5
@@ -1301,7 +1300,10 @@ that are expected by the MapCollection classes:
         self.center_lat = 0
         self.trackpoints = None
 
-        self.pin = gtk.gdk.pixbuf_new_from_file("pin.png")
+        try :
+            self.pin = gtk.gdk.pixbuf_new_from_file("pin.png")
+        except :
+            self.pin = None
         self.pin_lon = 0
         self.pin_lat = 0
         self.pin_xoff = -4
@@ -1405,8 +1407,9 @@ that are expected by the MapCollection classes:
         pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat,
         win_width, win_height)
 
-        self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
-        pin_y+self.pin_yoff,-1,-1)
+        if self.pin :
+            self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
+                             pin_y+self.pin_yoff,-1,-1)
 
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
