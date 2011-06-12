@@ -4,5 +4,5 @@ Comment=Online and Offline Maps
 Exec=pytopo
 Terminal=false
 Type=Application
-Icon=/usr/share/pixmaps/pytopo.png
+Icon=/usr/share/pytopo/pytopo.png
 Categories=Maps;

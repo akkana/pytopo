@@ -4,7 +4,7 @@
 
 from distutils.core import setup
 
-setup(name='PyTopo',
+setup(name='pytopo',
       version='1.0',
       description='Online and Offline Maps',
       author='Akkana Peck',
@@ -12,7 +12,8 @@ setup(name='PyTopo',
       url='http://shallowsky.com/software/topo/',
       scripts=['pytopo'],
       data_files=[ ('/usr/share/applications', ["pytopo.desktop"]),
-                   ('/usr/share/pixmaps',      ["pytopo.png"] )
+                   ('/usr/share/pixmaps', ["pytopo.png"]),
+                   ('/usr/share/pytopo', ["pytopo-pin.png"])
                  ]
      )
 

@@ -1304,7 +1304,7 @@ that are expected by the MapCollection classes:
         self.trackpoints = None
 
         try :
-            self.pin = gtk.gdk.pixbuf_new_from_file("pin.png")
+            self.pin = gtk.gdk.pixbuf_new_from_file("/usr/share/pytopo/pytopo-pin.png")
         except :
             self.pin = None
         self.pin_lon = 0
