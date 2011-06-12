@@ -1303,7 +1303,10 @@ that are expected by the MapCollection classes:
         self.cur_lat = 0
         self.trackpoints = None
 
-        self.pin = gtk.gdk.pixbuf_new_from_file("pin.png")
+        try :
+            self.pin = gtk.gdk.pixbuf_new_from_file("pin.png")
+        except :
+            self.pin = None
         self.pin_lon = 0
         self.pin_lat = 0
         self.pin_xoff = -4
