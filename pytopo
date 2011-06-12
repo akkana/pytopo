@@ -674,6 +674,7 @@ class GenericMapCollection(TiledMapCollection) :
         numdigits  -- number of digits in x and y file specifiers
         usedash    -- Boolean, use a dash between x and y in filenames?
         latfirst   -- Boolean, is latitude the first of the two numbers?
+
         """
         TiledMapCollection.__init__(self, _name, _location,
                                     _img_width, _img_height, )
@@ -1298,12 +1299,11 @@ that are expected by the MapCollection classes:
 
         self.center_lon = 0
         self.center_lat = 0
+        self.cur_lon = 0
+        self.cur_lat = 0
         self.trackpoints = None
 
-        try :
-            self.pin = gtk.gdk.pixbuf_new_from_file("pin.png")
-        except :
-            self.pin = None
+        self.pin = gtk.gdk.pixbuf_new_from_file("pin.png")
         self.pin_lon = 0
         self.pin_lat = 0
         self.pin_xoff = -4
@@ -1406,6 +1406,9 @@ that are expected by the MapCollection classes:
         win_width, win_height = self.drawing_area.window.get_size()
         pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat,
         win_width, win_height)
+
+        self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
+        pin_y+self.pin_yoff,-1,-1)
 
         if self.pin :
             self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
@@ -1510,7 +1513,7 @@ that are expected by the MapCollection classes:
         # Create the menu items
         open_item = gtk.MenuItem("Go to new location")
         pin_item = gtk.MenuItem("Pin this location")
-        save_item = gtk.MenuItem("Save this location")
+        save_item = gtk.MenuItem("Save pin location")
         quit_item = gtk.MenuItem("Quit")
 
         # Add them to the menu
@@ -1549,9 +1552,8 @@ that are expected by the MapCollection classes:
 
     def set_pin_by_mouse(self, widget) :
         """Set the pin at the current mouse location"""
-        x, y, state = self.drawing_area.window.get_pointer()
-        win_width, win_height = self.drawing_area.window.get_size()
-        self.pin_lon, self.pin_lat = self.xy2coords(x, y, win_width, win_height)
+        self.pin_lon, self.pin_lat = self.cur_lon, self.cur_lat
+        self.draw_map()
 
     def set_pin_to_center(self, widget) :
         """Set the pin at the current center point"""
@@ -1588,10 +1590,17 @@ that are expected by the MapCollection classes:
                     continue
                 print >>savefile, '[ "%s", %f, %f, "%s" ]' % \
                     (name,
-                     MapUtils.DecDegToDegMin(self.center_lon),
-                     MapUtils.DecDegToDegMin(self.center_lat),
+                     MapUtils.DecDegToDegMin(self.pin_lon),
+                     MapUtils.DecDegToDegMin(self.pin_lat),
                      self.Collection.name)
                 savefile.close()
+
+                #Add to KnownSites
+                self.controller.KnownSites.append( [name,
+                MapUtils.DecDegToDegMin(self.pin_lon),
+                MapUtils.DecDegToDegMin(self.pin_lat),
+                self.Collection.name] )
+
                 dialog.destroy()
                 return True
             else :
@@ -1811,6 +1820,9 @@ that are expected by the MapCollection classes:
 
         # Was it a right click?
         if event.button == 3 :
+            x, y, state = self.drawing_area.window.get_pointer()
+            win_width, win_height = self.drawing_area.window.get_size()
+            self.cur_lon, self.cur_lat = self.xy2coords(x, y, win_width, win_height)
             self.context_menu(event)
             return
 
@@ -1833,6 +1845,9 @@ that are expected by the MapCollection classes:
     def longpress(self) :
         if self.press_timeout :
             gobject.source_remove(self.press_timeout)
+        x, y, state = self.drawing_area.window.get_pointer()
+        win_width, win_height = self.drawing_area.window.get_size()
+        self.cur_lon, self.cur_lat = self.xy2coords(x, y, win_width, win_height)
         self.context_menu(None)
         return True
 
@@ -1862,9 +1877,10 @@ that are expected by the MapCollection classes:
             win_width, win_height = self.drawing_area.window.get_size()
             cur_long, cur_lat = self.xy2coords(event.x, event.y,
                                                win_width, win_height)
-            print "Click:", \
-                  MapUtils.DecDegToDegMinStr(cur_long), \
-                  MapUtils.DecDegToDegMinStr(cur_lat)
+            if Debug :
+                print "Click:", \
+                    MapUtils.DecDegToDegMinStr(cur_long), \
+                    MapUtils.DecDegToDegMinStr(cur_lat)
 
             # Find angle and distance since last click.
             # You would think that we could just use the long and lat
@@ -1885,21 +1901,22 @@ that are expected by the MapCollection classes:
                 # Convert to miles using latitude and radius of the earth.
                 dist = dist *2. * math.pi / 360.0 * 7926 \
                        * math.cos(cur_lat*math.pi/180)
-                if self.use_metric :
+                if Debug and self.use_metric :
                     print "Distance:", round(dist*1600,2), "meters,", \
                           round(dist*1.6,2), "km"
-                else :
+                elif Debug :
                     print "Distance:", round(dist*5280,2), "feet,", \
                           round(dist,2), "miles"
                 angle = int(math.atan2(-ydiff, -xdiff) * 180 / math.pi)
                 angle = MapUtils.angle_to_bearing(angle)
-                print "Bearing:", angle, "=", MapUtils.angle_to_quadrant(angle)
+                if Debug :
+                    print "Bearing:", angle, "=", MapUtils.angle_to_quadrant(angle)
             self.click_last_long = cur_long
             self.click_last_lat = cur_lat
 
-            self.pin_lon, self.pin_lat = self.xy2coords(event.x, event.y,
-                                                        win_width, win_height)
-            self.draw_map()
+            #self.pin_lon, self.pin_lat = self.xy2coords(event.x, event.y, win_width, win_height)
+
+            #self.draw_map()
 
         return True
 
