@@ -53,6 +53,8 @@ TODO: allow configuration of colors, line thickness etc.
 VersionString = "PyTopo Version 1.0 by Akkana Peck"
 
 import sys, os, glob, math, gtk, gobject, gc
+settings = gtk.settings_get_default()
+settings.set_property("gtk-touchscreen-mode", True)
 HaveDOM = True
 try :
     import xml.dom.minidom
@@ -1306,7 +1308,10 @@ that are expected by the MapCollection classes:
         try :
             self.pin = gtk.gdk.pixbuf_new_from_file("/usr/share/pytopo/pytopo-pin.png")
         except :
-            self.pin = None
+            try :
+                self.pin = gtk.gdk.pixbuf_new_from_file("pytopo-pin.png")
+            except :
+                self.pin = None
         self.pin_lon = 0
         self.pin_lat = 0
         self.pin_xoff = -4
@@ -1807,18 +1812,19 @@ that are expected by the MapCollection classes:
             self.x_start_drag = x
             self.y_start_drag = y
             self.is_dragging = True
-        self.move_to(x, y)
+        self.move_to(x, y, widget)
         return True
 
-    def move_to(self, x, y) :
-        dx = x - self.x_start_drag
-        dy = y - self.y_start_drag
-        self.center_lon -= dx / self.Collection.xscale
-        self.center_lat += dy / self.Collection.yscale
-        self.draw_map()
-        # Reset the drag coordinates now that we're there
-        self.x_start_drag = x
-        self.y_start_drag = y
+    def move_to(self, x, y, widget) :
+        if widget.drag_check_threshold(self.x_start_drag, self.y_start_drag, x, y) :
+            dx = x - self.x_start_drag
+            dy = y - self.y_start_drag
+            self.center_lon -= dx / self.Collection.xscale
+            self.center_lat += dy / self.Collection.yscale
+            self.draw_map()
+            # Reset the drag coordinates now that we're there
+            self.x_start_drag = x
+            self.y_start_drag = y
 
     def mousepress(self, widget, event) :
         """Handle mouse button presses"""
@@ -1870,7 +1876,8 @@ that are expected by the MapCollection classes:
         if self.is_dragging:
             self.is_dragging = False
             x, y, state = event.window.get_pointer()
-            self.move_to(x, y)
+            self.move_to(x, y, widget)
+            self.draw_zoom_control()
             return True
 
         if event.button == 1 :
@@ -1921,10 +1928,6 @@ that are expected by the MapCollection classes:
                     print "Bearing:", angle, "=", MapUtils.angle_to_quadrant(angle)
             self.click_last_long = cur_long
             self.click_last_lat = cur_lat
-
-            #self.pin_lon, self.pin_lat = self.xy2coords(event.x, event.y, win_width, win_height)
-
-            #self.draw_map()
 
         return True
 
