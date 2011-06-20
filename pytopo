@@ -52,7 +52,7 @@ TODO: allow configuration of colors, line thickness etc.
 
 VersionString = "PyTopo Version 1.0 by Akkana Peck"
 
-import sys, os, math, gtk, gobject, gc
+import sys, os, glob, math, gtk, gobject, gc
 HaveDOM = True
 try :
     import xml.dom.minidom
@@ -1511,29 +1511,37 @@ that are expected by the MapCollection classes:
         menu = gtk.Menu()    # Don't need to show menus
 
         # Create the menu items
-        open_item = gtk.MenuItem("Go to new location")
+        centerpin_item = gtk.MenuItem("Go to pin")
         pin_item = gtk.MenuItem("Pin this location")
         save_item = gtk.MenuItem("Save pin location")
+        locations_item = gtk.MenuItem("My Locations")
+        tracks_item = gtk.MenuItem("My Tracks")
         quit_item = gtk.MenuItem("Quit")
 
         # Add them to the menu
-        menu.append(open_item)
+        menu.append(centerpin_item)
         menu.append(pin_item)
         menu.append(save_item)
+        menu.append(locations_item)
+        menu.append(tracks_item)
         menu.append(quit_item)
 
         # Attach the callback functions to the activate signal
-        open_item.connect("activate", self.change_location)
+        centerpin_item.connect("activate", self.set_center_to_pin)
         pin_item.connect("activate", self.set_pin_by_mouse)
         save_item.connect("activate", self.save_location)
+        locations_item.connect("activate", self.mylocations)
+        tracks_item.connect("activate", self.mytracks)
 
         # We can attach the Quit menu item to our exit function
         quit_item.connect_object ("activate", self.GracefulExit, "quit")
 
         # We do need to show menu items
-        open_item.show()
+        centerpin_item.show()
         pin_item.show()
         save_item.show()
+        locations_item.show()
+        tracks_item.show()
         quit_item.show()
 
         if event :
@@ -1547,22 +1555,24 @@ that are expected by the MapCollection classes:
             # Not since the epoch.
         menu.popup(None, None, None, button, t)
 
-    def change_location(self, widget) :
-        self.controller.SelectionWindow(self)
+    def mylocations(self, widget) :
+        self.controller.LocationSelect(self)
 
     def set_pin_by_mouse(self, widget) :
         """Set the pin at the current mouse location"""
         self.pin_lon, self.pin_lat = self.cur_lon, self.cur_lat
         self.draw_map()
 
-    def set_pin_to_center(self, widget) :
-        """Set the pin at the current center point"""
-        self.pin_lon, self.pin_lat = self.center_lon, self.center_lat
+    def set_center_to_pin(self, widget) :
+        """Set the center at the current pin point"""
+        self.center_lon, self.center_lat = self.pin_lon, self.pin_lat
+        self.draw_map()
 
     def save_location(self, widget) :
-        dialog = gtk.Dialog("Choose a starting point", None, 0,
+        dialog = gtk.Dialog("Save location", None, 0,
                             (gtk.STOCK_CANCEL, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
+        dialog.set_size_request(200, 150)
         dialog.vbox.set_spacing(10)
 
         prompt = gtk.Label("Please specify a name:")
@@ -1581,19 +1591,6 @@ that are expected by the MapCollection classes:
                 if not name :
                     comment.set_text("Name can't be empty")
                     continue
-                try :
-                    savefilename = os.path.join(self.controller.config_dir,
-                                                "saved.sites")
-                    savefile = open(savefilename, "a")
-                except :
-                    comment.set_text("Couldn't save to " + savefilename)
-                    continue
-                print >>savefile, '[ "%s", %f, %f, "%s" ]' % \
-                    (name,
-                     MapUtils.DecDegToDegMin(self.pin_lon),
-                     MapUtils.DecDegToDegMin(self.pin_lat),
-                     self.Collection.name)
-                savefile.close()
 
                 #Add to KnownSites
                 self.controller.KnownSites.append( [name,
@@ -1606,6 +1603,18 @@ that are expected by the MapCollection classes:
             else :
                 dialog.destroy()
                 return True
+
+    def mytracks(self, widget) :
+        self.controller.TrackSelect(self)
+        if self.trackpoints != None :
+            self.trackpoints_center()
+        self.draw_map()
+
+
+    def trackpoints_center(self) :
+        minlon, minlat, maxlon, maxlat = self.trackpoints.getBounds()
+        self.center_lon = (maxlon + minlon) / 2
+        self.center_lat = (maxlat + minlat) / 2
 
     #
     # Drawing-related routines:
@@ -1735,8 +1744,7 @@ that are expected by the MapCollection classes:
             self.center_lat -= \
                 float(self.Collection.img_height) / self.Collection.yscale
         elif event.keyval == gtk.keysyms.space :
-            self.center_lon, self.center_lat = self.pin_lon, self.pin_lat
-            pass
+            self.set_center_to_pin()
         elif event.keyval == gtk.keysyms.l and \
                  event.state == gtk.gdk.CONTROL_MASK :
             pass    # Just fall through to draw_map()
@@ -1943,9 +1951,23 @@ class PyTopo :
     def __init__(self) :
         self.Collections = []
         self.KnownSites = []
+        self.KnownTracks = []
         self.init_width = 800
         self.init_height = 600
         self.default_collection = None
+
+    def __del__(self) :
+        """Write KnownSites to file."""
+        savefilename = os.path.join(self.config_dir, "saved.sites")
+        try :
+            savefile = open(savefilename, "w")
+        except :
+            return
+
+        for site in self.KnownSites :
+            print >>savefile, '[ "%s", %f, %f, "%s" ]' % \
+                    (site[0], site[1], site[2], site[3])
+        savefile.close()
 
     @staticmethod
     def Usage() :
@@ -2047,6 +2069,107 @@ class PyTopo :
             if iter :
                 #locname = store.get_value(iter, 0)
                 #collname = store.get_value(iter, 1)
+                site = store.get_value(iter, 2)
+                self.UseSite(site, mapwin)
+                dialog.destroy()
+                return True
+        else :
+            dialog.destroy()
+        return False
+
+    def TrackSelect(self, mapwin) :
+        dialog = gtk.Dialog("Tracks", None, 0,
+                            (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
+                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+        dialog.set_size_request(400, 300)
+
+        sw = gtk.ScrolledWindow()
+        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+
+        # List store will hold Track name and Track file path
+        store = gtk.ListStore(str, str)
+
+        # Create the list
+        for track in self.KnownTracks :
+            store.append([ track[0], track[1] ])
+
+        treeView = gtk.TreeView(store)
+
+        renderer = gtk.CellRendererText()
+        column = gtk.TreeViewColumn("Track name", renderer, text=0)
+        treeView.append_column(column)
+
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw.add(treeView)
+
+        dialog.vbox.pack_start(sw, expand=True)
+
+        dialog.show_all()
+
+        response = dialog.run()
+        if response == gtk.RESPONSE_OK:
+            selection = treeView.get_selection()
+            model, iter = selection.get_selected()
+            if iter :
+                trackfile = store.get_value(iter, 1)
+                mapwin.trackpoints = TrackPoints()
+                mapwin.trackpoints.readTrackFile(trackfile)
+                dialog.destroy()
+                return True
+        else :
+            dialog.destroy()
+        return False
+
+    def LocationSelect(self, mapwin) :
+        dialog = gtk.Dialog("Locations", None, 0,
+                            (gtk.STOCK_REMOVE, gtk.RESPONSE_APPLY,
+                             gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
+                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+        dialog.set_size_request(400, 300)
+
+        sw = gtk.ScrolledWindow()
+        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+
+        # List store will hold name, collection-name and site object
+        store = gtk.ListStore(str, str, object)
+
+        # Create the list
+        for site in self.KnownSites :
+            store.append([site[0], site[3], site])
+
+        # Make a treeview from the list:
+        treeView = gtk.TreeView(store)
+
+        renderer = gtk.CellRendererText()
+        column = gtk.TreeViewColumn("Location", renderer, text=0)
+        treeView.append_column(column)
+        renderer = gtk.CellRendererText()
+        column = gtk.TreeViewColumn("Collection", renderer, text=1)
+        treeView.append_column(column)
+
+        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw.add(treeView)
+
+        dialog.vbox.pack_start(sw, expand=True)
+
+        dialog.show_all()
+
+        response = dialog.run()
+        while response == gtk.RESPONSE_APPLY :
+            selection = treeView.get_selection()
+            model, iter = selection.get_selected()
+            if iter :
+                site = store.get_value(iter, 2)
+                self.KnownSites.remove(site)
+                store.remove(iter)
+            response = dialog.run()
+
+        if response == gtk.RESPONSE_OK:
+            selection = treeView.get_selection()
+            model, iter = selection.get_selected()
+            if iter :
                 site = store.get_value(iter, 2)
                 self.UseSite(site, mapwin)
                 dialog.destroy()
@@ -2285,6 +2408,16 @@ class PyTopo :
                                           float(match.group(3)),
                                           match.group(4) ] )
 
+    def read_tracks(self) :
+        home = os.environ["HOME"]
+        trackdir = os.path.join(home, 'Tracks')
+
+        if os.path.isdir(trackdir) :
+            for file in glob.glob( os.path.join(trackdir, '*.gpx') ):
+                head, gpx = os.path.split(file)
+                filename = gpx.partition('.')[0]
+                self.KnownTracks.append( [filename, file] )
+
     def create_initial_config(self) :
         """Make an initial configuration file.
            If the user has a ~/.config, make ~/.config/pytopo/pytopo.sites
@@ -2342,6 +2475,7 @@ You can add new sites and collections there; see the instructions at
         """main execution routine for pytopo."""
         self.exec_config_file()
         self.read_saved_sites()
+        self.read_tracks()
         gc.enable()
 
         mapwin = MapWindow(self)
