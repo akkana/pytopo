@@ -47,7 +47,6 @@ cd Maps/opencyclemap
 end
 
 TODO: allow configuration of colors, line thickness etc.
-
 """
 
 VersionString = "PyTopo Version 1.0 by Akkana Peck"
@@ -242,7 +241,7 @@ TiledMapCollection classes must implement
         self.zoom(0, center_lat)
 
         # Find the coordinate boundaries for the set of maps to draw.
-        # This may (indeed, usually will) include maps off the screen,
+        # This may (indeed, usually will) include maps partly off the screen,
         # so the coordinates will span a greater area than the visible window.
         if (Debug) :
             print "Calculating boundaries: min =", \
@@ -322,7 +321,7 @@ TiledMapCollection classes must implement
                 # If the pixbuf wasn't available, the collection may return
                 # a URL to be downloaded. Check for that:
                 if type(pixbuf) == types.TupleType :
-                    # Make sure it's not not already queued for download:
+                    # XXX Make sure it's not not already queued for download:
                     self.download_tiles.push(pixbuf[0], pixbuf[1],
                                              x, y, x_off, y_off,
                                              mapwin)
@@ -461,7 +460,7 @@ TiledMapCollection classes must implement
         global Debug
 
         # If we already have a download going, don't start another one
-        # (eventually we might want to run several in parallel).
+        # (eventually we'll want to run several in parallel).
         if self.download_func != None :
             if Debug :
                 print "There's already a download going; not downloading more"
@@ -526,12 +525,16 @@ class OSMMapCollection(TiledMapCollection) :
 
     # Utilities for mapping tiles to/from degrees.
     # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
-    def deg2num(self, lat_deg, lon_deg):
+    def deg2num(self, lat_deg, lon_deg, zoom=None):
+        if zoom :
+            powzoom = 2.0 ** zoom
+        else :
+            powzoom = self.powzoom
         lat_rad = math.radians(lat_deg)
-        xtilef = (lon_deg + 180.0) / 360.0 * self.powzoom
+        xtilef = (lon_deg + 180.0) / 360.0 * powzoom
         ytilef = ((1.0 - math.log(math.tan(lat_rad) +
                                   (1 / math.cos(lat_rad))) / math.pi)
-                  / 2.0 * self.powzoom)
+                  / 2.0 * powzoom)
         xtile = int(xtilef)
         ytile = int(ytilef)
 
@@ -578,7 +581,8 @@ class OSMMapCollection(TiledMapCollection) :
         return
 
     def get_maplet(self, longitude, latitude) :
-        """Get the maplet containing the specified coordinates.
+        """Fetch or queue download for the maplet containing the
+        specified coordinates.
         Input coordinates are in decimal degrees.
         Returns pixbuf, x_offset, y_offset, filename
         where offsets are pixels from top left of the specified coords
@@ -588,8 +592,7 @@ class OSMMapCollection(TiledMapCollection) :
         (xtile, ytile, x_off, y_off) = self.deg2num(latitude, longitude)
 
         filename = os.path.join(self.location, str(self.zoomlevel),
-                            str(xtile), str(ytile)) + self.ext
-
+                                str(xtile), str(ytile)) + self.ext
         pixbuf = self.fetch_or_download_maplet(filename)
         return pixbuf, x_off, y_off, filename
 
@@ -597,26 +600,36 @@ class OSMMapCollection(TiledMapCollection) :
     # at zoomlevel 12, 28
     # at zoomlevel 13, 53
     # at zoomlevel 14, 107
-    def get_next_maplet(self, fullpathname, dX, dY) :
-        """Given a maplet's pathname, get the next or previous one.
-        May not work for jumps more than 1 in any direction.
-        Returns pixbuf, newpath (either may be None).
-        """
+    def get_next_maplet_name(self, fullpathname, dX, dY) :
         fulldir, filename = os.path.split(fullpathname)
         ystr, ext = os.path.splitext(filename)
         zoomdir, xstr = os.path.split(fulldir)
         xstr = str(int(xstr) + dX)
         ystr = str(int(ystr) + dY)
 
-        newpath = os.path.join(zoomdir, xstr, ystr + ext)
+        return os.path.join(zoomdir, xstr, ystr + ext)
 
+    def get_next_maplet(self, fullpathname, dX, dY) :
+        """Given a maplet's pathname, get the next or previous one.
+        May not work for jumps more than 1 in any direction.
+        Returns pixbuf, newpath (either may be None).
+        """
+        newpath = self.get_next_maplet_name(fullpathname, dX, dY)
         if newpath == None :
             return None, newpath
 
         pixbuf = self.fetch_or_download_maplet(newpath)
         return pixbuf, newpath
 
+    def url_from_path(self, path) :
+        """URL we need to get the given tile file"""
+        xdir, basename = os.path.split(path)
+        xdir = os.path.basename(xdir)
+        return self.download_url + '/' + str(self.zoomlevel) + '/' \
+            + xdir + '/' + basename
+
     def fetch_or_download_maplet(self, path) :
+        """Return a pixbuf if the file is on disk, else (url, path)"""
         global Debug
         if not os.access(path, os.R_OK) :
             if not self.download_url :
@@ -629,11 +642,7 @@ class OSMMapCollection(TiledMapCollection) :
             thedir = os.path.dirname(path)
             if not os.access(thedir, os.W_OK) :
                 os.makedirs(thedir)
-            xdir, basename = os.path.split(path)
-            xdir = os.path.basename(xdir)
-            url = self.download_url + '/' + str(self.zoomlevel) + '/' \
-                + xdir + '/' + basename
-            return (url, path)
+            return (self.url_from_path(path), path)
 
         try :
             pixbuf = gtk.gdk.pixbuf_new_from_file(path)
@@ -641,6 +650,38 @@ class OSMMapCollection(TiledMapCollection) :
             return None
 
         return pixbuf
+
+    def download_area(self, minlon, minlat, maxlon, maxlat, minzoom, maxzoom) :
+        """Download all the tiles covering an area
+           and between two zoom levels (inclusive)."""
+
+        for zoom in xrange(minzoom, maxzoom+1) :
+            print "==== Zoom level", zoom
+            # Find the start and end tiles
+            # XXXXX Left off here: we're not taking zoom into account
+            # when calculating tile number. That can't be right!
+            (minxtile, minytile, x_off, y_off) = self.deg2num(maxlat, minlon,
+                                                              zoom)
+            (maxxtile, maxytile, x_off, y_off) = self.deg2num(minlat, maxlon,
+                                                              zoom)
+            print "X tiles from", minxtile, "to", maxxtile
+            print "Y tiles from", minytile, "to", maxytile
+            for ytile in range(minytile, maxytile+1) :
+                for xtile in range(minxtile, maxxtile+1) :
+                    print "Tile", xtile, ytile
+                    filename = os.path.join(self.location, str(zoom),
+                                            str(xtile), str(ytile)) + self.ext
+                    if os.access(filename, os.R_OK) :
+                        print filename, "is already there"
+                        continue
+                    url = self.url_from_path(filename)
+
+                    # XXX Parallelize this!
+                    print "Downloading", url, "to", filename
+                    thedir = os.path.dirname(filename)
+                    if not os.access(thedir, os.W_OK) :
+                        os.makedirs(thedir)
+                    urllib.urlretrieve(url, filename)
 
     def CoordsToFilename(self, longitude, latitude) :
         """Given coordinates in decimal degrees, map to the closest filename"""
@@ -1413,7 +1454,7 @@ that are expected by the MapCollection classes:
         # draw pin
         win_width, win_height = self.drawing_area.window.get_size()
         pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat,
-        win_width, win_height)
+                                      win_width, win_height)
 
         if self.pin :
             self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
@@ -1516,11 +1557,12 @@ that are expected by the MapCollection classes:
         menu = gtk.Menu()    # Don't need to show menus
 
         # Create the menu items
-        centerpin_item = gtk.MenuItem("Go to pin")
+        centerpin_item = gtk.MenuItem("Go to pin...")
         pin_item = gtk.MenuItem("Pin this location")
-        save_item = gtk.MenuItem("Save pin location")
-        locations_item = gtk.MenuItem("My Locations")
-        tracks_item = gtk.MenuItem("My Tracks")
+        save_item = gtk.MenuItem("Save pin location...")
+        locations_item = gtk.MenuItem("My Locations...")
+        tracks_item = gtk.MenuItem("My Tracks...")
+        download_item = gtk.MenuItem("Download Area...")
         quit_item = gtk.MenuItem("Quit")
 
         # Add them to the menu
@@ -1529,6 +1571,7 @@ that are expected by the MapCollection classes:
         menu.append(save_item)
         menu.append(locations_item)
         menu.append(tracks_item)
+        menu.append(download_item)
         menu.append(quit_item)
 
         # Attach the callback functions to the activate signal
@@ -1537,6 +1580,7 @@ that are expected by the MapCollection classes:
         save_item.connect("activate", self.save_location)
         locations_item.connect("activate", self.mylocations)
         tracks_item.connect("activate", self.mytracks)
+        download_item.connect("activate", self.download_area)
 
         # We can attach the Quit menu item to our exit function
         quit_item.connect_object ("activate", self.GracefulExit, "quit")
@@ -1547,6 +1591,7 @@ that are expected by the MapCollection classes:
         save_item.show()
         locations_item.show()
         tracks_item.show()
+        download_item.show()
         quit_item.show()
 
         if event :
@@ -1597,7 +1642,7 @@ that are expected by the MapCollection classes:
                     comment.set_text("Name can't be empty")
                     continue
 
-                #Add to KnownSites
+                # Add to KnownSites
                 self.controller.KnownSites.append( [name,
                 MapUtils.DecDegToDegMin(self.pin_lon),
                 MapUtils.DecDegToDegMin(self.pin_lat),
@@ -1615,11 +1660,144 @@ that are expected by the MapCollection classes:
             self.trackpoints_center()
         self.draw_map()
 
-
     def trackpoints_center(self) :
         minlon, minlat, maxlon, maxlat = self.trackpoints.getBounds()
         self.center_lon = (maxlon + minlon) / 2
         self.center_lat = (maxlat + minlat) / 2
+
+    def download_area(self, widget) :
+        if not self.Collection.download_area or not self.Collection.zoomlevel :
+            print "Can't download an area for this collection"
+            return
+
+        # Get default values for area and zoom levels:
+        win_width, win_height = self.get_size()
+        halfwidth = win_width / self.Collection.xscale / 2
+        halfheight = win_height / self.Collection.yscale / 2
+        minlon = self.center_lon - halfwidth
+        maxlon = self.center_lon + halfwidth
+        minlat = self.center_lat - halfheight
+        maxlat = self.center_lat + halfheight
+        minzoom = self.Collection.zoomlevel
+        maxzoom = self.Collection.zoomlevel + 4
+
+        # Prompt the user for any adjustments to area and zoom:
+        dialog = gtk.Dialog("Download an area", None, 0,
+                            (gtk.STOCK_REFRESH, gtk.RESPONSE_APPLY,
+                             gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
+                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+        #dialog.set_size_request(200, 150)
+        #dialog.vbox.set_spacing(10)
+        frame = gtk.Frame("Current zoom = %d" % self.Collection.zoomlevel)
+        dialog.vbox.pack_start(frame, True, True, 0)
+    
+        table = gtk.Table(4, 3, False)
+        table.set_border_width(5)
+        table.set_row_spacings(5)
+        table.set_col_spacings(10)
+        frame.add(table)
+
+        label = gtk.Label("Min longitude:")
+        label.set_justify(gtk.JUSTIFY_RIGHT)
+        table.attach(label, 0, 1, 0, 1,
+                     gtk.SHRINK, 0, 0, 0)
+        minlon_entry = gtk.Entry()
+        table.attach(minlon_entry, 1, 2, 0, 1,
+                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+
+        label = gtk.Label("Max longitude:")
+        label.set_justify(gtk.JUSTIFY_RIGHT)
+        table.attach(label, 2, 3, 0, 1,
+                     gtk.SHRINK, 0, 0, 0)
+        maxlon_entry = gtk.Entry()
+        table.attach(maxlon_entry, 3, 4, 0, 1,
+                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+
+        label = gtk.Label("Min latitude:")
+        label.set_justify(gtk.JUSTIFY_RIGHT)
+        table.attach(label, 0, 1, 1, 2,
+                     gtk.SHRINK, 0, 0, 0)
+        minlat_entry = gtk.Entry()
+        table.attach(minlat_entry, 1, 2, 1, 2,
+                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+
+        label = gtk.Label("Max latitude:")
+        label.set_justify(gtk.JUSTIFY_RIGHT)
+        table.attach(label, 2, 3, 1, 2,
+                     gtk.SHRINK, 0, 0, 0)
+        maxlat_entry = gtk.Entry()
+        table.attach(maxlat_entry, 3, 4, 1, 2,
+                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+
+        label = gtk.Label("Min zoom:")
+        label.set_justify(gtk.JUSTIFY_RIGHT)
+        table.attach(label, 0, 1, 2, 3,
+                     gtk.SHRINK, 0, 0, 0)
+        minzoom_entry = gtk.Entry()
+        table.attach(minzoom_entry, 1, 2, 2, 3,
+                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+
+        label = gtk.Label("Max zoom:")
+        label.set_justify(gtk.JUSTIFY_RIGHT)
+        table.attach(label, 2, 3, 2, 3,
+                     gtk.SHRINK, 0, 0, 0)
+        maxzoom_entry = gtk.Entry()
+        table.attach(maxzoom_entry, 3, 4, 2, 3,
+                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+
+        err_label = gtk.Label("")
+        dialog.vbox.pack_start(err_label, True, True, 0)
+
+        def reset_download_dialog() :
+            minlon_entry.set_text(str(minlon))
+            maxlon_entry.set_text(str(maxlon))
+            minlat_entry.set_text(str(minlat))
+            maxlat_entry.set_text(str(maxlat))
+            minzoom_entry.set_text(str(minzoom))
+            maxzoom_entry.set_text(str(maxzoom))
+
+        reset_download_dialog()
+
+        dialog.show_all()
+
+        while True :
+            response = dialog.run()
+            if response == gtk.RESPONSE_CANCEL:
+                dialog.destroy()
+                return True
+            if response == gtk.RESPONSE_APPLY:
+                reset_download_dialog()
+                continue
+            # Else the response must have been OK
+
+            try :
+                minlon = float(minlon_entry.get_text().strip())
+                maxlon = float(maxlon_entry.get_text().strip())
+                minlat = float(minlat_entry.get_text().strip())
+                maxlat = float(maxlat_entry.get_text().strip())
+                minzoom = int(minzoom_entry.get_text().strip())
+                maxzoom = int(maxzoom_entry.get_text().strip())
+                print "Downloading from %f - %f, %f - %f, zoom %d - %d" \
+                    % (minlon, maxlon, minlat, maxlat, minzoom, maxzoom)
+                for zoom in range(minzoom, maxzoom+1) :
+                    print "Zoom level", zoom
+                    err_label.set_text("Downloading zoom level %d" % zoom)
+
+                    # Show a busy cursor on the dialog:
+                    busy_cursor = gtk.gdk.Cursor(gtk.gdk.WATCH)
+                    dialog.window.set_cursor(busy_cursor)
+                    gtk.gdk.flush()
+
+                    self.Collection.download_area(minlon, minlat,
+                                                  maxlon, maxlat,
+                                                  zoom, zoom)
+                    # XXX should monitor the Cancel button while this
+                    # is going on!
+                dialog.destroy()
+                return True
+
+            except ValueError :
+                err_label.set_text("Sorry, can't parse one of the values")
 
     #
     # Drawing-related routines:
@@ -1732,7 +1910,7 @@ that are expected by the MapCollection classes:
         """Handle any key press."""
         if event.string == "q" :
             self.GracefulExit()
-        elif event.string == "+" :
+        elif event.string == "+" or event.string == "=" :
             self.Collection.zoom(1)
         elif event.string == "-" :
             self.Collection.zoom(-1)
