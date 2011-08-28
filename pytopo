@@ -576,7 +576,8 @@ class OSMMapCollection(TiledMapCollection) :
         self.xscale = 256. / (lon2 - lon1)
         self.yscale = 256. / (lat2 - lat1)
         if Debug :
-            print "Zoom: Calculated scales:", self.xscale, self.yscale
+            print "Zoom to %d: Calculated scales: %f, %f" \
+                % (self.zoomlevel, self.xscale, self.yscale)
 
         return
 
@@ -621,11 +622,13 @@ class OSMMapCollection(TiledMapCollection) :
         pixbuf = self.fetch_or_download_maplet(newpath)
         return pixbuf, newpath
 
-    def url_from_path(self, path) :
+    def url_from_path(self, path, zoomlevel=None) :
         """URL we need to get the given tile file"""
+        if not zoomlevel :
+            zoomlevel = self.zoomlevel
         xdir, basename = os.path.split(path)
         xdir = os.path.basename(xdir)
-        return self.download_url + '/' + str(self.zoomlevel) + '/' \
+        return self.download_url + '/' + str(zoomlevel) + '/' \
             + xdir + '/' + basename
 
     def fetch_or_download_maplet(self, path) :
@@ -650,38 +653,6 @@ class OSMMapCollection(TiledMapCollection) :
             return None
 
         return pixbuf
-
-    def download_area(self, minlon, minlat, maxlon, maxlat, minzoom, maxzoom) :
-        """Download all the tiles covering an area
-           and between two zoom levels (inclusive)."""
-
-        for zoom in xrange(minzoom, maxzoom+1) :
-            print "==== Zoom level", zoom
-            # Find the start and end tiles
-            # XXXXX Left off here: we're not taking zoom into account
-            # when calculating tile number. That can't be right!
-            (minxtile, minytile, x_off, y_off) = self.deg2num(maxlat, minlon,
-                                                              zoom)
-            (maxxtile, maxytile, x_off, y_off) = self.deg2num(minlat, maxlon,
-                                                              zoom)
-            print "X tiles from", minxtile, "to", maxxtile
-            print "Y tiles from", minytile, "to", maxytile
-            for ytile in range(minytile, maxytile+1) :
-                for xtile in range(minxtile, maxxtile+1) :
-                    print "Tile", xtile, ytile
-                    filename = os.path.join(self.location, str(zoom),
-                                            str(xtile), str(ytile)) + self.ext
-                    if os.access(filename, os.R_OK) :
-                        print filename, "is already there"
-                        continue
-                    url = self.url_from_path(filename)
-
-                    # XXX Parallelize this!
-                    print "Downloading", url, "to", filename
-                    thedir = os.path.dirname(filename)
-                    if not os.access(thedir, os.W_OK) :
-                        os.makedirs(thedir)
-                    urllib.urlretrieve(url, filename)
 
     def CoordsToFilename(self, longitude, latitude) :
         """Given coordinates in decimal degrees, map to the closest filename"""
@@ -1636,7 +1607,7 @@ that are expected by the MapCollection classes:
 
         while True :
             response = dialog.run()
-            if response == gtk.RESPONSE_OK:
+            if response == gtk.RESPONSE_OK :
                 name = nametext.get_text().strip()
                 if not name :
                     comment.set_text("Name can't be empty")
@@ -1665,8 +1636,12 @@ that are expected by the MapCollection classes:
         self.center_lon = (maxlon + minlon) / 2
         self.center_lat = (maxlat + minlat) / 2
 
+    def cancelDownload(self, widget, data=None) :
+        self.cancelled = True
+
     def download_area(self, widget) :
-        if not self.Collection.download_area or not self.Collection.zoomlevel :
+        global Debug
+        if not self.Collection.zoomlevel :
             print "Can't download an area for this collection"
             return
 
@@ -1748,6 +1723,13 @@ that are expected by the MapCollection classes:
         err_label = gtk.Label("")
         dialog.vbox.pack_start(err_label, True, True, 0)
 
+        progress_label = gtk.Label("")
+        dialog.vbox.pack_start(progress_label, True, True, 0)
+
+        def flush_events() :
+            while gtk.events_pending():
+                gtk.main_iteration(False)
+
         def reset_download_dialog() :
             minlon_entry.set_text(str(minlon))
             maxlon_entry.set_text(str(maxlon))
@@ -1760,6 +1742,8 @@ that are expected by the MapCollection classes:
 
         dialog.show_all()
 
+        self.cancelled = False
+
         while True :
             response = dialog.run()
             if response == gtk.RESPONSE_CANCEL:
@@ -1768,7 +1752,17 @@ that are expected by the MapCollection classes:
             if response == gtk.RESPONSE_APPLY:
                 reset_download_dialog()
                 continue
-            # Else the response must have been OK
+            # Else the response must have been OK.
+            # So connect the cancel button to cancelDownload(),
+            # which means first we have to find the cancel button:
+            # Starting with PyGTK 2.22 we can use this easier method:
+            #cancelBtn = dialog.get_widget_for_response(gtk.RESPONSE_OK)
+            # but for now:
+            buttons = dialog.get_action_area().get_children()
+            for b in buttons :
+                if b.get_label() == 'gtk-cancel' :
+                    b.connect("clicked", self.cancelDownload, str)
+                    break
 
             try :
                 minlon = float(minlon_entry.get_text().strip())
@@ -1777,27 +1771,88 @@ that are expected by the MapCollection classes:
                 maxlat = float(maxlat_entry.get_text().strip())
                 minzoom = int(minzoom_entry.get_text().strip())
                 maxzoom = int(maxzoom_entry.get_text().strip())
-                print "Downloading from %f - %f, %f - %f, zoom %d - %d" \
-                    % (minlon, maxlon, minlat, maxlat, minzoom, maxzoom)
-                for zoom in range(minzoom, maxzoom+1) :
-                    print "Zoom level", zoom
-                    err_label.set_text("Downloading zoom level %d" % zoom)
-
-                    # Show a busy cursor on the dialog:
-                    busy_cursor = gtk.gdk.Cursor(gtk.gdk.WATCH)
-                    dialog.window.set_cursor(busy_cursor)
-                    gtk.gdk.flush()
-
-                    self.Collection.download_area(minlon, minlat,
-                                                  maxlon, maxlat,
-                                                  zoom, zoom)
-                    # XXX should monitor the Cancel button while this
-                    # is going on!
-                dialog.destroy()
-                return True
+                break
 
             except ValueError :
                 err_label.set_text("Sorry, can't parse one of the values")
+                continue
+
+        if Debug :
+            print "Downloading from %f - %f, %f - %f, zoom %d - %d" \
+                % (minlon, maxlon, minlat, maxlat, minzoom, maxzoom)
+        for zoom in range(minzoom, maxzoom+1) :
+            err_label.set_text("Downloading zoom level %d" % zoom)
+
+            # Show a busy cursor on the dialog:
+            busy_cursor = gtk.gdk.Cursor(gtk.gdk.WATCH)
+            dialog.window.set_cursor(busy_cursor)
+            flush_events()
+            gtk.gdk.flush()
+
+            if Debug :
+                print "==== Zoom level", zoom
+
+            # Find the start and end tiles
+            (minxtile, minytile, x_off, y_off) = \
+                self.Collection.deg2num(maxlat, minlon, zoom)
+            (maxxtile, maxytile, x_off, y_off) = \
+                self.Collection.deg2num(minlat, maxlon, zoom)
+            if Debug :
+                print "X tiles from", minxtile, "to", maxxtile
+                print "Y tiles from", minytile, "to", maxytile
+
+            pathlist = []
+            for ytile in range(minytile, maxytile+1) :
+                for xtile in range(minxtile, maxxtile+1) :
+                    if Debug :
+                        print "Tile", xtile, ytile,
+                    filename = os.path.join(self.Collection.location,
+                                            str(zoom),
+                                            str(xtile),
+                                            str(ytile)) \
+                                            + self.Collection.ext
+                    if os.access(filename, os.R_OK) :
+                        if Debug :
+                            print filename, "is already there"
+                        continue
+                    pathlist.append(filename)
+                    if Debug :
+                        print "appended as", filename
+
+            numtiles = len(pathlist)
+            err_label.set_text("Zoom level %d: %d tiles" % (zoom, numtiles))
+            flush_events()
+            num_downloaded = 0
+
+            for filename in pathlist :
+                if self.cancelled :
+                    dialog.destroy()
+                    return True
+
+                url = self.Collection.url_from_path(filename, zoom)
+
+                # XXX Parallelize this!
+                if Debug :
+                    print "Downloading", url, "to", filename
+                thedir = os.path.dirname(filename)
+                if not os.access(thedir, os.W_OK) :
+                    os.makedirs(thedir)
+                #err_label.set_text("%d %%: %d of %d" % \
+                #                   (int(num_downloaded*100 / numtiles),
+                #                    num_downloaded, numtiles))
+                if Debug :
+                    print "%d %%: %d of %d" % \
+                        (int(num_downloaded*100 / numtiles),
+                         num_downloaded, numtiles)
+                progress_label.set_text("%d: %s" % (num_downloaded, url))
+                flush_events()
+                urllib.urlretrieve(url, filename)
+                num_downloaded += 1
+
+                # XXX should show progress more graphically.
+
+        dialog.destroy()
+        return True
 
     #
     # Drawing-related routines:
