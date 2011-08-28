@@ -194,6 +194,10 @@ map coordinates and need a starting place. Should probably remove it.
     def zoom(self, amount, latitude=45) :
         return
 
+    def zoomTo(self, newzoom, latitude=45) :
+        """Zoom to a specific zoom level"""
+        return
+
     # Does the collection have its map files in place?
     def exists(self) :
         self.location = self.sub_tilde(self.location)
@@ -550,18 +554,15 @@ class OSMMapCollection(TiledMapCollection) :
         lat_deg = math.degrees(lat_rad)
         return(lat_deg, lon_deg)
 
-    def zoom(self, amount, latitude=45) :
-        """
-        Zoom in or out by the specified amount,
-        updating the scales appropriately.
-        Call zoom(0) to update x/y scales without changing zoom level.
+    def zoomTo(self, newzoom, latitude=45) :
+        """Zoom to a specific zoom level, updating scales accordingly.
         Pass latitude for map collections (e.g. OSM) that cover
         large areas so scale will tend to vary with latitude.
         """
         global Debug
 
-        self.zoomlevel += amount
-        if amount != 0 :
+        if self.zoomlevel != newzoom :
+            self.zoomlevel = newzoom
             self.powzoom = 2.0 ** self.zoomlevel
 
         # Get scale, in pixels / degree.
@@ -578,8 +579,16 @@ class OSMMapCollection(TiledMapCollection) :
         if Debug :
             print "Zoom to %d: Calculated scales: %f, %f" \
                 % (self.zoomlevel, self.xscale, self.yscale)
-
         return
+
+    def zoom(self, amount, latitude=45) :
+        """Zoom in or out by the specified amount,
+        updating the scales appropriately.
+        Call zoom(0) to update x/y scales without changing zoom level.
+        Pass latitude for map collections (e.g. OSM) that cover
+        large areas so scale will tend to vary with latitude.
+        """
+        self.zoomTo(self.zoomlevel + amount)
 
     def get_maplet(self, longitude, latitude) :
         """Fetch or queue download for the maplet containing the
@@ -1359,7 +1368,7 @@ that are expected by the MapCollection classes:
         """Create the initial window."""
         win = gtk.Window()
         win.set_name("PyTopo")
-        win.connect("destroy", gtk.main_quit)
+        win.connect("destroy", self.GracefulExit)
         win.set_border_width(5)
 
         vbox = gtk.VBox(spacing=3)
@@ -1590,6 +1599,9 @@ that are expected by the MapCollection classes:
         self.draw_map()
 
     def save_location(self, widget) :
+        """Save the pinned location.
+        XXX should save zoom level too, if different from collection default.
+        """
         dialog = gtk.Dialog("Save location", None, 0,
                             (gtk.STOCK_CANCEL, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -1614,10 +1626,10 @@ that are expected by the MapCollection classes:
                     continue
 
                 # Add to KnownSites
-                self.controller.KnownSites.append( [name,
-                MapUtils.DecDegToDegMin(self.pin_lon),
-                MapUtils.DecDegToDegMin(self.pin_lat),
-                self.Collection.name] )
+                self.controller.appendKnownSite( [name,
+                    MapUtils.DecDegToDegMin(self.pin_lon),
+                    MapUtils.DecDegToDegMin(self.pin_lat),
+                    self.Collection.name] )
 
                 dialog.destroy()
                 return True
@@ -2172,6 +2184,8 @@ that are expected by the MapCollection classes:
         """Clean up the window and exit.
            The "extra" argument is so it can be calld from GTK callbacks.
         """
+        self.controller.saveSites() # Tell PyTopo to save any new sites/tracks
+
         gtk.main_quit()
         # The python profilers don't work if you call sys.exit here.
 #
@@ -2191,19 +2205,7 @@ class PyTopo :
         self.init_width = 800
         self.init_height = 600
         self.default_collection = None
-
-    def __del__(self) :
-        """Write KnownSites to file."""
-        savefilename = os.path.join(self.config_dir, "saved.sites")
-        try :
-            savefile = open(savefilename, "w")
-        except :
-            return
-
-        for site in self.KnownSites :
-            print >>savefile, '[ "%s", %f, %f, "%s" ]' % \
-                    (site[0], site[1], site[2], site[3])
-        savefile.close()
+        self.needsSaving = False
 
     @staticmethod
     def Usage() :
@@ -2231,6 +2233,32 @@ class PyTopo :
         print errstr
         print "===============\n"
         PyTopo.Usage()
+
+    def appendKnownSite(self, site) :
+        self.KnownSites.append(site)
+        self.needsSaving = True
+
+    def saveSites(self) :
+        """Write KnownSites to file.
+        Should only be called from graceful exit.
+        """
+        if not self.needsSaving :
+            return
+
+        savefilename = os.path.join(self.config_dir, "saved.sites")
+        try :
+            savefile = open(savefilename, "w")
+        except :
+            return
+
+        for site in self.KnownSites :
+            if len(site) == 5 :
+                print >>savefile, '[ "%s", %f, %f, "%s", %d ]' % \
+                    (site[0], site[1], site[2], site[3], site[4])
+            else :
+                print >>savefile, '[ "%s", %f, %f, "%s" ]' % \
+                    (site[0], site[1], site[2], site[3])
+        savefile.close()
 
     def print_sites(self) :
         """Print the list of known sites."""
@@ -2431,6 +2459,8 @@ class PyTopo :
             print site[0] + ":", \
                 MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
                 MapUtils.DecDegToDegMinStr(mapwin.center_lat)
+        if len(site) > 4 and collection.zoomTo :
+            collection.zoomTo(site[4])
         mapwin.draw_map()
         return True
 
@@ -2624,6 +2654,7 @@ class PyTopo :
 
     def read_saved_sites(self) :
         """Read previously saved (favorite) sites."""
+        global Debug
         savefilename = os.path.join(self.config_dir, "saved.sites")
         try :
             savefile = open(savefilename, "r")
@@ -2631,18 +2662,22 @@ class PyTopo :
             return
 
         # A line typically looks like this:
-        r = re.compile('\[ *"([^"]*)", ([-0-9\.]*), ([-0-9\.]*), "([^"]*)" *\]')
+        # [ "san-francisco", -121.750000, 37.400000, "openstreetmap" ]
+        # or, with an extra optional zoom level,
+        # [ "san-francisco", -121.750000, 37.400000, "openstreetmap", 11 ]
+        r = re.compile('\[ *"([^"]*)", *([-0-9\.]*), *([-0-9\.]*), *"([^"]*)",? *([0-9]+)? *\]')
         for line in savefile :
-            # [ "cima dome", -115.581186, 35.291856, "opencyclemap" ]
             match = r.search(line)
             if match :
+                matches = match.groups()
+                # Convert from strings to numbers
+                site = [ matches[0], float(matches[1]), float(matches[2]),
+                         matches[3] ]
+                if len(matches) == 5 and matches[4] != None :
+                    site.append(int(matches[4]))
                 if Debug :
-                    print "Adding",match.group(1), match.group(2), \
-                        match.group(3), match.group(4), "to KnownSites"
-                self.KnownSites.append( [ match.group(1),
-                                          float(match.group(2)),
-                                          float(match.group(3)),
-                                          match.group(4) ] )
+                    print "Adding", site[0], "to KnownSites"
+                self.KnownSites.append( site )
 
     def read_tracks(self) :
         home = os.environ["HOME"]
