@@ -57,7 +57,7 @@ settings.set_property("gtk-touchscreen-mode", True)
 HaveDOM = True
 try :
     import xml.dom.minidom
-except ImportError, e:
+except ImportError:
     HaveDOM = False
 
 import types, urllib, re
@@ -175,42 +175,36 @@ map coordinates and need a starting place. Should probably remove it.
          - the offset in pixels into the image for the given coordinates,
            from top left.
         """
-        return None,0,0
+        return None, 0, 0
 
-    # Draw a map in a window, centered around the specified coordinates.
-    # drawwin is a DrawWin object.
     def draw_map(self, center_lon, center_lat, drawwin) :
+        """Draw a map in a window, centered around the specified coordinates.
+        drawwin is a DrawWin object."""
         return
 
-    # A way to display some part of a map collection even if we're fuzzy
-    # on the coordinates -- get the coordinate of the first maplet
-    # and return as longitude, latitude.
     def get_top_left(self) :
+        """A way to display some part of a map collection even if we're fuzzy
+        on the coordinates -- get the coordinate of the first maplet
+        and return as longitude, latitude."""
         return 0, 0
 
-    # Most map collections can't zoom, but some can.
-    # This will recalculate the xscale and yscale, which
-    # in many projections will need to know current latitude.
     def zoom(self, amount, latitude=45) :
+        """Zoom by the given number of steps (positive to zoom in,
+        negative to zoom out). Pass amount=0 to recalculate/redraw.
+        Some map collections need to know latitude to determine scale.
+        """
         return
 
-    def zoomTo(self, newzoom, latitude=45) :
-        """Zoom to a specific zoom level"""
+    def zoom_to(self, newzoom, latitude=45) :
+        """Zoom to a specific zoom level and recalculate scales.
+        Some map collections need to know latitude to determine scale.
+        """
         return
 
-    # Does the collection have its map files in place?
     def exists(self) :
-        self.location = self.sub_tilde(self.location)
+        """Does the collection have its map files in place?"""
+        self.location = os.path.expanduser(self.location)
         return os.access(self.location, os.X_OK)
-
-    @staticmethod
-    def sub_tilde(name) :
-        # config.get alas doesn't substitute $HOME or ~
-        if name[0:2] == "~/" :
-            name = os.path.join(os.environ['HOME'], name[2:])
-        elif name[0:6] == "$HOME/" :
-            name = os.path.join(os.environ['HOME'], name[6:])
-        return name
 
 class TiledMapCollection(MapCollection) :
 
@@ -233,7 +227,6 @@ TiledMapCollection classes must implement
 
     def draw_map(self, center_lon, center_lat, mapwin) :
         """Draw maplets at the specified coordinates, to fill the mapwin."""
-        global Debug
 
         # Get the current window size:
         win_width, win_height = mapwin.get_size()
@@ -362,6 +355,17 @@ TiledMapCollection classes must implement
         if len(self.download_tiles) > 0 and self.download_func == None :
             gobject.timeout_add(300, self.download_more)
 
+    def get_next_maplet_name(self, fullpathname, dX, dY) :
+        """Starting from a maplet name, get the one a set distance away."""
+        return
+
+    def get_next_maplet(self, fullpathname, dX, dY) :
+        """Given a maplet's pathname, get the next or previous one.
+        May not work for jumps more than 1 in any direction.
+        Returns pixbuf, newpath (either may be None).
+        """
+        return
+
     def draw_one_tile(self, pixbuf, mapwin, x, y, x_off, y_off) :
         """Draw a single tile, perhaps after downloading it."""
         if pixbuf != None :
@@ -442,7 +446,7 @@ TiledMapCollection classes must implement
         try :
             pixbuf = gtk.gdk.pixbuf_new_from_file(path)
             self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
-        except Exeption, e:
+        except Exception, e:
             print "Couldn't draw tile:", e
             self.download_failures += 1
 
@@ -461,7 +465,6 @@ TiledMapCollection classes must implement
            Should always return False so it won't get rescheduled.
            Eventually this should download in a separate thread.
         """
-        global Debug
 
         # If we already have a download going, don't start another one
         # (eventually we'll want to run several in parallel).
@@ -514,7 +517,7 @@ class OSMMapCollection(TiledMapCollection) :
         self.powzoom = 2.0 ** self.zoomlevel   # to avoid re-re-calculating
         self.download_url = _download_url
 
-        self.location = self.sub_tilde(self.location)
+        self.location = os.path.expanduser(self.location)
 
         # Handle ~ format for location
 
@@ -530,6 +533,7 @@ class OSMMapCollection(TiledMapCollection) :
     # Utilities for mapping tiles to/from degrees.
     # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
     def deg2num(self, lat_deg, lon_deg, zoom=None):
+        """Map coordinates to tile numbers and offsets"""
         if zoom :
             powzoom = 2.0 ** zoom
         else :
@@ -549,17 +553,17 @@ class OSMMapCollection(TiledMapCollection) :
         return(xtile, ytile, x_off, y_off)
 
     def num2deg(self, xtile, ytile):
+        """Map file numbers to coordinates"""
         lon_deg = xtile / self.powzoom * 360.0 - 180.0
         lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * ytile / self.powzoom)))
         lat_deg = math.degrees(lat_rad)
         return(lat_deg, lon_deg)
 
-    def zoomTo(self, newzoom, latitude=45) :
+    def zoom_to(self, newzoom, latitude=45) :
         """Zoom to a specific zoom level, updating scales accordingly.
         Pass latitude for map collections (e.g. OSM) that cover
         large areas so scale will tend to vary with latitude.
         """
-        global Debug
 
         if self.zoomlevel != newzoom :
             self.zoomlevel = newzoom
@@ -588,7 +592,7 @@ class OSMMapCollection(TiledMapCollection) :
         Pass latitude for map collections (e.g. OSM) that cover
         large areas so scale will tend to vary with latitude.
         """
-        self.zoomTo(self.zoomlevel + amount)
+        self.zoom_to(self.zoomlevel + amount)
 
     def get_maplet(self, longitude, latitude) :
         """Fetch or queue download for the maplet containing the
@@ -611,6 +615,7 @@ class OSMMapCollection(TiledMapCollection) :
     # at zoomlevel 13, 53
     # at zoomlevel 14, 107
     def get_next_maplet_name(self, fullpathname, dX, dY) :
+        """Starting from a maplet name, get the one a set distance away."""
         fulldir, filename = os.path.split(fullpathname)
         ystr, ext = os.path.splitext(filename)
         zoomdir, xstr = os.path.split(fulldir)
@@ -642,7 +647,6 @@ class OSMMapCollection(TiledMapCollection) :
 
     def fetch_or_download_maplet(self, path) :
         """Return a pixbuf if the file is on disk, else (url, path)"""
-        global Debug
         if not os.access(path, os.R_OK) :
             if not self.download_url :
                 if Debug :
@@ -658,12 +662,12 @@ class OSMMapCollection(TiledMapCollection) :
 
         try :
             pixbuf = gtk.gdk.pixbuf_new_from_file(path)
-        except gobject.GError, e :
+        except gobject.GError :
             return None
 
         return pixbuf
 
-    def CoordsToFilename(self, longitude, latitude) :
+    def coords_to_filename(self, longitude, latitude) :
         """Given coordinates in decimal degrees, map to the closest filename"""
         return None
 
@@ -719,7 +723,7 @@ class GenericMapCollection(TiledMapCollection) :
         where offsets are pixels from top left of the specified coords
         and pixbuf or (less often) filename may be None.
         """
-        filename = self.CoordsToFilename(longitude, latitude)
+        filename = self.coords_to_filename(longitude, latitude)
         if (Debug) :
             print "Generic get_maplet", longitude, latitude, "->", filename
         if filename == None or not os.access(filename, os.R_OK) :
@@ -765,7 +769,7 @@ class GenericMapCollection(TiledMapCollection) :
         pixbuf = gtk.gdk.pixbuf_new_from_file(newpath)
         return pixbuf, newpath
 
-    def CoordsToFilename(self, longitude, latitude) :
+    def coords_to_filename(self, longitude, latitude) :
         """Given coordinates in decimal degrees, map to the closest filename"""
         if self.left_longitude > longitude or self.top_latitude < latitude :
             return None
@@ -779,7 +783,7 @@ class GenericMapCollection(TiledMapCollection) :
             y_grid = temp
         retstr = os.path.join(self.location,
                               self.prefix + MapUtils.ohstring(x_grid,
-                                                              self.numdigits));
+                                                              self.numdigits))
         if self.usedash:
             retstr = retstr + "-"
         retstr = retstr + MapUtils.ohstring(y_grid, self.numdigits) + self.ext
@@ -815,19 +819,17 @@ class TopoMapCollection(TiledMapCollection) :
         self.ser15prefix = _ser15prefix
         self.img_ext = _img_ext
 
-        # Correction because Topo1 maps aren't in WGS 84.
+        # _correction because Topo1 maps aren't in WGS 84.
         # Right now these numbers are EMPIRICAL and inaccurate.
         # Need to do them right!
         # http://www.ngs.noaa.gov/cgi-bin/nadcon.prl says the correction
         # in the Mojave area from NAD27 to NAD84 (nobody converts to
         # WGS84, alas) should be -0.05463', 2.99014' (-1.684m, 75.554m)
-        self.lonCorrection = 0 # 0.032778 / 1000
-        self.latCorrection = 0 # -1.794084 / 1000
+        self.lon_correction = 0 # 0.032778 / 1000
+        self.lat_correction = 0 # -1.794084 / 1000
 
     def set_series(self, _series) :
         """Set the series to either 7.5 or 15 minutes."""
-
-        global Debug
 
         #traceback.print_stack()
         self.series = _series
@@ -851,10 +853,8 @@ class TopoMapCollection(TiledMapCollection) :
         and pixbuf or (less often) filename may be None.
         """
 
-        global Debug
-
-        filename = self.CoordsToFilename(longitude - self.lonCorrection,
-                                         latitude - self.latCorrection)
+        filename = self.coords_to_filename(longitude - self.lon_correction,
+                                         latitude - self.lat_correction)
         if (Debug) :
             print "T1MC get_maplet(", MapUtils.DecDegToDegMinStr(longitude),
             print  ",", MapUtils.DecDegToDegMinStr(latitude), "):", filename
@@ -870,14 +870,15 @@ class TopoMapCollection(TiledMapCollection) :
 
         # longitude increases rightward:
         x_off = int((longitude - MapUtils.TruncateToFrac(longitude, self.frac)
-                     - self.lonCorrection) * self.xscale)
+                     - self.lon_correction) * self.xscale)
         if (Debug) :
             print "truncated", MapUtils.DecDegToDegMinStr(longitude), "to",
-            print MapUtils.DecDegToDegMinStr(MapUtils.TruncateToFrac(longitude, self.frac))
+            print MapUtils.DecDegToDegMinStr(MapUtils.TruncateToFrac(longitude,
+                                                                     self.frac))
 
         # Latitude decreases downward:
         y_off = int((MapUtils.TruncateToFrac(latitude, self.frac) +
-                     self.frac - latitude - self.latCorrection) * self.yscale)
+                     self.frac - latitude - self.lat_correction) * self.yscale)
 
         if (Debug) :
             print "truncated", MapUtils.DecDegToDegMinStr(latitude), "to",
@@ -980,7 +981,7 @@ class TopoMapCollection(TiledMapCollection) :
     # http://en.wikipedia.org/wiki/Geographic_coordinate_system
     # http://en.wikipedia.org/wiki/Geodetic_system
     #
-    def CoordsToFilename(self, longitude, latitude) :
+    def coords_to_filename(self, longitude, latitude) :
         """Given a pair of coordinates in deg.mmss, map to the
         containing filename, e.g. q37122c2/012t0501.gif.
         """
@@ -1028,9 +1029,9 @@ class TopoMapCollection(TiledMapCollection) :
         letter = ord(qdir[6]) - ord('a')
         digit = int(qdir[7]) - 1
         thislon = -int(qdir[3:6]) + (digit * 7.5 * 1.5 / 60)
-        #thislon += self.lonCorrection
+        #thislon += self.lon_correction
         thislat = int(qdir[1:3]) + (letter * 7.5 * 1.5 / 60)
-        #thislat += self.latCorrection
+        #thislat += self.lat_correction
         return thislon, thislat
 
     def get_top_left(self) :
@@ -1140,7 +1141,7 @@ class TrackPoints :
         else :
             self.points.append([lon, lat])
 
-    def getBounds(self) :
+    def get_bounds(self) :
         return self.minlon, self.minlat, self.maxlon, self.maxlat
 
     def readTrackFile(self, filename) :
@@ -1210,7 +1211,7 @@ class MapUtils :
     def angle_to_bearing(angle) :
         return (450 - angle) % 360
 
-    # Convert an angle (degrees) to the appropriate quadrant string, e.g. N 57 E.
+    # Convert an angle (deg) to the appropriate quadrant string, e.g. N 57 E.
     @staticmethod
     def angle_to_quadrant(angle) :
         if angle > 180 :
@@ -1318,7 +1319,7 @@ that are expected by the MapCollection classes:
         self.controller = _controller
 
         # The current map collection being used:
-        self.Collection = None
+        self.collection = None
 
         self.center_lon = 0
         self.center_lat = 0
@@ -1327,7 +1328,8 @@ that are expected by the MapCollection classes:
         self.trackpoints = None
 
         try :
-            self.pin = gtk.gdk.pixbuf_new_from_file("/usr/share/pytopo/pytopo-pin.png")
+            self.pin = \
+                gtk.gdk.pixbuf_new_from_file("/usr/share/pytopo/pytopo-pin.png")
         except :
             try :
                 self.pin = gtk.gdk.pixbuf_new_from_file("pytopo-pin.png")
@@ -1344,7 +1346,7 @@ that are expected by the MapCollection classes:
 
         # Where to save generated maps. The default is fine for most people.
         # Which is a good thing since there's currently no way to change it.
-        self.MapSaveDir = os.environ["HOME"] + "/Topo/"
+        self.map_save_dir = os.environ["HOME"] + "/Topo/"
 
         # X/gtk graphics variables we need:
         self.drawing_area = 0
@@ -1358,7 +1360,7 @@ that are expected by the MapCollection classes:
         self.track_color = gtk.gdk.color_parse("magenta")
         self.waypoint_color = gtk.gdk.color_parse("blue")
         # Grid color is only needed when Debug,
-        # but this is called before ParseArgs so we don't know Debug.
+        # but this is called before parse_args so we don't know Debug.
         self.grid_color = gtk.gdk.color_parse("green")
 
         # The timeout for long press events
@@ -1368,7 +1370,7 @@ that are expected by the MapCollection classes:
         """Create the initial window."""
         win = gtk.Window()
         win.set_name("PyTopo")
-        win.connect("destroy", self.GracefulExit)
+        win.connect("destroy", self.graceful_exit)
         win.set_border_width(5)
 
         vbox = gtk.VBox(spacing=3)
@@ -1411,7 +1413,7 @@ that are expected by the MapCollection classes:
         """Redraw the map, centered at center_lon, center_lat."""
         global Debug
 
-        if self.Collection == None :
+        if self.collection == None :
             print "No collection!"
             return
         if not self.drawing_area :
@@ -1424,7 +1426,7 @@ that are expected by the MapCollection classes:
             print "window draw_map centered at",
             print MapUtils.DecDegToDegMinStr(self.center_lon),
             print MapUtils.DecDegToDegMinStr(self.center_lat)
-        self.Collection.draw_map(self.center_lon, self.center_lat, self)
+        self.collection.draw_map(self.center_lon, self.center_lat, self)
 
         self.draw_trackpoints()
 
@@ -1445,16 +1447,16 @@ that are expected by the MapCollection classes:
         if self.trackpoints != None :   # may be trackpoints or waypoints
             win_width, win_height = self.drawing_area.window.get_size()
             if len(self.trackpoints.points) > 0 :
-                cur_x = None;
-                cur_y = None;
+                cur_x = None
+                cur_y = None
                 self.xgc.line_style = gtk.gdk.LINE_ON_OFF_DASH
                 self.xgc.line_width = 3
                 self.set_track_color()
 
                 for pt in self.trackpoints.points :
-                    x = int((pt[0] - self.center_lon) * self.Collection.xscale
+                    x = int((pt[0] - self.center_lon) * self.collection.xscale
                             + win_width/2)
-                    y = int((self.center_lat - pt[1]) * self.Collection.yscale
+                    y = int((self.center_lat - pt[1]) * self.collection.yscale
                             + win_height/2)
 
                     if ((x >= 0 and x < win_width and
@@ -1465,18 +1467,19 @@ that are expected by the MapCollection classes:
                         cur_x = x
                         cur_y = y
                     else :
-                        #print "Skipping", pt[0], pt[1], ": would be", x, ",", y
-                        cur_x = None;
-                        cur_y = None;
+                        #print "Skipping", pt[0], pt[1], \
+                        #    ": would be", x, ",", y
+                        cur_x = None
+                        cur_y = None
 
             if len(self.trackpoints.waypoints) > 0 :
                 self.set_waypoint_color()
                 self.xgc.line_style = gtk.gdk.LINE_SOLID
                 self.xgc.line_width = 2
                 for pt in self.trackpoints.waypoints :
-                    x = int((pt[0] - self.center_lon) * self.Collection.xscale
+                    x = int((pt[0] - self.center_lon) * self.collection.xscale
                             + win_width/2)
-                    y = int((self.center_lat - pt[1]) * self.Collection.yscale
+                    y = int((self.center_lat - pt[1]) * self.collection.yscale
                             + win_height/2)
 
                     if x >= 0 and x < win_width and y >= 0 and y < win_height :
@@ -1489,44 +1492,46 @@ that are expected by the MapCollection classes:
            Also draw any other controls we might need.
         """
         win_width, win_height = self.drawing_area.window.get_size()
-        self.zoomBtnSize = int(win_width / 25)
+        self.zoom_btn_size = int(win_width / 25)
         self.zoom_X1 = 8
         self.zoom_in_Y1 = 10
-        self.zoom_out_Y1 = self.zoom_in_Y1 + self.zoomBtnSize * 2
-        textoffset = self.zoomBtnSize / 5
+        self.zoom_out_Y1 = self.zoom_in_Y1 + self.zoom_btn_size * 2
+        textoffset = self.zoom_btn_size / 5
 
         self.xgc.line_style = gtk.gdk.LINE_SOLID
         self.set_bg_color()
         self.xgc.line_width = 3
         # Draw the boxes
         self.draw_rectangle(False, self.zoom_X1, self.zoom_in_Y1,
-                            self.zoomBtnSize, self.zoomBtnSize)
+                            self.zoom_btn_size, self.zoom_btn_size)
         self.draw_rectangle(False, self.zoom_X1, self.zoom_out_Y1,
-                            self.zoomBtnSize, self.zoomBtnSize)
+                            self.zoom_btn_size, self.zoom_btn_size)
 
-        midpointx = self.zoom_X1 + self.zoomBtnSize/2
+        midpointx = self.zoom_X1 + self.zoom_btn_size/2
         # Draw the -
-        midpointy = self.zoom_out_Y1 + self.zoomBtnSize/2
+        midpointy = self.zoom_out_Y1 + self.zoom_btn_size/2
         self.draw_line(self.zoom_X1 + textoffset, midpointy,
-                       self.zoom_X1 + self.zoomBtnSize - textoffset, midpointy)
+                       self.zoom_X1 + self.zoom_btn_size - textoffset,
+                       midpointy)
 
         # Draw the +
-        midpointy = self.zoom_in_Y1 + self.zoomBtnSize/2
+        midpointy = self.zoom_in_Y1 + self.zoom_btn_size/2
         self.draw_line(self.zoom_X1 + textoffset, midpointy,
-                       self.zoom_X1 + self.zoomBtnSize - textoffset, midpointy)
+                       self.zoom_X1 + self.zoom_btn_size - textoffset,
+                       midpointy)
         self.draw_line(midpointx, self.zoom_in_Y1 + textoffset,
                        midpointx,
-                       self.zoom_in_Y1 + self.zoomBtnSize - textoffset)
+                       self.zoom_in_Y1 + self.zoom_btn_size - textoffset)
 
     def was_click_in_zoom(self, x, y) :
         """Do the coordinates fall within the zoom in or out buttons?
            Returns 0 for none, 1 for zoom in, -1 for zoom out.
         """
-        if x < self.zoom_X1 or x > self.zoom_X1 + self.zoomBtnSize :
+        if x < self.zoom_X1 or x > self.zoom_X1 + self.zoom_btn_size :
             return 0
-        if y < self.zoom_in_Y1 or y > self.zoom_out_Y1 + self.zoomBtnSize :
+        if y < self.zoom_in_Y1 or y > self.zoom_out_Y1 + self.zoom_btn_size :
             return 0
-        if y < self.zoom_in_Y1 + self.zoomBtnSize :
+        if y < self.zoom_in_Y1 + self.zoom_btn_size :
             return 1
         if y > self.zoom_out_Y1 :
             return -1
@@ -1563,7 +1568,7 @@ that are expected by the MapCollection classes:
         download_item.connect("activate", self.download_area)
 
         # We can attach the Quit menu item to our exit function
-        quit_item.connect_object ("activate", self.GracefulExit, "quit")
+        quit_item.connect_object ("activate", self.graceful_exit, "quit")
 
         # We do need to show menu items
         centerpin_item.show()
@@ -1586,7 +1591,7 @@ that are expected by the MapCollection classes:
         menu.popup(None, None, None, button, t)
 
     def mylocations(self, widget) :
-        self.controller.LocationSelect(self)
+        self.controller.location_select(self)
 
     def set_pin_by_mouse(self, widget) :
         """Set the pin at the current mouse location"""
@@ -1626,10 +1631,10 @@ that are expected by the MapCollection classes:
                     continue
 
                 # Add to KnownSites
-                self.controller.appendKnownSite( [name,
+                self.controller.append_known_site( [name,
                     MapUtils.DecDegToDegMin(self.pin_lon),
                     MapUtils.DecDegToDegMin(self.pin_lat),
-                    self.Collection.name] )
+                    self.collection.name] )
 
                 dialog.destroy()
                 return True
@@ -1644,29 +1649,29 @@ that are expected by the MapCollection classes:
         self.draw_map()
 
     def trackpoints_center(self) :
-        minlon, minlat, maxlon, maxlat = self.trackpoints.getBounds()
+        minlon, minlat, maxlon, maxlat = self.trackpoints.get_bounds()
         self.center_lon = (maxlon + minlon) / 2
         self.center_lat = (maxlat + minlat) / 2
 
-    def cancelDownload(self, widget, data=None) :
+    def cancel_download(self, widget, data=None) :
         self.cancelled = True
 
     def download_area(self, widget) :
         global Debug
-        if not self.Collection.zoomlevel :
+        if not self.collection.zoomlevel :
             print "Can't download an area for this collection"
             return
 
         # Get default values for area and zoom levels:
         win_width, win_height = self.get_size()
-        halfwidth = win_width / self.Collection.xscale / 2
-        halfheight = win_height / self.Collection.yscale / 2
+        halfwidth = win_width / self.collection.xscale / 2
+        halfheight = win_height / self.collection.yscale / 2
         minlon = self.center_lon - halfwidth
         maxlon = self.center_lon + halfwidth
         minlat = self.center_lat - halfheight
         maxlat = self.center_lat + halfheight
-        minzoom = self.Collection.zoomlevel
-        maxzoom = self.Collection.zoomlevel + 4
+        minzoom = self.collection.zoomlevel
+        maxzoom = self.collection.zoomlevel + 4
 
         # Prompt the user for any adjustments to area and zoom:
         dialog = gtk.Dialog("Download an area", None, 0,
@@ -1675,7 +1680,7 @@ that are expected by the MapCollection classes:
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
         #dialog.set_size_request(200, 150)
         #dialog.vbox.set_spacing(10)
-        frame = gtk.Frame("Current zoom = %d" % self.Collection.zoomlevel)
+        frame = gtk.Frame("Current zoom = %d" % self.collection.zoomlevel)
         dialog.vbox.pack_start(frame, True, True, 0)
     
         table = gtk.Table(4, 3, False)
@@ -1765,7 +1770,7 @@ that are expected by the MapCollection classes:
                 reset_download_dialog()
                 continue
             # Else the response must have been OK.
-            # So connect the cancel button to cancelDownload(),
+            # So connect the cancel button to cancel_download(),
             # which means first we have to find the cancel button:
             # Starting with PyGTK 2.22 we can use this easier method:
             #cancelBtn = dialog.get_widget_for_response(gtk.RESPONSE_OK)
@@ -1773,7 +1778,7 @@ that are expected by the MapCollection classes:
             buttons = dialog.get_action_area().get_children()
             for b in buttons :
                 if b.get_label() == 'gtk-cancel' :
-                    b.connect("clicked", self.cancelDownload, str)
+                    b.connect("clicked", self.cancel_download, str)
                     break
 
             try :
@@ -1806,9 +1811,9 @@ that are expected by the MapCollection classes:
 
             # Find the start and end tiles
             (minxtile, minytile, x_off, y_off) = \
-                self.Collection.deg2num(maxlat, minlon, zoom)
+                self.collection.deg2num(maxlat, minlon, zoom)
             (maxxtile, maxytile, x_off, y_off) = \
-                self.Collection.deg2num(minlat, maxlon, zoom)
+                self.collection.deg2num(minlat, maxlon, zoom)
             if Debug :
                 print "X tiles from", minxtile, "to", maxxtile
                 print "Y tiles from", minytile, "to", maxytile
@@ -1818,11 +1823,11 @@ that are expected by the MapCollection classes:
                 for xtile in range(minxtile, maxxtile+1) :
                     if Debug :
                         print "Tile", xtile, ytile,
-                    filename = os.path.join(self.Collection.location,
+                    filename = os.path.join(self.collection.location,
                                             str(zoom),
                                             str(xtile),
                                             str(ytile)) \
-                                            + self.Collection.ext
+                                            + self.collection.ext
                     if os.access(filename, os.R_OK) :
                         if Debug :
                             print filename, "is already there"
@@ -1841,7 +1846,7 @@ that are expected by the MapCollection classes:
                     dialog.destroy()
                     return True
 
-                url = self.Collection.url_from_path(filename, zoom)
+                url = self.collection.url_from_path(filename, zoom)
 
                 # XXX Parallelize this!
                 if Debug :
@@ -1907,10 +1912,10 @@ that are expected by the MapCollection classes:
     def draw_string(self, x, y, str) :
         """Draw a string."""
         import pango
-        layout = self.drawing_area.create_pango_layout (str);
+        layout = self.drawing_area.create_pango_layout (str)
         fontdesc = pango.FontDescription("Sans Bold 12")
-        layout.set_font_description (fontdesc);
-        self.drawing_area.window.draw_layout(self.xgc, x, y, layout);
+        layout.set_font_description (fontdesc)
+        self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
 
     # Save the current map as something which could be gimped or printed.
     # XXX THIS IS BROKEN, code assumes start_lon/start_lat but has center_.
@@ -1922,13 +1927,13 @@ that are expected by the MapCollection classes:
         win_width, win_height = self.get_size()
 
         # Calculate dAngle in decimal degrees
-        dAngle = self.Collection.img_width / self.Collection.xscale
+        dAngle = self.collection.img_width / self.collection.xscale
 
         # Calculate number of charts based on window size, and round up
         # so the saved map shows at least as much as the window does.
         #win_width, win_height = drawing_area.window.get_size()
-        num_lon = int (.8 + float(win_width) / self.Collection.img_width)
-        num_lat = int (.8 + float(win_height) / self.Collection.img_height)
+        num_lon = int (.8 + float(win_width) / self.collection.img_width)
+        num_lat = int (.8 + float(win_height) / self.collection.img_height)
 
         ny = 0
         curlat = self.center_lat + dAngle*num_lat * .25
@@ -1937,13 +1942,13 @@ that are expected by the MapCollection classes:
             nx = 0
             while nx < num_lon :
                 file_list += " " + \
-                    self.Collection.CoordsToFilename(curlon, curlat)
+                    self.collection.coords_to_filename(curlon, curlat)
                 curlon += dAngle
                 nx += 1
             curlat -= dAngle
             ny += 1
 
-        outfile = self.MapSaveDir + "topo" + "_" + \
+        outfile = self.map_save_dir + "topo" + "_" + \
                   str(self.center_lon) + "_" + str(self.center_lat) + ".gif"
         cmdstr = "montage -geometry 262x328 -tile " + \
                  str(nx) + "x" + str(ny) + " " + \
@@ -1957,7 +1962,8 @@ that are expected by the MapCollection classes:
     def expose_event(self, widget, event) :
         """Handle exposes on the canvas."""
         #print "Expose:", event.type, "for object", self
-        #print "area:", event.area.x, event.area.y, event.area.width, event.area.height
+        #print "area:", event.area.x, event.area.y, \
+        #    event.area.width, event.area.height
 
         if self.xgc == 0 :
             self.xgc = self.drawing_area.window.new_gc()
@@ -1971,36 +1977,36 @@ that are expected by the MapCollection classes:
 
     def key_quit(self, *args) :
         """Callback when the user types q."""
-        self.GracefulExit()
+        self.graceful_exit()
 
     def key_press_event(self, widget, event) :
         """Handle any key press."""
         if event.string == "q" :
-            self.GracefulExit()
+            self.graceful_exit()
         elif event.string == "+" or event.string == "=" :
-            self.Collection.zoom(1)
+            self.collection.zoom(1)
         elif event.string == "-" :
-            self.Collection.zoom(-1)
+            self.collection.zoom(-1)
         elif event.keyval == gtk.keysyms.Left :
             self.center_lon -= \
-                float(self.Collection.img_width) / self.Collection.xscale
+                float(self.collection.img_width) / self.collection.xscale
         elif event.keyval == gtk.keysyms.Right :
             self.center_lon += \
-                float(self.Collection.img_width) / self.Collection.xscale
+                float(self.collection.img_width) / self.collection.xscale
         elif event.keyval == gtk.keysyms.Up :
             self.center_lat += \
-                float(self.Collection.img_height) / self.Collection.yscale
+                float(self.collection.img_height) / self.collection.yscale
         elif event.keyval == gtk.keysyms.Down :
             self.center_lat -= \
-                float(self.Collection.img_height) / self.Collection.yscale
+                float(self.collection.img_height) / self.collection.yscale
         elif event.keyval == gtk.keysyms.space :
             self.set_center_to_pin()
         elif event.keyval == gtk.keysyms.l and \
                  event.state == gtk.gdk.CONTROL_MASK :
             pass    # Just fall through to draw_map()
         elif event.string == "m" :
-            if PyTopo.SelectionWindow(p, self) :
-                self.set_pin()
+            if PyTopo.selection_window(p, self) :
+                self.set_center_to_pin()
                 pass
         elif event.string == "s" :
             self.save_as()
@@ -2016,15 +2022,15 @@ that are expected by the MapCollection classes:
         """Convert pixels to longitude/latitude."""
         # collection.x_scale is in pixels per degree.
         return (self.center_lon - \
-                    float(win_width/2 - x) / self.Collection.xscale,
+                    float(win_width/2 - x) / self.collection.xscale,
                 self.center_lat + \
-                    float(win_height/2 - y) / self.Collection.yscale)
+                    float(win_height/2 - y) / self.collection.yscale)
 
     def coords2xy(self, lon, lat, win_width, win_height) :
         """Convert lon/lat to pixels."""
-        return (int((lon - self.center_lon) * self.Collection.xscale
+        return (int((lon - self.center_lon) * self.collection.xscale
                     + win_width/2),
-                int((self.center_lat - lat) * self.Collection.yscale
+                int((self.center_lat - lat) * self.collection.yscale
                     + win_height/2) )
 
     def drag_event(self, widget, event) :
@@ -2038,7 +2044,7 @@ that are expected by the MapCollection classes:
         # as a drag. So if a drag starts in the zoom control area,
         # it was probably really meant to be a single click.
         if self.was_click_in_zoom(event.x, event.y) :
-            return False;
+            return False
 
         # The GTK documentation @ 24.2.1
         # http://www.pygtk.org/pygtk2tutorial/sec-EventHandling.html
@@ -2061,11 +2067,12 @@ that are expected by the MapCollection classes:
         return True
 
     def move_to(self, x, y, widget) :
-        if widget.drag_check_threshold(self.x_start_drag, self.y_start_drag, x, y) :
+        if widget.drag_check_threshold(self.x_start_drag, self.y_start_drag,
+                                       x, y) :
             dx = x - self.x_start_drag
             dy = y - self.y_start_drag
-            self.center_lon -= dx / self.Collection.xscale
-            self.center_lat += dy / self.Collection.yscale
+            self.center_lon -= dx / self.collection.xscale
+            self.center_lat += dy / self.collection.yscale
             self.draw_map()
             # Reset the drag coordinates now that we're there
             self.x_start_drag = x
@@ -2081,7 +2088,8 @@ that are expected by the MapCollection classes:
         if event.button == 3 :
             x, y, state = self.drawing_area.window.get_pointer()
             win_width, win_height = self.drawing_area.window.get_size()
-            self.cur_lon, self.cur_lat = self.xy2coords(x, y, win_width, win_height)
+            self.cur_lon, self.cur_lat = self.xy2coords(x, y,
+                                                        win_width, win_height)
             self.context_menu(event)
             return
 
@@ -2097,7 +2105,7 @@ that are expected by the MapCollection classes:
 
         self.center_lon = cur_long
         self.center_lat = cur_lat
-        self.Collection.zoom(1)
+        self.collection.zoom(1)
         self.draw_map()
         return True
 
@@ -2130,7 +2138,7 @@ that are expected by the MapCollection classes:
 
             zoom =  self.was_click_in_zoom(event.x, event.y)
             if zoom :
-                self.Collection.zoom(zoom)
+                self.collection.zoom(zoom)
                 self.draw_map()
                 return True
 
@@ -2170,21 +2178,23 @@ that are expected by the MapCollection classes:
                 angle = int(math.atan2(-ydiff, -xdiff) * 180 / math.pi)
                 angle = MapUtils.angle_to_bearing(angle)
                 if Debug :
-                    print "Bearing:", angle, "=", MapUtils.angle_to_quadrant(angle)
+                    print "Bearing:", angle, "=", \
+                        MapUtils.angle_to_quadrant(angle)
             self.click_last_long = cur_long
             self.click_last_lat = cur_lat
 
         return True
 
+    @staticmethod
     def nop(*args) :
         "Do nothing."
         return True
 
-    def GracefulExit(self, extra=None) :
+    def graceful_exit(self, extra=None) :
         """Clean up the window and exit.
            The "extra" argument is so it can be calld from GTK callbacks.
         """
-        self.controller.saveSites() # Tell PyTopo to save any new sites/tracks
+        self.controller.save_sites() # Tell PyTopo to save any new sites/tracks
 
         gtk.main_quit()
         # The python profilers don't work if you call sys.exit here.
@@ -2199,50 +2209,52 @@ class PyTopo :
     """
 
     def __init__(self) :
-        self.Collections = []
+        self.collections = []
         self.KnownSites = []
         self.KnownTracks = []
         self.init_width = 800
         self.init_height = 600
         self.default_collection = None
-        self.needsSaving = False
+        self.needs_saving = False
 
     @staticmethod
     def Usage() :
         global VersionString
         print VersionString
-        print "Usage: pytopo [-t trackfile] site_name"
-        print "       pytopo [-t trackfile] start_lat start_long collection"
-        print "       pytopo -p"
-        print "Use degrees.decimal_minutes format for coordinates."
-        print "Set up site names in ~/.pytopo"
-        print "Print list of known sites with pytopo -p"
-        print ""
-        print "Track files may contain track points and/or waypoints;"
-        print "multiple track files are allowed."
-        print ""
-        print "Move around using arrow keys.  q quits."
-        print "Click in the map to print the coordinates of the clicked location."
-        print "'s' will attempt to save the current map as a GIF file in ~/Topo/."
+        print """
+Usage: pytopo [-t trackfile] site_name
+       pytopo [-t trackfile] start_lat start_long collection
+       pytopo -p
+
+Use degrees.decimal_minutes format for coordinates.
+Set up site names in ~/.pytopo
+Print list of known sites with pytopo -p
+
+Track files may contain track points and/or waypoints;
+multiple track files are allowed.
+
+Move around using arrow keys.  q quits.
+Click in the map to print the coordinates of the clicked location.
+'s' will attempt to save the current map as a GIF file in ~/Topo/."""
         sys.exit(1)
 
     @staticmethod
-    def ErrorOut(errstr) :
+    def error_out(errstr) :
         """Print an error and exit cleanly."""
         print "==============="
         print errstr
         print "===============\n"
         PyTopo.Usage()
 
-    def appendKnownSite(self, site) :
+    def append_known_site(self, site) :
         self.KnownSites.append(site)
-        self.needsSaving = True
+        self.needs_saving = True
 
-    def saveSites(self) :
+    def save_sites(self) :
         """Write KnownSites to file.
         Should only be called from graceful exit.
         """
-        if not self.needsSaving :
+        if not self.needs_saving :
             return
 
         savefilename = os.path.join(self.config_dir, "saved.sites")
@@ -2267,25 +2279,25 @@ class PyTopo :
             #print site[0], site[1]
         sys.exit(0)
 
-    def FindCollection(self, collname) :
+    def find_collection(self, collname) :
         """Find a collection with the given name."""
         global Debug
 
         #print "Looking for a collection named", collname
         # Make sure collname is a MapCollection we know about:
         collection = None
-        for coll in self.Collections :
+        for coll in self.collections :
             if collname == coll.name :
                 if not coll.exists() :
-                    PyTopo.ErrorOut("Can't access location " + coll.location +
-                                    " for collection " + collname)
+                    PyTopo.error_out("Can't access location " + coll.location +
+                                     " for collection " + collname)
                 collection = coll
                 if (Debug) :
                     print "Found the collection", collection.name
                 return collection
         return collection
 
-    def SelectionWindow(self, mapwin) :
+    def selection_window(self, mapwin) :
         dialog = gtk.Dialog("Choose a point", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -2305,22 +2317,22 @@ class PyTopo :
 
         # http://pygtk.org/pygtk2tutorial/ch-TreeViewWidget.html
         # Make a treeview from the list:
-        treeView = gtk.TreeView(store)
+        treeview = gtk.TreeView(store)
 
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Location", renderer, text=0)
         #column.pack_start(renderer, True)
         #column.set_resizable(True)
-        treeView.append_column(column)
+        treeview.append_column(column)
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Collection", renderer, text=1)
         #column.pack_start(renderer, False)
-        treeView.append_column(column)
+        treeview.append_column(column)
 
         #store.set_sort_column_id(0, gtk.SORT_ASCENDING)
 
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        sw.add(treeView)
+        sw.add(treeview)
 
         dialog.vbox.pack_start(sw, expand=True)
 
@@ -2328,13 +2340,13 @@ class PyTopo :
 
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
-            selection = treeView.get_selection()
+            selection = treeview.get_selection()
             model, iter = selection.get_selected()
             if iter :
                 #locname = store.get_value(iter, 0)
                 #collname = store.get_value(iter, 1)
                 site = store.get_value(iter, 2)
-                self.UseSite(site, mapwin)
+                self.use_site(site, mapwin)
                 dialog.destroy()
                 return True
         else :
@@ -2358,14 +2370,14 @@ class PyTopo :
         for track in self.KnownTracks :
             store.append([ track[0], track[1] ])
 
-        treeView = gtk.TreeView(store)
+        treeview = gtk.TreeView(store)
 
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Track name", renderer, text=0)
-        treeView.append_column(column)
+        treeview.append_column(column)
 
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        sw.add(treeView)
+        sw.add(treeview)
 
         dialog.vbox.pack_start(sw, expand=True)
 
@@ -2373,7 +2385,7 @@ class PyTopo :
 
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
-            selection = treeView.get_selection()
+            selection = treeview.get_selection()
             model, iter = selection.get_selected()
             if iter :
                 trackfile = store.get_value(iter, 1)
@@ -2385,7 +2397,7 @@ class PyTopo :
             dialog.destroy()
         return False
 
-    def LocationSelect(self, mapwin) :
+    def location_select(self, mapwin) :
         dialog = gtk.Dialog("Locations", None, 0,
                             (gtk.STOCK_REMOVE, gtk.RESPONSE_APPLY,
                              gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
@@ -2404,17 +2416,17 @@ class PyTopo :
             store.append([site[0], site[3], site])
 
         # Make a treeview from the list:
-        treeView = gtk.TreeView(store)
+        treeview = gtk.TreeView(store)
 
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Location", renderer, text=0)
-        treeView.append_column(column)
+        treeview.append_column(column)
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Collection", renderer, text=1)
-        treeView.append_column(column)
+        treeview.append_column(column)
 
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        sw.add(treeView)
+        sw.add(treeview)
 
         dialog.vbox.pack_start(sw, expand=True)
 
@@ -2422,7 +2434,7 @@ class PyTopo :
 
         response = dialog.run()
         while response == gtk.RESPONSE_APPLY :
-            selection = treeView.get_selection()
+            selection = treeview.get_selection()
             model, iter = selection.get_selected()
             if iter :
                 site = store.get_value(iter, 2)
@@ -2431,22 +2443,22 @@ class PyTopo :
             response = dialog.run()
 
         if response == gtk.RESPONSE_OK:
-            selection = treeView.get_selection()
+            selection = treeview.get_selection()
             model, iter = selection.get_selected()
             if iter :
                 site = store.get_value(iter, 2)
-                self.UseSite(site, mapwin)
+                self.use_site(site, mapwin)
                 dialog.destroy()
                 return True
         else :
             dialog.destroy()
         return False
 
-    def UseSite(self, site, mapwin) :
-        collection = self.FindCollection(site[3])
+    def use_site(self, site, mapwin) :
+        collection = self.find_collection(site[3])
         if not collection :
             return False
-        mapwin.Collection = collection
+        mapwin.collection = collection
 
         # site[1] and site[2] are the long and lat in deg.minutes
         #print site[0], site[1], site[2]
@@ -2459,12 +2471,12 @@ class PyTopo :
             print site[0] + ":", \
                 MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
                 MapUtils.DecDegToDegMinStr(mapwin.center_lat)
-        if len(site) > 4 and collection.zoomTo :
-            collection.zoomTo(site[4])
+        if len(site) > 4 and collection.zoom_to :
+            collection.zoom_to(site[4])
         mapwin.draw_map()
         return True
 
-    def ParseArgs(self, mapwin, args) :
+    def parse_args(self, mapwin, args) :
         """Parse runtime arguments."""
         global VersionString
         global Debug
@@ -2490,16 +2502,16 @@ class PyTopo :
                     if len(args) < 2 :
                         print "-c must specify collection"
                         PyTopo.Usage()
-                    mapwin.Collection = self.FindCollection(args[1])
-                    if mapwin.Collection == None :
-                        PyTopo.ErrorOut("I can't find a map collection called "
+                    mapwin.collection = self.find_collection(args[1])
+                    if mapwin.collection == None :
+                        PyTopo.error_out("I can't find a map collection called "
                                         + args[1])
                     # Start initially at top left, but subsequent args
                     # may change this:
                     mapwin.center_lon, mapwin.center_lat = \
-                        mapwin.Collection.get_top_left()
+                        mapwin.collection.get_top_left()
                     if (Debug) :
-                        print "Collection", mapwin.Collection.name,
+                        print "Collection", mapwin.collection.name,
                         print "Starting at", \
                             MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
                             ", ", MapUtils.DecDegToDegMinStr(mapwin.center_lat)
@@ -2513,7 +2525,7 @@ class PyTopo :
                     mapwin.trackpoints.readTrackFile(args[1])
                     args = args[1:]
                 else :
-                    PyTopo.ErrorOut("Unknown flag " + args[0])
+                    PyTopo.error_out("Unknown flag " + args[0])
 
                 # Done processing this flag
                 args = args[1:]
@@ -2531,11 +2543,11 @@ class PyTopo :
             # Try to match a known site:
             for site in self.KnownSites :
                 if args[0] == site[0] :
-                    if not self.UseSite(site, mapwin) :
+                    if not self.use_site(site, mapwin) :
                         continue
                     break
 
-            if mapwin.Collection and mapwin.center_lon and mapwin.center_lat :
+            if mapwin.collection and mapwin.center_lon and mapwin.center_lat :
                 args = args[1:]
                 continue
 
@@ -2547,7 +2559,7 @@ class PyTopo :
                    len(args[1] > 1 and args[1][1].isdigit) :
                     mapwin.center_lon = MapUtils.DegMinToDecDeg(float(args[0]))
                     mapwin.center_lat = MapUtils.DegMinToDecDeg(float(args[2]))
-                    mapwin.Collection = PyTopo.FindCollection(args[3])
+                    mapwin.collection = self.find_collection(args[3])
                     args = args[2:]
                     continue
                 print "Didn't find any"
@@ -2563,15 +2575,15 @@ class PyTopo :
 
         # Now we've parsed all the arguments.
         # If we didn't get a collection, use the default, if any:
-        if not mapwin.Collection and self.default_collection :
-            mapwin.Collection = self.FindCollection(self.default_collection)
+        if not mapwin.collection and self.default_collection :
+            mapwin.collection = self.find_collection(self.default_collection)
 
         # If we have a collection and a track but no center point,
         # center it on the trackpoints:
-        if mapwin.trackpoints != None and mapwin.Collection != None \
+        if mapwin.trackpoints != None and mapwin.collection != None \
                 and not (mapwin.center_lat and mapwin.center_lon) :
             print "Trying to center map based on track points"
-            minlon, minlat, maxlon, maxlat = mapwin.trackpoints.getBounds()
+            minlon, minlat, maxlon, maxlat = mapwin.trackpoints.get_bounds()
             mapwin.center_lon = (maxlon + minlon) / 2
             mapwin.center_lat = (maxlat + minlat) / 2
             # XXX Do something useful with min/max
@@ -2579,12 +2591,12 @@ class PyTopo :
 
         # By now, we hope we have the mapwin positioned with a collection
         # and starting coordinates:
-        if mapwin.Collection and mapwin.center_lon and mapwin.center_lat :
+        if mapwin.collection and mapwin.center_lon and mapwin.center_lat :
             return
 
         # Didn't match any known run mode:
         # start in GUI mode choosing a location:
-        if not self.SelectionWindow(mapwin) :
+        if not self.selection_window(mapwin) :
             self.Usage()
 
 # Check for a user config file named .pytopo
@@ -2627,7 +2639,8 @@ class PyTopo :
                         print "Couldn't create a new pytopo config file"
                         return
                 else :
-                    print "Suggestion: rename", userfile, "to", pytopo.sites
+                    print "Suggestion: rename", userfile, \
+                          "to ~/.config/pytopo/pytopo.sites"
                     print userfile, "may eventually be deprecated"
         if Debug :
             print "Found", userfile
@@ -2646,7 +2659,7 @@ class PyTopo :
         execfile(userfile, globals(), locals)
 
         # Then extract the changed values back out:
-        self.Collections = locals['Collections']
+        self.collections = locals['Collections']
         self.KnownSites = locals['KnownSites']
         self.init_width = locals["init_width"]
         self.init_height = locals["init_height"]
@@ -2751,10 +2764,10 @@ You can add new sites and collections there; see the instructions at
 
         mapwin = MapWindow(self)
 
-        self.ParseArgs(mapwin, pytopo_args)
+        self.parse_args(mapwin, pytopo_args)
 
         # For cProfile testing, run with a dummy collection (no data needed):
-        #mapwin.Collection = MapCollection("dummy", "/tmp")
+        #mapwin.collection = MapCollection("dummy", "/tmp")
 
         #print cProfile.__file__
         #cProfile.run('mapwin.show_window()', 'cprof.out')
