@@ -1145,7 +1145,11 @@ class TrackPoints :
         return self.minlon, self.minlat, self.maxlon, self.maxlat
 
     def readTrackFile(self, filename) :
+        """Read a track file. Throw IOError if the file doesn't exist."""
         global Debug
+
+        if not os.path.exists(filename) :
+            raise IOError("Can't open track file %s" % filename)
 
         if (Debug) :
             print "Using track file", filename
@@ -1346,7 +1350,7 @@ that are expected by the MapCollection classes:
 
         # Where to save generated maps. The default is fine for most people.
         # Which is a good thing since there's currently no way to change it.
-        self.map_save_dir = os.environ["HOME"] + "/Topo/"
+        self.map_save_dir = os.path.expanduser("~/Topo/")
 
         # X/gtk graphics variables we need:
         self.drawing_area = 0
@@ -2216,6 +2220,8 @@ class PyTopo :
         self.init_height = 600
         self.default_collection = None
         self.needs_saving = False
+        self.config_dir = os.path.expanduser("~/.config/pytopo",)
+        self.savefilename = os.path.join(self.config_dir, "saved.sites")
 
     @staticmethod
     def Usage() :
@@ -2224,11 +2230,11 @@ class PyTopo :
         print """
 Usage: pytopo [-t trackfile] site_name
        pytopo [-t trackfile] start_lat start_long collection
-       pytopo -p
+       pytopo -p : list known sites
+       pytopo -h : print this message
 
 Use degrees.decimal_minutes format for coordinates.
-Set up site names in ~/.pytopo
-Print list of known sites with pytopo -p
+Set up site names in ~/.config/pytopo.sites, track logs in ~/Tracks.
 
 Track files may contain track points and/or waypoints;
 multiple track files are allowed.
@@ -2257,7 +2263,6 @@ Click in the map to print the coordinates of the clicked location.
         if not self.needs_saving :
             return
 
-        savefilename = os.path.join(self.config_dir, "saved.sites")
         try :
             savefile = open(savefilename, "w")
         except :
@@ -2391,6 +2396,7 @@ Click in the map to print the coordinates of the clicked location.
                 trackfile = store.get_value(iter, 1)
                 mapwin.trackpoints = TrackPoints()
                 mapwin.trackpoints.readTrackFile(trackfile)
+                # XXX Might want to handle IOError in case file doesn't exist
                 dialog.destroy()
                 return True
         else :
@@ -2492,6 +2498,9 @@ Click in the map to print the coordinates of the clicked location.
                 if args[0] == "-v" or args[0] == "--version" :
                     print VersionString
                     sys.exit(0)
+                elif args[0] == "-h" or args[0] == "--help" :
+                    PyTopo.Usage()
+
                 # Next clause is impossible because of the prev isdigit check:
                 #if args[0] == "-15" :
                 #    series = 15
@@ -2522,21 +2531,35 @@ Click in the map to print the coordinates of the clicked location.
                 elif args[0] == "-t" and len(args) > 1:
                     if mapwin.trackpoints == None :
                         mapwin.trackpoints = TrackPoints()
-                    mapwin.trackpoints.readTrackFile(args[1])
+
+                    # Is it a known track?
+                    for tr in self.KnownTracks :
+                        if args[1] == tr[0] :
+                            if Debug :
+                                print "Reading known track", tr[0], tr[1]
+                            args[1] = tr[1]
+                            break
+
+                    try :
+                        mapwin.trackpoints.readTrackFile(args[1])
+                    except IOError :
+                        print "Can't read track file", args[1]
                     args = args[1:]
                 else :
                     PyTopo.error_out("Unknown flag " + args[0])
 
                 # Done processing this flag
                 args = args[1:]
-                print "Done processing flag; args are now", args
                 continue
 
             # args[0] doesn't start with '-'. Is it a gpx file?
             if len(args[0]) > 4 and args[0][-4:] == '.gpx' :
                 if mapwin.trackpoints == None :
                     mapwin.trackpoints = TrackPoints()
-                mapwin.trackpoints.readTrackFile(args[0])
+                try :
+                    mapwin.trackpoints.readTrackFile(args[0])
+                except IOError :
+                    print "Can't read track file", args[0]
                 args = args[1:]
                 continue
 
@@ -2582,7 +2605,6 @@ Click in the map to print the coordinates of the clicked location.
         # center it on the trackpoints:
         if mapwin.trackpoints != None and mapwin.collection != None \
                 and not (mapwin.center_lat and mapwin.center_lon) :
-            print "Trying to center map based on track points"
             minlon, minlat, maxlon, maxlat = mapwin.trackpoints.get_bounds()
             mapwin.center_lon = (maxlon + minlon) / 2
             mapwin.center_lat = (maxlat + minlat) / 2
@@ -2620,17 +2642,15 @@ Click in the map to print the coordinates of the clicked location.
         """Load the user's .pytopo config file,
         found either in $HOME/.config/pytopo/ or $HOME/pytopo.
         """
-        home = os.environ["HOME"]
-        self.config_dir = os.path.join(home, ".config", "pytopo",)
         userfile = os.path.join(self.config_dir, "pytopo.sites")
         if not os.access(userfile, os.R_OK) :
             if Debug :
                 print "Couldn't open", userfile
-            userfile = os.path.join(home, ".pytopo")
+            userfile = os.path.expanduser("~/.pytopo")
             if not os.access(userfile, os.R_OK) :
                 if Debug :
                     print "Couldn't open", userfile, "either"
-                userfile = os.path.join(home, ".config", "pytopo", ".pytopo")
+                userfile = os.path.join(self.config_dir, "pytopo", ".pytopo")
                 if not os.access(userfile, os.R_OK) :
                     if Debug :
                         print "Couldn't open", userfile, "either"
@@ -2693,8 +2713,7 @@ Click in the map to print the coordinates of the clicked location.
                 self.KnownSites.append( site )
 
     def read_tracks(self) :
-        home = os.environ["HOME"]
-        trackdir = os.path.join(home, 'Tracks')
+        trackdir = os.path.expanduser('~/Tracks')
 
         if os.path.isdir(trackdir) :
             for file in glob.glob( os.path.join(trackdir, '*.gpx') ):
@@ -2707,8 +2726,7 @@ Click in the map to print the coordinates of the clicked location.
            If the user has a ~/.config, make ~/.config/pytopo/pytopo.sites
            else fall back on ~/.pytopo.
         """
-        home = os.environ["HOME"]
-        confdir = os.path.join(home, ".config", "pytopo")
+        confdir = os.path.expanduser("~/.config/pytopo")
         try :
             if not os.access(confdir, os.W_OK) :
                 os.mkdir(confdir)
@@ -2717,7 +2735,7 @@ Click in the map to print the coordinates of the clicked location.
         except :
             fp = None
         if not fp :
-            userfile = os.path.join(home, ".pytopo")
+            userfile = os.path.expanduser("~/.pytopo")
             try :
                 fp = open(userfile, 'w')
             except :
