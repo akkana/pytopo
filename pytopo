@@ -592,7 +592,7 @@ class OSMMapCollection(TiledMapCollection) :
         Pass latitude for map collections (e.g. OSM) that cover
         large areas so scale will tend to vary with latitude.
         """
-        self.zoom_to(self.zoomlevel + amount)
+        self.zoom_to(self.zoomlevel + amount, latitude)
 
     def get_maplet(self, longitude, latitude) :
         """Fetch or queue download for the maplet containing the
