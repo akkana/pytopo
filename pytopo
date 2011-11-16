@@ -1638,7 +1638,8 @@ that are expected by the MapCollection classes:
                 self.controller.append_known_site( [name,
                     MapUtils.DecDegToDegMin(self.pin_lon),
                     MapUtils.DecDegToDegMin(self.pin_lat),
-                    self.collection.name] )
+                    self.collection.name,
+                    self.collection.zoomlevel] )
 
                 dialog.destroy()
                 return True
@@ -2257,24 +2258,26 @@ Click in the map to print the coordinates of the clicked location.
         self.needs_saving = True
 
     def save_sites(self) :
-        """Write KnownSites to file.
-        Should only be called from graceful exit.
+        """Write any new KnownSites to file.
+           Should only be called from graceful exit.
         """
         if not self.needs_saving :
             return
 
         try :
-            savefile = open(savefilename, "w")
+            savefile = open(self.savefilename, "w")
         except :
+            print "Couldn't open save file", self.savefilename
             return
 
-        for site in self.KnownSites :
-            if len(site) == 5 :
-                print >>savefile, '[ "%s", %f, %f, "%s", %d ]' % \
-                    (site[0], site[1], site[2], site[3], site[4])
-            else :
-                print >>savefile, '[ "%s", %f, %f, "%s" ]' % \
-                    (site[0], site[1], site[2], site[3])
+        for site in self.KnownSites[self.first_saved_site:] :
+            # All sites have a string, two floats and another string;
+            # some sites may have additional ints after that.
+            print >>savefile, '[ "%s", %f, %f, "%s"' % \
+                (site[0], site[1], site[2], site[3]),
+            if len(site) > 4 :
+                print >>savefile, ', ' + ', '.join(map(str, site[4:])),
+            print >>savefile, "]"
         savefile.close()
 
     def print_sites(self) :
@@ -2576,7 +2579,6 @@ Click in the map to print the coordinates of the clicked location.
 
             # Doesn't match a known site. Maybe the args are coordinates?
             try :
-                print "Looking for coordinate args in", args
                 if len(args) >= 2 and \
                    len(args[0] > 1 and args[0][1].isdigit) and \
                    len(args[1] > 1 and args[1][1].isdigit) :
@@ -2585,7 +2587,6 @@ Click in the map to print the coordinates of the clicked location.
                     mapwin.collection = self.find_collection(args[3])
                     args = args[2:]
                     continue
-                print "Didn't find any"
 
             except ValueError, e :
                 print "Couldn't parse coordinates"
@@ -2688,9 +2689,8 @@ Click in the map to print the coordinates of the clicked location.
     def read_saved_sites(self) :
         """Read previously saved (favorite) sites."""
         global Debug
-        savefilename = os.path.join(self.config_dir, "saved.sites")
         try :
-            savefile = open(savefilename, "r")
+            savefile = open(self.savefilename, "r")
         except :
             return
 
@@ -2698,8 +2698,11 @@ Click in the map to print the coordinates of the clicked location.
         # [ "san-francisco", -121.750000, 37.400000, "openstreetmap" ]
         # or, with an extra optional zoom level,
         # [ "san-francisco", -121.750000, 37.400000, "openstreetmap", 11 ]
-        r = re.compile('\[ *"([^"]*)", *([-0-9\.]*), *([-0-9\.]*), *"([^"]*)",? *([0-9]+)? *\]')
+
+        r = re.compile('\["([^"]*)",([-0-9\.]*),([-0-9\.]*),"([^"]*)",?([0-9]+)?\]')
         for line in savefile :
+            # First remove all whitespace:
+            line = re.sub(r'\s', '', line)
             match = r.search(line)
             if match :
                 matches = match.groups()
@@ -2711,6 +2714,8 @@ Click in the map to print the coordinates of the clicked location.
                 if Debug :
                     print "Adding", site[0], "to KnownSites"
                 self.KnownSites.append( site )
+
+        savefile.close()
 
     def read_tracks(self) :
         trackdir = os.path.expanduser('~/Tracks')
@@ -2776,6 +2781,9 @@ You can add new sites and collections there; see the instructions at
     def main(self, pytopo_args) :
         """main execution routine for pytopo."""
         self.exec_config_file()
+        # Remember how many known sites we got from the config file;
+        # the rest are read in from saved sites and may need to be re-saved.
+        self.first_saved_site = len(self.KnownSites)
         self.read_saved_sites()
         self.read_tracks()
         gc.enable()
