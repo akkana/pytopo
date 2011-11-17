@@ -33,7 +33,16 @@ program called TangoGPS that can download and show OSM maps, but it has a
 difficult interface that's optimized for cellphones.)
 
 <p>
-<b>Download: The current version is <a href="pytopo-0.9">PyTopo 0.9</a>.</b>
+<b>Download: The current version is <a href="pytopo-1.1">PyTopo 1.1</a>.</b>
+
+<p>
+1.0 got all kinds of cool new stuff, including map dragging, more user
+interface for zooming and saving sites, track logs saved in ~/Tracks,
+etc. so it's usable without a keyboard, e.g. on a tablet.
+Embarassingly, we were so intent on adding new features that
+we never got around to making a formal release! So 1.1 has all
+those features, plus a lot of reliability enhancements to make
+everything work more solidly.
 
 <p>
 The big news in 0.9 is the new OSM Map Collection, which can download map
@@ -47,9 +56,15 @@ them yourself), so once you've downloaded an area you're good to go offline
 and your maps will still work.
 
 <p>
-If you feel experimental, you can get the current SVN version:
+The latest and greatest is always in the current SVN version:
 <b><a href="http://code.google.com/p/pytopo/">PyTopo is hosted
 on Google Code</a></b>.
+
+<p>
+There's an experimental MeeGo package for
+anyone interested in trying it, and I'd be interested to know if it
+works on other RPM platforms as well:
+<a href="PyTopo-1.0-1-beta1.noarch.rpm">PyTopo-1.0-1-beta1.noarch.rpm</a>.
 
 <h2>Using PyTopo</h2>
 <p>
@@ -245,6 +260,18 @@ map data would be an excellent approach.)</i>
 
 <h2>Change Log</h2>
 <dl>
+
+<dt>1.1, November 16 2011
+<dd>
+Fix a lot of minor bugs and some usability problems with features 
+introduced in 1.0.
+
+<dt>1.0, May 7 2011
+<dd>
+Lots of UI additions to make pytopo work well on MeeGo and other
+tablets. Now there's a "pin", you can save sites, go to saved track
+logs and lots of other goodies, including some great contributions
+from Ville Jyrkkä.
 
 <dt>0.9, October 30, 2010
 <dd>
