@@ -13,6 +13,13 @@
 # but take inputs in deg.decimal_minutes.
 
 """
+1.1 Release notes:
+
+This is mostly a reliability/stability release. Fixed a lot of little
+bugs associated with some of the new features: bulk downloading works
+better (though still needs more work), saved sites and loaded track
+logs work much better, no error if pin.png isn't in the right place, etc.
+
 1.0 Release notes:
 
 PyTopo now supports dragging the map! Wahoo!
