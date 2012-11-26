@@ -13,7 +13,19 @@
 # but take inputs in deg.decimal_minutes.
 
 """
-1.1 Release notes:
+##RB Some extra notes: Version date 08/22/12
+class MapCollection :
+class TiledMapCollection(MapCollection) :
+class OSMMapCollection(TiledMapCollection) :
+class GenericMapCollection(TiledMapCollection) :
+class TopoMapCollection(TiledMapCollection) :
+class Topo1MapCollection(TopoMapCollection) :
+class MapUtils :
+class DownloadTileQueue :
+class MapWindow() :
+	  def gpsReader (self) :
+class PyTopo :
+##rb Some extra notes
 
 This is mostly a reliability/stability release. Fixed a lot of little
 bugs associated with some of the new features: bulk downloading works
@@ -58,7 +70,15 @@ TODO: allow configuration of colors, line thickness etc.
 
 VersionString = "PyTopo Version 1.0 by Akkana Peck"
 
-import sys, os, glob, math, gtk, gobject, gc
+import sys, os, glob, math, gtk, gobject, gc, threading
+##RB
+import time
+import string
+import struct
+import serial
+import signal
+#rb
+
 settings = gtk.settings_get_default()
 settings.set_property("gtk-touchscreen-mode", True)
 HaveDOM = True
@@ -153,6 +173,277 @@ import types, urllib, re
 #
 
 Debug = False
+
+##RB This is Garmin gps support code.  Probably includes dead code as I combined some apps and deleated all
+#    (or most) that did not directly support this app
+ 
+DLE = "\0x10"
+ETX = "\0x03"
+EOM = DLE+ETX
+gpsAlt = 0.0
+gpsLat = 0.0
+gpsLon = 0.0
+ser = 0
+RBzoomLevel = 99
+RBgpsRead = 1
+gpsReaderThread = None
+
+class GPSposn :
+  def checksum(self, data):
+    sum = 0
+    for i in data:
+#        print ord(i)
+        sum = sum + ord(i)
+    sum = sum % 256
+    return chr((256-sum) % 256)
+  def escape(self, data):
+    global DLE
+    "Escape any DLE characters --------- Active"
+    return string.join(string.split(data, DLE), DLE+DLE)
+
+  def hexdump(self, data):
+    if isinstance(data, int):
+        data = struct.pack('<H', data)
+    return ''.join(["%02x " % ord(x) for x in data])
+
+
+  def sendPacket(self, ptype, data, readAck=1):
+    global ser
+    global DLE
+    global EOM
+    global barf
+    #print "  sendPacket -> Send a message. By default this will also wait for the ack."
+    if type(data) == type(""):
+        ld = chr(len(data))
+    else: # XXX assume 16-bit integer for now
+        ld = chr(2)
+        data = struct.pack("<h",data)
+    tp = chr(ptype)
+    chk = self.checksum( tp + ld + data)
+    escline = self.escape( ld + data + chk)
+    bytes = chr(0x10) + tp + escline + chr(0x10) + chr(0x03)
+    #print "  Data -> "  + self.hexdump(bytes)
+    try:
+      ser.write(bytes)
+    except:
+      return 0
+    if readAck:
+        readAcknowledge(ptype)
+    return 1
+################################################################################
+################################################################################
+  
+  def __init__(self) :
+    global ser
+    global gpsAlt, gpsLat, gpsLon, RBgpsRead
+    diag = []
+    Pid_Ack_Byte = 6
+    RequestCounter = 0
+    Altitude = Latitude = Longitude = 0.0
+    ser = 0
+    #while True:
+    while RBgpsRead:
+      Miag =""
+      data = chr(49) + chr(0)
+      time.sleep(1)
+      if RequestCounter == 4:
+        #print "NAK"
+        self.sendPacket(21, data, 0)             #Send NAK
+      if RequestCounter >= 5:
+        #print "Restart"
+        #sendPacket(21, data, 0)             #Send NAK
+        RequestCounter = 0
+        if ser != 0:
+          ser.close()
+          ser = 0
+        continue
+      RequestCounter += 1
+      if (self.sendPacket(10, data,0) == 0) or (RequestCounter >= 5):
+      #if sendPacket(2, data,0) == 0:
+        #print "Write fail"
+        try:
+          #print "ttyUSB1 ?"
+          ser = serial.Serial("/dev/ttyUSB1", writeTimeout=2, timeout=2, interCharTimeout=2, baudrate=9600)
+        except:
+          try:
+            #print "ttyUSB0 ?"
+            ser = serial.Serial("/dev/ttyUSB0", writeTimeout=2, timeout=2, interCharTimeout=2, baudrate=9600)
+          except:
+            #print "No GPS"
+            Altitude = Latitude = Longitude = 0.0
+            gpsAlt = gpsLat = gpsLon = 0.0
+        continue
+      PacketSize = 0
+      while True:
+        PacketSize += 1
+        if PacketSize >= 10000:
+          print "PacketSize overflow"
+          break
+        try:
+          ch = ser.read(1)
+        except:
+          print "read fail"
+          ser = 0
+          break
+        if ch == "":
+          break
+        Miag += ch
+      #print self.hexdump(Miag)
+
+  
+      if ser == 0:                      #read failed
+        continue
+      offset = 0
+      while True:                       #Process packets received
+        while True:                     #verify sub packet start
+          if offset >= len(Miag):
+          #print "BREAK?"
+            break
+          if ord(Miag[offset]) == 16:
+            offset += 1
+            break
+          else:
+            offset += 1                 #Should not happen
+
+        if offset >= len(Miag):
+        #print "BREAK??"
+          break
+        packetType = ord(Miag[offset])     #remember for ack
+        if packetType == 6:      #Packet type == ack
+          offset += 7                     #So skip it
+          continue                        #to next sub packet
+
+        elif packetType == 51 :    #hex 33
+          offset += 2
+          pd = ""
+          for j in range(0,1):                # Alt ::: from gpsapp.c 6442
+            pd=""
+            for i in range(0,4):
+              if ord(Miag[offset]) == 16:
+                offset += 1                   #escape next char
+              pd= pd + Miag[offset]
+              offset += 1
+            t = struct.Struct('<f')
+            ud = t.unpack(pd)
+            s = float(ud[0])
+            Altitude = s * 3.28                #in feet
+
+          for j in range(0,3):                # epe, eph, epv::: from gpsapp.c 6442
+            pd=""
+            for i in range(0,4):
+              if ord(Miag[offset]) == 16:
+                offset += 1                   #escape next char
+              pd= pd + Miag[offset]
+              offset += 1
+            s = struct.Struct('<f')
+            unpacked_data = s.unpack(pd)
+
+          for j in range(0, 1):                #  fix
+            pd=""
+            for i in range(0,2):
+              if ord(Miag[offset]) == 16:
+                offset += 1                
+              pd= pd + Miag[offset]
+              offset += 1
+            s = struct.Struct('<H')
+            unpacked_data = s.unpack(pd)
+  
+          for j in range(0, 1):                # tow
+            pd=""
+            for i in range(0,8):
+              if ord(Miag[offset]) == 16:
+                offset += 1               
+              pd= pd + Miag[offset]
+              offset += 1
+            s = struct.Struct('<d')
+            unpacked_data = s.unpack(pd)
+   
+          for j in range(0, 1):                #  lat
+            pd=""
+            for i in range(0,8):
+              if ord(Miag[offset]) == 16:
+                offset += 1              
+              pd= pd + Miag[offset]
+              offset += 1
+            t = struct.Struct('<d')
+            ud = t.unpack(pd)
+            s = float(ud[0])
+            s *= 180/3.14159265
+            Latitude = s
+
+          for j in range(0, 1):                # lon
+            pd=""
+            for i in range(0,8):
+              if ord(Miag[offset]) == 16:
+                offset += 1              
+              pd= pd + Miag[offset]
+              offset += 1
+            t = struct.Struct('<d')
+            ud = t.unpack(pd)
+            s = float(ud[0])
+            s *= 180/3.14159265
+            Longitude = s
+
+          for j in range(0,4):                # east, north, up, msl_hght
+            pd=""
+            for i in range(0,4):
+              if ord(Miag[offset]) == 16:
+                offset += 1                   #escape next char
+              pd= pd + Miag[offset]
+              offset += 1
+            s = struct.Struct('<f')
+            unpacked_data = s.unpack(pd)
+
+          for j in range(0, 1):                #  leap_scnds
+            pd=""
+            for i in range(0,2):
+              if ord(Miag[offset]) == 16:
+                offset += 1                
+              pd= pd + Miag[offset]
+              offset += 1
+            s = struct.Struct('<H')
+            unpacked_data = s.unpack(pd)
+
+          for j in range(0, 1):                #  wn_days
+            pd=""
+            for i in range(0,4):
+              if ord(Miag[offset]) == 16:
+                offset += 1                
+              pd= pd + Miag[offset]
+              offset += 1
+            s = struct.Struct('<f')
+            unpacked_data = s.unpack(pd)
+          offset += 3                                                   #skip checksum & eom
+          RequestCounter = 0
+          gpsAlt = Altitude
+          gpsLat = Latitude
+          gpsLon = Longitude
+          #print Altitude, Latitude, Longitude
+          #time.sleep(1)
+          continue
+
+        else:   #No interest packet
+          offset += 1
+          while True:                     #So skip to end
+            #print ord(Miag[offset])
+            if ord(Miag[offset]) == 16:
+              offset += 1
+              if ord(Miag[offset]) == 3:  #End of packet 10 03
+                offset += 1
+                RequestCounter = 0
+                self.sendPacket(Pid_Ack_Byte, struct.pack("<h", packetType), 0) # No.  So ack for type ??
+                break
+              else:
+                offset += 1
+            else:
+              offset += 1
+          #End No Interest packet
+        #End all sub packet process
+      #End receive packets process
+    print "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx Bye Y'all"
+    #End init process
+  #End class
+##rb
 
 class MapCollection :
 
@@ -587,6 +878,11 @@ class OSMMapCollection(TiledMapCollection) :
         (lat2, lon2) = self.num2deg(xtile+1, ytile-1)
         self.xscale = 256. / (lon2 - lon1)
         self.yscale = 256. / (lat2 - lat1)
+##RB       to display zoom level
+        global RBzoomLevel
+        RBzoomLevel = self.zoomlevel
+##rb
+
         if Debug :
             print "Zoom to %d: Calculated scales: %f, %f" \
                 % (self.zoomlevel, self.xscale, self.yscale)
@@ -683,7 +979,6 @@ class OSMMapCollection(TiledMapCollection) :
         return None, None
 
 class GenericMapCollection(TiledMapCollection) :
-
     """
     A GenericMapCollection is tiled, like the Topo collections,
     but uses a less specific naming scheme:
@@ -1370,6 +1665,11 @@ that are expected by the MapCollection classes:
         self.bg_color = gtk.gdk.color_parse("black")
         self.track_color = gtk.gdk.color_parse("magenta")
         self.waypoint_color = gtk.gdk.color_parse("blue")
+
+##RB for path length calc GPS icon display
+        self.PathLength = 0
+        self.spot_color = gtk.gdk.color_parse("red")
+
         # Grid color is only needed when Debug,
         # but this is called before parse_args so we don't know Debug.
         self.grid_color = gtk.gdk.color_parse("green")
@@ -1387,6 +1687,13 @@ that are expected by the MapCollection classes:
         vbox = gtk.VBox(spacing=3)
         win.add(vbox)
 
+##RB        Frame label will popluate with mouse coordinates and more
+        self.frame = gtk.Frame("***")
+        vbox.pack_start(self.frame, False, False, 0)
+        gpsReaderThread = threading.Thread(target=self.gpsReader)
+        gpsReaderThread.start()
+##rb
+	  
         self.drawing_area = gtk.DrawingArea()
         self.drawing_area.set_size_request(init_width, init_height)
         vbox.pack_start(self.drawing_area)
@@ -1396,6 +1703,12 @@ that are expected by the MapCollection classes:
                                      gtk.gdk.POINTER_MOTION_HINT_MASK |
                                      gtk.gdk.BUTTON_PRESS_MASK |
                                      gtk.gdk.BUTTON_RELEASE_MASK )
+
+##RB display update triggers
+        signal.signal(signal.SIGALRM, self.GPSshow)
+        signal.setitimer(signal.ITIMER_REAL, 1, 1)
+        self.drawing_area.connect("motion_notify_event", self.mousemove)
+##rb
 
         self.drawing_area.connect("expose-event", self.expose_event)
         self.drawing_area.connect("button-press-event", self.mousepress)
@@ -1416,6 +1729,19 @@ that are expected by the MapCollection classes:
 
         win.show_all()
         gtk.main()
+
+##RB
+    def gpsReader (self) :
+        global RBgpsRead
+        app = GPSposn()     #does not return until end. updates lat, lon at 1 second rate
+    def GPSshow (self, SIGALRM, _) :
+        global gpsLat, gpsLon
+        if gpsLat == 0:
+          return;
+        if gpsLon == 0:
+          return;
+        self.draw_map()
+##rb
 
     #
     # Draw maplets to fill the window, centered at center_lon, center_lat
@@ -1439,6 +1765,9 @@ that are expected by the MapCollection classes:
             print MapUtils.DecDegToDegMinStr(self.center_lat)
         self.collection.draw_map(self.center_lon, self.center_lat, self)
 
+##RB
+        self.draw_GPSpoint()
+
         self.draw_trackpoints()
 
         if not self.is_dragging :
@@ -1452,6 +1781,29 @@ that are expected by the MapCollection classes:
         if self.pin :
             self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
                              pin_y+self.pin_yoff,-1,-1)
+
+##RB draw gps location icon
+    def draw_GPSpoint(self) :
+        # Now draw GPS point if visible:
+        global gpsLat, gpsLon
+        tLat = gpsLat
+        tLon = gpsLon
+        win_width, win_height = self.drawing_area.window.get_size()
+        self.set_waypoint_color()
+        self.xgc.line_style = gtk.gdk.LINE_SOLID
+        self.xgc.line_width = 2
+        x = int((tLon - self.center_lon) * self.collection.xscale
+                            + win_width/2)
+        y = int((self.center_lat - tLat) * self.collection.yscale
+                            + win_height/2)
+
+        if x >= 0 and x < win_width and y >= 0 and y < win_height :
+          self.draw_rectangle(False, x-16, y-16, 32, 32)
+          self.draw_rectangle(False, x-4, y-4, 8, 8)
+          self.xgc.set_rgb_fg_color(self.spot_color)
+          self.draw_rectangle(False, x-14, y-14, 28, 28)
+          self.draw_rectangle(True, x-2, y-2, 4, 4)
+##rb
 
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
@@ -1685,6 +2037,15 @@ that are expected by the MapCollection classes:
         minzoom = self.collection.zoomlevel
         maxzoom = self.collection.zoomlevel + 4
 
+##RB download box. Convienient for multi session downloads
+        minlon = -84.5
+        maxlon = -82.4
+        minlat = 8.0
+        maxlat = 9.5
+        minzoom = 5
+        maxzoom = 14
+##rb
+
         # Prompt the user for any adjustments to area and zoom:
         dialog = gtk.Dialog("Download an area", None, 0,
                             (gtk.STOCK_REFRESH, gtk.RESPONSE_APPLY,
@@ -1806,7 +2167,7 @@ that are expected by the MapCollection classes:
                 err_label.set_text("Sorry, can't parse one of the values")
                 continue
 
-        if Debug :
+        if True:
             print "Downloading from %f - %f, %f - %f, zoom %d - %d" \
                 % (minlon, maxlon, minlat, maxlat, minzoom, maxzoom)
         for zoom in range(minzoom, maxzoom+1) :
@@ -1841,8 +2202,16 @@ that are expected by the MapCollection classes:
                                             str(ytile)) \
                                             + self.collection.ext
                     if os.access(filename, os.R_OK) :
+
+##RB to discard 18 byte "No File" files
+                      fs = os.path.getsize(filename)       #File is present
+                      if fs == 18 :                        #But not really
+                        os.remove(filename)
+                        print filename, "xxxxxxxxxxxx Removed as bad"
+                      else :
+##rb
                         if Debug :
-                            print filename, "is already there"
+                              print filename, "is already there"
                         continue
                     pathlist.append(filename)
                     if Debug :
@@ -1861,7 +2230,7 @@ that are expected by the MapCollection classes:
                 url = self.collection.url_from_path(filename, zoom)
 
                 # XXX Parallelize this!
-                if Debug :
+                if True:
                     print "Downloading", url, "to", filename
                 thedir = os.path.dirname(filename)
                 if not os.access(thedir, os.W_OK) :
@@ -1869,13 +2238,37 @@ that are expected by the MapCollection classes:
                 #err_label.set_text("%d %%: %d of %d" % \
                 #                   (int(num_downloaded*100 / numtiles),
                 #                    num_downloaded, numtiles))
-                if Debug :
+                if True :
                     print "%d %%: %d of %d" % \
                         (int(num_downloaded*100 / numtiles),
                          num_downloaded, numtiles)
                 progress_label.set_text("%d: %s" % (num_downloaded, url))
                 flush_events()
-                urllib.urlretrieve(url, filename)
+
+##RB download with 18 byte size filter and exception retry
+                RBtryCtr = 0
+                while RBtryCtr < 1 :
+                  try :
+                    urllib.urlretrieve(url, filename)
+                    fs = os.path.getsize(filename)
+                    print "RB-------%d" % fs        #18 byte file is ng
+                    if fs == 18 :
+                      os.remove(filename)
+                      print "*****removedit"
+                      RBtryCtr += 1
+                      #time.sleep(2)
+                    else :
+                      RBtryCtr = 99	#success
+                  except :
+                    RBtryCtr += 1
+                    if RBtryCtr > 10 :
+                      print "Screw it"
+                      dialog.destroy()
+                      return True
+                    print "Blew it"
+                    time.sleep(2)
+##rb
+
                 num_downloaded += 1
 
                 # XXX should show progress more graphically.
@@ -2090,6 +2483,17 @@ that are expected by the MapCollection classes:
             self.x_start_drag = x
             self.y_start_drag = y
 
+##RB
+    def mousemove(self, widget, event) :
+        """Handle mouse move"""
+        win_width, win_height = self.drawing_area.window.get_size()
+        cur_long, cur_lat = self.xy2coords(event.x, event.y,
+                                           win_width, win_height)
+        global RBzoomLevel
+        self.frame.set_label('ZoomLevel = {0:d} Mouse = {1:.4f}, {2:.4f} GPS = [{3:.0f}, {4:.4f}, {5:.4f}]'\
+                             .format(RBzoomLevel, cur_lat, cur_long, gpsAlt, gpsLat, gpsLon))
+##rb
+
     def mousepress(self, widget, event) :
         """Handle mouse button presses"""
 
@@ -2157,10 +2561,24 @@ that are expected by the MapCollection classes:
             win_width, win_height = self.drawing_area.window.get_size()
             cur_long, cur_lat = self.xy2coords(event.x, event.y,
                                                win_width, win_height)
-            if Debug :
-                print "Click:", \
-                    MapUtils.DecDegToDegMinStr(cur_long), \
-                    MapUtils.DecDegToDegMinStr(cur_lat)
+
+##RB Better distance calc and path length.  Click twice in same location to init path
+            print "CurLat", cur_lat, "CurLon", cur_long
+            R = 3982         # Radius of the earth in miles
+            dLon = (cur_long - self.click_last_long) * math.pi / 180
+            dLat = (cur_lat - self.click_last_lat) * math.pi / 180
+            a = math.sin(dLat/2) * math.sin(dLat/2) +   \
+                math.cos(cur_lat * math.pi / 180) * math.cos(self.click_last_lat * math.pi / 180) *   \
+                math.sin(dLon/2) * math.sin(dLon/2) 
+            c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a)) 
+            d = R * c        # Distance in km
+            print "d", d
+            if d == 0 :
+              self.PathLength = 0
+            else :
+              self.PathLength += d
+              print "PathLength", self.PathLength
+##rb
 
             # Find angle and distance since last click.
             # You would think that we could just use the long and lat
@@ -2173,7 +2591,9 @@ that are expected by the MapCollection classes:
             # So use the current image aspect ratio to convert from angles
             # to pixels, then we'll convert from there to miles/km.
             # XXX This is probably still fairly inaccurate, check!
-            if self.click_last_long != 0 and self.click_last_lat != 0 :
+
+            #if self.click_last_long != 0 and self.click_last_lat != 0 :
+            if 0 :
                 xdiff = (cur_long - self.click_last_long)
                 ydiff = (cur_lat - self.click_last_lat)
                 dist = math.sqrt(xdiff*xdiff + ydiff*ydiff)
@@ -2181,10 +2601,10 @@ that are expected by the MapCollection classes:
                 # Convert to miles using latitude and radius of the earth.
                 dist = dist *2. * math.pi / 360.0 * 7926 \
                        * math.cos(cur_lat*math.pi/180)
-                if Debug and self.use_metric :
+                if 1  and self.use_metric :
                     print "Distance:", round(dist*1600,2), "meters,", \
                           round(dist*1.6,2), "km"
-                elif Debug :
+                elif 1  :
                     print "Distance:", round(dist*5280,2), "feet,", \
                           round(dist,2), "miles"
                 angle = int(math.atan2(-ydiff, -xdiff) * 180 / math.pi)
@@ -2206,6 +2626,14 @@ that are expected by the MapCollection classes:
         """Clean up the window and exit.
            The "extra" argument is so it can be calld from GTK callbacks.
         """
+##RB
+        global RBgpsRead
+        print "Bye Grace"
+        if ser != 0:        #usb / gps
+          ser.close()
+        RBgpsRead = 0
+##rb
+
         self.controller.save_sites() # Tell PyTopo to save any new sites/tracks
 
         gtk.main_quit()
@@ -2502,7 +2930,6 @@ Click in the map to print the coordinates of the clicked location.
 
         arg0 = args[0]
         args = args[1:]
-
         while len(args) > 0 :
             if args[0][0] == '-' and not args[0][1].isdigit() :
                 if args[0] == "-v" or args[0] == "--version" :
@@ -2834,7 +3261,7 @@ def start_job(generator):
     _task_return(None)
     return generator
 
-import threading
+
 gobject.threads_init()
 
 def threaded_task(function, *args, **kwargs):
@@ -2855,6 +3282,15 @@ def download_job(url, localpath, callback):
             print "Downloading", url
         try :
             urllib.urlretrieve(url, localpath)
+
+##RB Drop files with "no file" content
+            fs = os.path.getsize(localpath)
+            print "RB-------%d" % fs        #18 byte file is ng
+            if fs == 18 :
+              os.remove(localpath)
+              print "*****removedit"
+##rb
+
             return localpath
         except IOError, e :
             return None
