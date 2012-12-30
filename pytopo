@@ -355,7 +355,7 @@ TiledMapCollection classes must implement
         # otherwise Python will let the process grow until it
         # fills all of memory.
         # http://www.daa.com.au/pipermail/pygtk/2003-December/006499.html
-        # (At this indentation level, we free after draing the whole map.)
+        # (At this indentation level, we free after drawing the whole map.)
         gc.collect()
 
         # If we queued any downloads, schedule a function to take care of that:
@@ -1323,7 +1323,7 @@ that are expected by the MapCollection classes:
 """
 
     def __init__(self, _controller) :
-        """Initialize variables, but don't create the widow yet."""
+        """Initialize variables, but don't create the window yet."""
 
         # Save a reference to the PyTopo object that created this window.
         # We'll need it to change locations, collections etc.
@@ -1368,6 +1368,7 @@ that are expected by the MapCollection classes:
         self.is_dragging = False
 
         self.bg_color = gtk.gdk.color_parse("black")
+        self.bg_scale_color = gtk.gdk.color_parse("white")
         self.track_color = gtk.gdk.color_parse("magenta")
         self.waypoint_color = gtk.gdk.color_parse("blue")
         # Grid color is only needed when Debug,
@@ -1453,6 +1454,8 @@ that are expected by the MapCollection classes:
             self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
                              pin_y+self.pin_yoff,-1,-1)
 
+        self.draw_map_scale()
+
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
         if self.trackpoints != None :   # may be trackpoints or waypoints
@@ -1497,6 +1500,259 @@ that are expected by the MapCollection classes:
                         self.draw_string(x, y, pt[2])
                         self.draw_rectangle(True, x-3, y-3, 6, 6)
 
+    ########## added 21 Dec 2012 ##########
+
+    def draw_map_scale(self) :
+        ########################################################################
+        #
+        # The draw_map_scale function calculates and draws a map scale at the
+        # bottom of the map window created by the PyTopo mapping application.
+        # Distances are calculated along the surface of the geoid defined by the
+        # earth equitorial radius, Req, and the square of the eccentricity of
+        # the earth, esq.
+        # The map scale is accurate only for the center latitude of the map.
+        # The circumference of the earth at the equator is 24901 miles (an upper
+        # limit on map size).
+        # USGS quadrangles use NAD-27, but WGS-84 is the most recent datum, and
+        # GPS uses WGS-84.
+        #
+        # Copyright (C) 2012 Spencer A. Buckner
+        #
+        ########################################################################
+
+        # Define constants
+        # Req = 6.3781370e+06   # WGS-84 earth equatorial radius (meters)
+        # esq = 6.694380e-03    # WGS-84 square of eccentricity of earth
+        Req = 6.3782064e+06   # NAD-27 earth equatorial radius (meters)
+        esq = 6.768658e-03    # NAD-27 square of eccentricity of earth
+
+        # Calculate pixels per mile and pixels per kilometer at map center
+        lat_deg = self.center_lat
+        lat_rad = lat_deg*math.pi/180
+        cos_lat = math.cos(lat_rad)
+        cos_lat_sq = cos_lat*cos_lat
+        R_meters = Req*math.sqrt(1 - esq)/math.sqrt(1 - esq*cos_lat_sq)   # earth radius (meters)
+        R_miles = R_meters/(0.0254*12*5280)                               # earth radius (miles)
+        R_km = R_meters/1000	                                            # earth radius (km)
+        xscale_deg = self.collection.xscale                               # pixels per degree
+        xscale_mi = xscale_deg*360/(2*math.pi*R_miles*cos_lat)            # pixels per mile
+        xscale_km = xscale_deg*360/(2*math.pi*R_km*cos_lat)               # pixels per km
+
+        ##################################################
+
+        # Calculate length of map-scale bar and labels
+        win_width, win_height = self.drawing_area.window.get_size()
+        width_mi = win_width/xscale_mi
+        width_km = win_width/xscale_km
+
+        if width_mi < 0.1 or width_mi >= 50000 :
+            return
+
+        if 0.1 <= width_mi and width_mi < 0.2 :
+            length_mi = xscale_mi*0.05
+            length_km = xscale_km*0.05
+            label_mi = "0.05 mi"
+            label_km = "0.05 km"
+            irange = 6
+            str_length_mi = 42
+            str_length_km = 45
+        elif 0.2 <= width_mi and width_mi < 0.5 :
+            length_mi = xscale_mi*0.1
+            length_km = xscale_km*0.1
+            label_mi = "0.1 mi"
+            label_km = "0.1 km"
+            irange = 6
+            str_length_mi = 35
+            str_length_km = 38
+        elif 0.5 <= width_mi and width_mi < 1 :
+            length_mi = xscale_mi*0.2
+            length_km = xscale_km*0.2
+            label_mi = "0.2 mi"
+            label_km = "0.2 km"
+            irange = 5
+            str_length_mi = 35
+            str_length_km = 38
+        elif 1 <= width_mi and width_mi < 2 :
+            length_mi = xscale_mi*0.5
+            length_km = xscale_km*0.5
+            label_mi = "0.5 mi"
+            label_km = "0.5 km"
+            irange = 6
+            str_length_mi = 35
+            str_length_km = 38
+        elif 2 <= width_mi and width_mi < 5 :
+            length_mi = xscale_mi*1
+            length_km = xscale_km*1
+            label_mi = "1 mi"
+            label_km = "1 km"
+            irange = 6
+            str_length_mi = 24
+            str_length_km = 27
+        elif 5 <= width_mi and width_mi < 10 :
+            length_mi = xscale_mi*2
+            length_km = xscale_km*2
+            label_mi = "2 mi"
+            label_km = "2 km"
+            irange = 5
+            str_length_mi = 24
+            str_length_km = 27
+        elif 10 <= width_mi and width_mi < 20 :
+            length_mi = xscale_mi*5
+            length_km = xscale_km*5
+            label_mi = "5 mi"
+            label_km = "5 km"
+            irange = 6
+            str_length_mi = 24
+            str_length_km = 27
+        elif 20 <= width_mi and width_mi < 50 :
+            length_mi = xscale_mi*10
+            length_km = xscale_km*10
+            label_mi = "10 mi"
+            label_km = "10 km"
+            irange = 6
+            str_length_mi = 32
+            str_length_km = 35
+        elif 50 <= width_mi and width_mi < 100 :
+            length_mi = xscale_mi*20
+            length_km = xscale_km*20
+            label_mi = "20 mi"
+            label_km = "20 km"
+            irange = 5
+            str_length_mi = 32
+            str_length_km = 35
+        elif 100 <= width_mi and width_mi < 200 :
+            length_mi = xscale_mi*50
+            length_km = xscale_km*50
+            label_mi = "50 mi"
+            label_km = "50 km"
+            irange = 6
+            str_length_mi = 32
+            str_length_km = 35
+        elif 200 <= width_mi and width_mi < 500 :
+            length_mi = xscale_mi*100
+            length_km = xscale_km*100
+            label_mi = "100 mi"
+            label_km = "100 km"
+            irange = 6
+            str_length_mi = 39
+            str_length_km = 42
+        elif 500 <= width_mi and width_mi < 1000 :
+            length_mi = xscale_mi*200
+            length_km = xscale_km*200
+            label_mi = "200 mi"
+            label_km = "200 km"
+            irange = 5
+            str_length_mi = 39
+            str_length_km = 42
+        elif 1000 <= width_mi and width_mi < 2000 :
+            length_mi = xscale_mi*500
+            length_km = xscale_km*500
+            label_mi = "500 mi"
+            label_km = "500 km"
+            irange = 6
+            str_length_mi = 39
+            str_length_km = 42
+        elif 2000 <= width_mi and width_mi < 5000 :
+            length_mi = xscale_mi*1000
+            length_km = xscale_km*1000
+            label_mi = "1000 mi"
+            label_km = "1000 km"
+            irange = 6
+            str_length_mi = 46
+            str_length_km = 49
+        elif 5000 <= width_mi and width_mi < 10000 :
+            length_mi = xscale_mi*2000
+            length_km = xscale_km*2000
+            label_mi = "2000 mi"
+            label_km = "2000 km"
+            irange = 5
+            str_length_mi = 46
+            str_length_km = 49
+        elif 10000 <= width_mi and width_mi < 20000 :
+            length_mi = xscale_mi*5000
+            length_km = xscale_km*5000
+            label_mi = "5000 mi"
+            label_km = "5000 km"
+            irange = 6
+            str_length_mi = 46
+            str_length_km = 49
+        elif 20000 <= width_mi and width_mi < 50000 :
+            length_mi = xscale_mi*10000
+            length_km = xscale_km*10000
+            label_mi = "10000 mi"
+            label_km = "10000 km"
+            irange = 6
+            str_length_mi = 53
+            str_length_km = 56
+
+        ##################################################
+
+        # Calculate coordinates of miles map-scale bar
+        x1 = int((win_width - length_mi)/2 + 0.5)
+        y1 = int(win_height - 30 + 0.5)
+        x2 = int(x1 + length_mi + 0.5)
+        y2 = y1
+
+        # Draw white miles map-scale background
+        self.xgc.line_style = gtk.gdk.LINE_SOLID
+        self.set_bg_scale_color()
+        self.xgc.line_width = 20
+        self.draw_line(x1-10-5-10, y1, x2+10+str_length_mi+10, y2)
+
+        # Draw miles map-scale bar
+        self.set_bg_color()
+        self.xgc.line_width = 1
+        self.draw_line(x1, y1, x2, y2)
+
+        # Draw tick marks on miles map-scale bar
+        x0 = x1
+        for i in range(irange) :
+            x1 = x0 + int(i*length_mi/(irange - 1) + 0.5)
+            x2 = x1
+            self.draw_line(x1, y1-3, x2, y2+3)
+
+        # Draw miles map-scale labels
+        x = x0 - 10 - 6
+        y = win_height - 36
+        self.draw_string_scale(x, y, "0")
+        x = x2 + 10
+        self.draw_string_scale(x, y, label_mi)
+
+        ##################################################
+
+        # Calculate coordinates of kilometers map-scale bar
+        x1 = int((win_width - length_km)/2 + 0.5)
+        y1 = int(win_height - 10 + 0.5)
+        x2 = int(x1 + length_km + 0.5)
+        y2 = y1
+
+        # Draw white kilometers map-scale background
+        self.xgc.line_style = gtk.gdk.LINE_SOLID
+        self.set_bg_scale_color()
+        self.xgc.line_width = 20
+        self.draw_line(x1-10-5-10, y1, x2+10+str_length_km+10, y2)
+
+        # Draw kilometers map-scale bar
+        self.set_bg_color()
+        self.xgc.line_width = 1
+        self.draw_line(x1, y1, x2, y2)
+
+        # Draw tick marks on kilometers map-scale bar
+        x0 = x1
+        for i in range(irange) :
+            x1 = x0 + int(i*length_km/(irange - 1) + 0.5)
+            x2 = x1
+            self.draw_line(x1, y1-3, x2, y2+3)
+
+        # Draw kilometers map-scale labels
+        x = x0 - 10 - 6
+        y = win_height - 16
+        self.draw_string_scale(x, y, "0")
+        x = x2 + 10
+        self.draw_string_scale(x, y, label_km)
+
+    ########## end added ##########
+
     def draw_zoom_control(self) :
         """Draw some zoom controls in case we're running on a tablet
            and have no keyboard to zoom or move around.
@@ -1512,6 +1768,7 @@ that are expected by the MapCollection classes:
         self.xgc.line_style = gtk.gdk.LINE_SOLID
         self.set_bg_color()
         self.xgc.line_width = 3
+
         # Draw the boxes
         self.draw_rectangle(False, self.zoom_X1, self.zoom_in_Y1,
                             self.zoom_btn_size, self.zoom_btn_size)
@@ -1896,6 +2153,10 @@ that are expected by the MapCollection classes:
         #self.xgc.set_rgb_fg_color(self.bg_color)
         self.xgc.foreground = self.xgc.background
 
+    def set_bg_scale_color(self) :
+        """Change to map-scale background color (white)."""
+        self.xgc.set_rgb_fg_color(self.bg_scale_color)
+
     def set_grid_color(self) :
         """Change to the color used to show the grid (for debugging)."""
         self.xgc.set_rgb_fg_color(self.grid_color)
@@ -1926,6 +2187,14 @@ that are expected by the MapCollection classes:
         import pango
         layout = self.drawing_area.create_pango_layout (str)
         fontdesc = pango.FontDescription("Sans Bold 12")
+        layout.set_font_description (fontdesc)
+        self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
+
+    def draw_string_scale(self, x, y, str) :
+        """Draw a string."""
+        import pango
+        layout = self.drawing_area.create_pango_layout (str)
+        fontdesc = pango.FontDescription("Sans 9")
         layout.set_font_description (fontdesc)
         self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
 
