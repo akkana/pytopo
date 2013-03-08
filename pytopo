@@ -1371,9 +1371,7 @@ that are expected by the MapCollection classes:
         self.bg_scale_color = gtk.gdk.color_parse("white")
         self.track_color = gtk.gdk.color_parse("magenta")
         self.waypoint_color = gtk.gdk.color_parse("blue")
-        # Grid color is only needed when Debug,
-        # but this is called before parse_args so we don't know Debug.
-        self.grid_color = gtk.gdk.color_parse("green")
+        self.grid_color = gtk.gdk.color_parse("grey45")
 
         # The timeout for long press events
         self.press_timeout = None
@@ -1516,7 +1514,11 @@ that are expected by the MapCollection classes:
         # USGS quadrangles use NAD-27, but WGS-84 is the most recent datum, and
         # GPS uses WGS-84.
         #
-        # Copyright (C) 2012 Spencer A. Buckner
+        # References:
+        #    http://en.wikipedia.org/wiki/Geodetic_system
+        #    http://www.gmat.unsw.edu.au/snap/gps/clynch_pdfs/radiigeo.pdf
+        #
+        # Copyright (C) 2013 Spencer A. Buckner
         #
         ########################################################################
 
@@ -1529,14 +1531,15 @@ that are expected by the MapCollection classes:
         # Calculate pixels per mile and pixels per kilometer at map center
         lat_deg = self.center_lat
         lat_rad = lat_deg*math.pi/180
+        sin_lat = math.sin(lat_rad)
+        sin_lat_sq = sin_lat*sin_lat
         cos_lat = math.cos(lat_rad)
-        cos_lat_sq = cos_lat*cos_lat
-        R_meters = Req*math.sqrt(1 - esq)/math.sqrt(1 - esq*cos_lat_sq)   # earth radius (meters)
-        R_miles = R_meters/(0.0254*12*5280)                               # earth radius (miles)
-        R_km = R_meters/1000	                                            # earth radius (km)
-        xscale_deg = self.collection.xscale                               # pixels per degree
-        xscale_mi = xscale_deg*360/(2*math.pi*R_miles*cos_lat)            # pixels per mile
-        xscale_km = xscale_deg*360/(2*math.pi*R_km*cos_lat)               # pixels per km
+        R_meters = Req/math.sqrt(1 - esq*sin_lat_sq)             # earth radius (m)
+        R_miles = R_meters/(0.0254*12*5280)                      # earth radius (miles)
+        R_km = R_meters/1000	                                   # earth radius (km)
+        xscale_deg = self.collection.xscale                      # pixels per degree
+        xscale_mi = xscale_deg*360/(2*math.pi*R_miles*cos_lat)   # pixels per mile
+        xscale_km = xscale_deg*360/(2*math.pi*R_km*cos_lat)      # pixels per km
 
         ##################################################
 
@@ -1766,7 +1769,7 @@ that are expected by the MapCollection classes:
         textoffset = self.zoom_btn_size / 5
 
         self.xgc.line_style = gtk.gdk.LINE_SOLID
-        self.set_bg_color()
+        self.set_grid_color()
         self.xgc.line_width = 3
 
         # Draw the boxes
