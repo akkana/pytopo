@@ -1498,8 +1498,6 @@ that are expected by the MapCollection classes:
                         self.draw_string(x, y, pt[2])
                         self.draw_rectangle(True, x-3, y-3, 6, 6)
 
-    ########## added 21 Dec 2012 ##########
-
     def draw_map_scale(self) :
         ########################################################################
         #
@@ -1543,150 +1541,37 @@ that are expected by the MapCollection classes:
 
         ##################################################
 
-        # Calculate length of map-scale bar and labels
+        # Calculate window width in miles and kilometers
         win_width, win_height = self.drawing_area.window.get_size()
-        width_mi = win_width/xscale_mi
-        width_km = win_width/xscale_km
+        width_mi = win_width/xscale_mi   # (miles)
+        width_km = win_width/xscale_km   # (kilometers)
 
-        if width_mi < 0.1 or width_mi >= 50000 :
-            return
-
-        if 0.1 <= width_mi and width_mi < 0.2 :
-            length_mi = xscale_mi*0.05
-            length_km = xscale_km*0.05
-            label_mi = "0.05 mi"
-            label_km = "0.05 km"
-            irange = 6
-            str_length_mi = 42
-            str_length_km = 45
-        elif 0.2 <= width_mi and width_mi < 0.5 :
-            length_mi = xscale_mi*0.1
-            length_km = xscale_km*0.1
-            label_mi = "0.1 mi"
-            label_km = "0.1 km"
-            irange = 6
-            str_length_mi = 35
-            str_length_km = 38
-        elif 0.5 <= width_mi and width_mi < 1 :
-            length_mi = xscale_mi*0.2
-            length_km = xscale_km*0.2
-            label_mi = "0.2 mi"
-            label_km = "0.2 km"
-            irange = 5
-            str_length_mi = 35
-            str_length_km = 38
-        elif 1 <= width_mi and width_mi < 2 :
-            length_mi = xscale_mi*0.5
-            length_km = xscale_km*0.5
-            label_mi = "0.5 mi"
-            label_km = "0.5 km"
-            irange = 6
-            str_length_mi = 35
-            str_length_km = 38
-        elif 2 <= width_mi and width_mi < 5 :
-            length_mi = xscale_mi*1
-            length_km = xscale_km*1
-            label_mi = "1 mi"
-            label_km = "1 km"
-            irange = 6
-            str_length_mi = 24
-            str_length_km = 27
-        elif 5 <= width_mi and width_mi < 10 :
-            length_mi = xscale_mi*2
-            length_km = xscale_km*2
-            label_mi = "2 mi"
-            label_km = "2 km"
-            irange = 5
-            str_length_mi = 24
-            str_length_km = 27
-        elif 10 <= width_mi and width_mi < 20 :
-            length_mi = xscale_mi*5
-            length_km = xscale_km*5
-            label_mi = "5 mi"
-            label_km = "5 km"
-            irange = 6
-            str_length_mi = 24
-            str_length_km = 27
-        elif 20 <= width_mi and width_mi < 50 :
-            length_mi = xscale_mi*10
-            length_km = xscale_km*10
-            label_mi = "10 mi"
-            label_km = "10 km"
-            irange = 6
-            str_length_mi = 32
-            str_length_km = 35
-        elif 50 <= width_mi and width_mi < 100 :
-            length_mi = xscale_mi*20
-            length_km = xscale_km*20
-            label_mi = "20 mi"
-            label_km = "20 km"
-            irange = 5
-            str_length_mi = 32
-            str_length_km = 35
-        elif 100 <= width_mi and width_mi < 200 :
-            length_mi = xscale_mi*50
-            length_km = xscale_km*50
-            label_mi = "50 mi"
-            label_km = "50 km"
-            irange = 6
-            str_length_mi = 32
-            str_length_km = 35
-        elif 200 <= width_mi and width_mi < 500 :
-            length_mi = xscale_mi*100
-            length_km = xscale_km*100
-            label_mi = "100 mi"
-            label_km = "100 km"
-            irange = 6
-            str_length_mi = 39
-            str_length_km = 42
-        elif 500 <= width_mi and width_mi < 1000 :
-            length_mi = xscale_mi*200
-            length_km = xscale_km*200
-            label_mi = "200 mi"
-            label_km = "200 km"
-            irange = 5
-            str_length_mi = 39
-            str_length_km = 42
-        elif 1000 <= width_mi and width_mi < 2000 :
-            length_mi = xscale_mi*500
-            length_km = xscale_km*500
-            label_mi = "500 mi"
-            label_km = "500 km"
-            irange = 6
-            str_length_mi = 39
-            str_length_km = 42
-        elif 2000 <= width_mi and width_mi < 5000 :
-            length_mi = xscale_mi*1000
-            length_km = xscale_km*1000
-            label_mi = "1000 mi"
-            label_km = "1000 km"
-            irange = 6
-            str_length_mi = 46
-            str_length_km = 49
-        elif 5000 <= width_mi and width_mi < 10000 :
-            length_mi = xscale_mi*2000
-            length_km = xscale_km*2000
-            label_mi = "2000 mi"
-            label_km = "2000 km"
-            irange = 5
-            str_length_mi = 46
-            str_length_km = 49
-        elif 10000 <= width_mi and width_mi < 20000 :
-            length_mi = xscale_mi*5000
-            length_km = xscale_km*5000
-            label_mi = "5000 mi"
-            label_km = "5000 km"
-            irange = 6
-            str_length_mi = 46
-            str_length_km = 49
-        elif 20000 <= width_mi and width_mi < 50000 :
-            length_mi = xscale_mi*10000
-            length_km = xscale_km*10000
-            label_mi = "10000 mi"
-            label_km = "10000 km"
-            irange = 6
-            str_length_mi = 53
-            str_length_km = 56
+        # Calculate length of map-scale bars in pixels;
+        # length (pixels) <= win_width/2.
+        log_width = math.log10(width_mi/2)
+        power_10 = math.floor(log_width)
+        fraction = log_width - power_10
+        log10_1 = 0
+        log10_2 = math.log10(2)
+        log10_5 = math.log10(5)
+        log10_10 = 1
+        if log10_1 <= fraction and fraction < log10_2 :
+            length = 1*math.pow(10, power_10)   # (miles or kilometers)
+            nticks = 6
+        elif log10_2 <= fraction and fraction < log10_5 :
+            length = 2*math.pow(10, power_10)   # (miles or kilometers)
+            nticks = 5
+        elif log10_5 <= fraction and fraction < log10_10 :
+            length = 5*math.pow(10, power_10)   # (miles or kilometers)
+            nticks = 6
+        length_mi = xscale_mi*length   # (pixels)
+        length_km = xscale_km*length   # (pixels)
+        label_mi = str(10)
+        label_km = str(10)
+        label_mi = '\0'*len(label_mi)
+        label_km = '\0'*len(label_km)
+        label_mi = "%g mi" %length
+        label_km = "%g km" %length
 
         ##################################################
 
@@ -1696,11 +1581,20 @@ that are expected by the MapCollection classes:
         x2 = int(x1 + length_mi + 0.5)
         y2 = y1
 
-        # Draw white miles map-scale background
+        # Get label length in pixels;
+        # length of "0" string is 7.
+        import pango
+        font_desc = pango.FontDescription ("Sans 9")
+        layout = self.drawing_area.create_pango_layout (label_mi)
+        layout.set_font_description (font_desc)
+        width, height = layout.get_pixel_size ()
+        str_length_mi = width
+
+        # Draw white background for miles map-scale
         self.xgc.line_style = gtk.gdk.LINE_SOLID
         self.set_bg_scale_color()
         self.xgc.line_width = 20
-        self.draw_line(x1-10-5-10, y1, x2+10+str_length_mi+10, y2)
+        self.draw_line(x1-10-7-10, y1, x2+10+str_length_mi+10, y2)
 
         # Draw miles map-scale bar
         self.set_bg_color()
@@ -1709,13 +1603,13 @@ that are expected by the MapCollection classes:
 
         # Draw tick marks on miles map-scale bar
         x0 = x1
-        for i in range(irange) :
-            x1 = x0 + int(i*length_mi/(irange - 1) + 0.5)
+        for i in range(nticks) :
+            x1 = x0 + int(i*length_mi/(nticks - 1) + 0.5)
             x2 = x1
             self.draw_line(x1, y1-3, x2, y2+3)
 
         # Draw miles map-scale labels
-        x = x0 - 10 - 6
+        x = x0 - 10 - 7
         y = win_height - 36
         self.draw_string_scale(x, y, "0")
         x = x2 + 10
@@ -1729,11 +1623,19 @@ that are expected by the MapCollection classes:
         x2 = int(x1 + length_km + 0.5)
         y2 = y1
 
-        # Draw white kilometers map-scale background
+        # Get label length in pixels;
+        # length of "0" string is 7.
+        font_desc = pango.FontDescription ("Sans 9")
+        layout = self.drawing_area.create_pango_layout (label_km)
+        layout.set_font_description (font_desc)
+        width, height = layout.get_pixel_size ()
+        str_length_km = width
+
+        # Draw white background for kilometers map-scale
         self.xgc.line_style = gtk.gdk.LINE_SOLID
         self.set_bg_scale_color()
         self.xgc.line_width = 20
-        self.draw_line(x1-10-5-10, y1, x2+10+str_length_km+10, y2)
+        self.draw_line(x1-10-7-10, y1, x2+10+str_length_km+10, y2)
 
         # Draw kilometers map-scale bar
         self.set_bg_color()
@@ -1742,8 +1644,8 @@ that are expected by the MapCollection classes:
 
         # Draw tick marks on kilometers map-scale bar
         x0 = x1
-        for i in range(irange) :
-            x1 = x0 + int(i*length_km/(irange - 1) + 0.5)
+        for i in range(nticks) :
+            x1 = x0 + int(i*length_km/(nticks - 1) + 0.5)
             x2 = x1
             self.draw_line(x1, y1-3, x2, y2+3)
 
@@ -1753,8 +1655,6 @@ that are expected by the MapCollection classes:
         self.draw_string_scale(x, y, "0")
         x = x2 + 10
         self.draw_string_scale(x, y, label_km)
-
-    ########## end added ##########
 
     def draw_zoom_control(self) :
         """Draw some zoom controls in case we're running on a tablet
