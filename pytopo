@@ -58,7 +58,9 @@ TODO: allow configuration of colors, line thickness etc.
 
 VersionString = "PyTopo Version 1.0 by Akkana Peck"
 
-import sys, os, glob, math, gtk, gobject, gc
+import sys, os, glob, math
+import gtk, gobject, glib
+import gc
 settings = gtk.settings_get_default()
 settings.set_property("gtk-touchscreen-mode", True)
 HaveDOM = True
@@ -453,8 +455,14 @@ TiledMapCollection classes must implement
         try :
             pixbuf = gtk.gdk.pixbuf_new_from_file(path)
             self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
+        except glib.GError, e:
+            print "Couldn't draw tile:", e, "... deleting"
+            os.unlink(path)
+            self.download_failures += 1
+            # Usually this means OSM gave us a text file containing
+            # a string like "Tile Not Available"
         except Exception, e:
-            print "Couldn't draw tile:", e
+            print "Error drawing tile:", e
             self.download_failures += 1
 
         # Redraw any trackpoints, since they might have been overwritten:
@@ -1129,11 +1137,11 @@ class TrackPoints :
 
         if lon < self.minlon :
             self.minlon = lon
-        elif lon > self.maxlon :
+        if lon > self.maxlon :
             self.maxlon = lon
         if lat < self.minlat :
             self.minlat = lat
-        elif lat > self.maxlat :
+        if lat > self.maxlat :
             self.maxlat = lat
 
         if (waypoint) :
