@@ -1114,6 +1114,8 @@ Topo2MapCollection: data from local-area Topo! packages that
                                    _ser7prefix=_prefix, _ser15prefix=None,
                                    _img_ext=".jpg")
 
+START = "start"
+
 class TrackPoints :
 
     """Parsing and handling of GPS track files.
@@ -1178,13 +1180,21 @@ class TrackPoints :
 
         # Handle track(s)
         trkpts = dom.getElementsByTagName("trkpt")
-        for i in range (0, len(trkpts), 1) :
-            self.handleTrackPoint(trkpts[i], False)
+
+        # We need to keep different track files separate -- don't
+        # draw lines from the end of one track to the beginning of the next.
+        if trkpts:
+            self.points.append(START)
+
+            for i in range (0, len(trkpts), 1) :
+                self.handleTrackPoint(trkpts[i], False)
 
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
-        for i in range (0, len(waypts), 1) :
-            self.handleTrackPoint(waypts[i], True)
+        if waypts:
+            self.waypoints.append(START)
+            for i in range (0, len(waypts), 1) :
+                self.handleTrackPoint(waypts[i], True)
 
         # GPX also allows for routing, rtept, but I don't think we need those.
 
@@ -1474,6 +1484,10 @@ that are expected by the MapCollection classes:
                 self.set_track_color()
 
                 for pt in self.trackpoints.points :
+                    if pt == START:
+                        cur_x = None
+                        cur_y = None
+                        continue
                     x = int((pt[0] - self.center_lon) * self.collection.xscale
                             + win_width/2)
                     y = int((self.center_lat - pt[1]) * self.collection.yscale
@@ -1497,6 +1511,8 @@ that are expected by the MapCollection classes:
                 self.xgc.line_style = gtk.gdk.LINE_SOLID
                 self.xgc.line_width = 2
                 for pt in self.trackpoints.waypoints :
+                    if pt == START:
+                        continue
                     x = int((pt[0] - self.center_lon) * self.collection.xscale
                             + win_width/2)
                     y = int((self.center_lat - pt[1]) * self.collection.yscale
