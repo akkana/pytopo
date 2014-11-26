@@ -581,6 +581,12 @@ class OSMMapCollection(TiledMapCollection) :
         """
 
         if self.zoomlevel != newzoom :
+            if newzoom > 19 or \
+               (newzoom > 18 and
+                self.download_url.endswith('opencyclemap.org/cycle')) :
+                print "Can't zoom to level", newzoom, "in a", \
+                    self.name, "map collection"
+                return
             self.zoomlevel = newzoom
             self.powzoom = 2.0 ** self.zoomlevel
 
