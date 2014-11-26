@@ -513,7 +513,7 @@ class OSMMapCollection(TiledMapCollection) :
 
     def __init__(self, _name, _location, _ext,
                  _img_width, _img_height, _init_zoom,
-                 _download_url=None) :
+                 _download_url=None, maxzoom=19) :
         """arguments:
         name         -- user-visible name of the collection
         location     -- directory on disk where the maps reside
@@ -531,6 +531,7 @@ class OSMMapCollection(TiledMapCollection) :
         self.zoomlevel = _init_zoom
         self.powzoom = 2.0 ** self.zoomlevel   # to avoid re-re-calculating
         self.download_url = _download_url
+        self.maxzoom = maxzoom
 
         self.location = os.path.expanduser(self.location)
 
@@ -581,11 +582,9 @@ class OSMMapCollection(TiledMapCollection) :
         """
 
         if self.zoomlevel != newzoom :
-            if newzoom > 19 or \
-               (newzoom > 18 and
-                self.download_url.endswith('opencyclemap.org/cycle')) :
-                print "Can't zoom to level", newzoom, "in a", \
-                    self.name, "map collection"
+            if newzoom > self.maxzoom :
+                print "Can't zoom past level", self.maxzoom, "in", \
+                    self.name, "map collections"
                 return
             self.zoomlevel = newzoom
             self.powzoom = 2.0 ** self.zoomlevel
