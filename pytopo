@@ -457,7 +457,8 @@ TiledMapCollection classes must implement
             self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
         except glib.GError, e:
             print "Couldn't draw tile:", e, "... deleting"
-            os.unlink(path)
+            if os.path.exists(path) :
+                os.unlink(path)
             self.download_failures += 1
             # Usually this means OSM gave us a text file containing
             # a string like "Tile Not Available"
@@ -1511,6 +1512,7 @@ that are expected by the MapCollection classes:
                         cur_x = None
                         cur_y = None
 
+            # XXX Need a way to optionally turn off waypoints
             if len(self.trackpoints.waypoints) > 0 :
                 self.set_waypoint_color()
                 self.xgc.line_style = gtk.gdk.LINE_SOLID
@@ -3058,6 +3060,8 @@ def download_job(url, localpath, callback):
             urllib.urlretrieve(url, localpath)
             return localpath
         except IOError, e :
+            print "Couldn't download", url, ":"
+            print e
             return None
 
     path = yield threaded_task(download, url, localpath, callback)
