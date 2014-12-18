@@ -1361,6 +1361,7 @@ that are expected by the MapCollection classes:
         self.cur_lon = 0
         self.cur_lat = 0
         self.trackpoints = None
+        self.show_waypoints = True
 
         try :
             self.pin = \
@@ -1512,8 +1513,7 @@ that are expected by the MapCollection classes:
                         cur_x = None
                         cur_y = None
 
-            # XXX Need a way to optionally turn off waypoints
-            if len(self.trackpoints.waypoints) > 0 :
+            if self.show_waypoints and len(self.trackpoints.waypoints) > 0 :
                 self.set_waypoint_color()
                 self.xgc.line_style = gtk.gdk.LINE_SOLID
                 self.xgc.line_width = 2
@@ -1741,6 +1741,7 @@ that are expected by the MapCollection classes:
         return 0
 
     def context_menu(self, event) :
+        '''Create a context menu. This is called anew on every right-click.'''
         menu = gtk.Menu()    # Don't need to show menus
 
         # Create the menu items
@@ -1750,6 +1751,10 @@ that are expected by the MapCollection classes:
         locations_item = gtk.MenuItem("My Locations...")
         tracks_item = gtk.MenuItem("My Tracks...")
         download_item = gtk.MenuItem("Download Area...")
+        if self.show_waypoints :
+            show_waypoint_item = gtk.MenuItem("Hide waypoints...")
+        else :
+            show_waypoint_item = gtk.MenuItem("Show waypoints...")
         quit_item = gtk.MenuItem("Quit")
 
         # Add them to the menu
@@ -1759,6 +1764,7 @@ that are expected by the MapCollection classes:
         menu.append(locations_item)
         menu.append(tracks_item)
         menu.append(download_item)
+        menu.append(show_waypoint_item)
         menu.append(quit_item)
 
         # Attach the callback functions to the activate signal
@@ -1768,6 +1774,7 @@ that are expected by the MapCollection classes:
         locations_item.connect("activate", self.mylocations)
         tracks_item.connect("activate", self.mytracks)
         download_item.connect("activate", self.download_area)
+        show_waypoint_item.connect("activate", self.toggle_show_waypoints)
 
         # We can attach the Quit menu item to our exit function
         quit_item.connect_object ("activate", self.graceful_exit, "quit")
@@ -1779,6 +1786,7 @@ that are expected by the MapCollection classes:
         locations_item.show()
         tracks_item.show()
         download_item.show()
+        show_waypoint_item.show()
         quit_item.show()
 
         if event :
@@ -1791,6 +1799,10 @@ that are expected by the MapCollection classes:
             # "the time of the event in milliseconds" -- but since when?
             # Not since the epoch.
         menu.popup(None, None, None, button, t)
+
+    def toggle_show_waypoints(self, widget) :
+        self.show_waypoints = not self.show_waypoints
+        self.draw_map()
 
     def mylocations(self, widget) :
         self.controller.location_select(self)
