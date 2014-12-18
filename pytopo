@@ -70,6 +70,7 @@ except ImportError:
     HaveDOM = False
 
 import types, urllib, re
+import collections
 
 #import pdb
 
@@ -1742,52 +1743,45 @@ that are expected by the MapCollection classes:
 
     def context_menu(self, event) :
         '''Create a context menu. This is called anew on every right-click.'''
-        menu = gtk.Menu()    # Don't need to show menus
 
-        # Create the menu items
-        centerpin_item = gtk.MenuItem("Go to pin...")
-        pin_item = gtk.MenuItem("Pin this location")
-        save_item = gtk.MenuItem("Save pin location...")
-        locations_item = gtk.MenuItem("My Locations...")
-        tracks_item = gtk.MenuItem("My Tracks...")
-        download_item = gtk.MenuItem("Download Area...")
-        if self.show_waypoints :
-            show_waypoint_item = gtk.MenuItem("Hide waypoints...")
-        else :
-            show_waypoint_item = gtk.MenuItem("Show waypoints...")
-        quit_item = gtk.MenuItem("Quit")
+        contextmenu = collections.OrderedDict([
+            ( "Go to pin...", self.set_center_to_pin),
+            ( "Pin this location", self.set_pin_by_mouse),
+            ( "Save pin location...", self.save_location),
+            ( "My Locations...", self.mylocations),
+            ( "My Tracks...", self.mytracks),
+            ( "Download Area...", self.download_area),
+            ( "Show waypoints...", self.toggle_show_waypoints),
+            ( "Change background map", None),
+            ( "Quit", self.graceful_exit)
+            ])
 
-        # Add them to the menu
-        menu.append(centerpin_item)
-        menu.append(pin_item)
-        menu.append(save_item)
-        menu.append(locations_item)
-        menu.append(tracks_item)
-        menu.append(download_item)
-        menu.append(show_waypoint_item)
-        menu.append(quit_item)
+        menu = gtk.Menu()
+        for itemname in contextmenu.keys() :
+            item = gtk.MenuItem(itemname)
 
-        # Attach the callback functions to the activate signal
-        centerpin_item.connect("activate", self.set_center_to_pin)
-        pin_item.connect("activate", self.set_pin_by_mouse)
-        save_item.connect("activate", self.save_location)
-        locations_item.connect("activate", self.mylocations)
-        tracks_item.connect("activate", self.mytracks)
-        download_item.connect("activate", self.download_area)
-        show_waypoint_item.connect("activate", self.toggle_show_waypoints)
+            # Show/Hide waypoints changes its name since it's a toggle:
+            if contextmenu[itemname] == self.toggle_show_waypoints :
+                if self.show_waypoints :
+                    item.set_label("Hide waypoints...")
+                item.connect("activate", contextmenu[itemname])
 
-        # We can attach the Quit menu item to our exit function
-        quit_item.connect_object ("activate", self.graceful_exit, "quit")
+            # Change background map gives a submenu of available collections.
+            elif itemname == "Change background map" :
+                submenu = gtk.Menu()
+                for coll in self.controller.collections :
+                    subitem = gtk.MenuItem(coll.name)
+                    subitem.connect("activate", self.change_collection,
+                                    coll.name)
+                    submenu.append(subitem)
+                    subitem.show()
+                item.set_submenu(submenu)
 
-        # We do need to show menu items
-        centerpin_item.show()
-        pin_item.show()
-        save_item.show()
-        locations_item.show()
-        tracks_item.show()
-        download_item.show()
-        show_waypoint_item.show()
-        quit_item.show()
+            else :
+                item.connect("activate", contextmenu[itemname])
+
+            menu.append(item)
+            item.show()
 
         if event :
             button = event.button
@@ -1799,6 +1793,15 @@ that are expected by the MapCollection classes:
             # "the time of the event in milliseconds" -- but since when?
             # Not since the epoch.
         menu.popup(None, None, None, button, t)
+
+    def change_collection(self, widget, name) :
+        newcoll = self.controller.find_collection(name)
+        if newcoll :
+            newcoll.zoom_to(self.collection.zoomlevel, self.cur_lat)
+            self.collection = newcoll
+            self.draw_map()
+        else :
+            print "Couldn't find a collection named '%s'" % name
 
     def toggle_show_waypoints(self, widget) :
         self.show_waypoints = not self.show_waypoints
