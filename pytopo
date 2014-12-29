@@ -72,6 +72,11 @@ except ImportError:
 import types, urllib, re
 import collections
 
+# If we download files, we'll try to use the magic library to make
+# sure we got the right file type. But no need to import it
+# if we're not downloading anything.
+magic_parser = None
+
 #import pdb
 
 #import traceback
@@ -437,8 +442,8 @@ TiledMapCollection classes must implement
         # In that case, just give up on downloading.
         if path == None :
             self.download_failures += 1
-            if self.download_failures > 5 :
-                print "Download failed; giving up"
+            if self.download_failures > 10 :
+                print "\nDownload failed; giving up"
                 self.download_func = None
                 # Clear self.download_tiles, so that if the net returns
                 # we'll start on new stuff, not old stuff.
@@ -457,8 +462,13 @@ TiledMapCollection classes must implement
             pixbuf = gtk.gdk.pixbuf_new_from_file(path)
             self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
         except glib.GError, e:
-            print "Couldn't draw tile:", e, "... deleting"
-            if os.path.exists(path) :
+            print "Couldn't draw tile:", e,
+            if not Debug:
+                print "... deleting"
+            else:
+                print ""
+            print ""
+            if os.path.exists(path) and not Debug :
                 os.unlink(path)
             self.download_failures += 1
             # Usually this means OSM gave us a text file containing
@@ -3067,22 +3077,52 @@ def threaded_task(function, *args, **kwargs):
     return _task
 
 def download_job(url, localpath, callback):
-    global Debug
     def download(url, localpath, callback):
+        global magic_parser
         if Debug :
             print "Downloading", url
         try :
             urllib.urlretrieve(url, localpath)
-            return localpath
         except IOError, e :
             print "Couldn't download", url, ":"
             print e
             return None
 
+        if magic_parser == None:
+            try:
+                import magic
+                magic_parser = magic.open(magic.MAGIC_MIME)
+                magic_parser.load()
+            except:
+                magic_parser = False
+        if magic_parser:
+            mimetype = magic_parser.file(localpath)
+            if not mimetype.startswith("image/"):
+                print "Problem downloading", localpath
+                print "Type:", mimetype
+                # Opencyclemap, at least, sometimes serves text files
+                # that say "tile not available". Other servers may serve
+                # HTML files. If it's text, give the user a chance to see it.
+                if mimetype.startswith("text/"):
+                    with open(localpath, 'r') as errfile:
+                        errstr = errfile.read()
+                    # Don't show more than three full lines of error message:
+                    if len(errstr) > 240:
+                        errstr = errstr[0:100]
+                    print 'File contents: "%s"' % errstr.strip()
+                else:
+                    print "File type is", mimetype
+
+                # Return no local path, so it can be deleted if appropriate.
+                return None
+
+        return localpath
+
     path = yield threaded_task(download, url, localpath, callback)
     if Debug :
         print >>sys.stderr, "[downloaded %s]" % (localpath)
     callback(path)
+
 
 # Conditional main:
 if __name__ == "__main__" :
