@@ -1195,23 +1195,25 @@ class TrackPoints :
             print "Reading track file", filename
         dom = xml.dom.minidom.parse(filename)
 
-        # Handle track(s)
-        trkpts = dom.getElementsByTagName("trkpt")
+        # Handle track(s).
+        segs = dom.getElementsByTagName("trkseg")
+        for seg in segs:
+            trkpts = seg.getElementsByTagName("trkpt")
 
-        # We need to keep different track files separate -- don't
-        # draw lines from the end of one track to the beginning of the next.
-        if trkpts:
-            self.points.append(START)
+            # We need to keep different track files and segments separate -- don't
+            # draw lines from the end of one track to the beginning of the next.
+            if trkpts:
+                self.points.append(START)
 
-            for i in range (0, len(trkpts), 1) :
-                self.handleTrackPoint(trkpts[i], False)
+                for i in range (0, len(trkpts), 1) :
+                    self.handleTrackPoint(trkpts[i], False)
 
-        # Handle waypoints
-        waypts = dom.getElementsByTagName("wpt")
-        if waypts:
-            self.waypoints.append(START)
-            for i in range (0, len(waypts), 1) :
-                self.handleTrackPoint(waypts[i], True)
+            # Handle waypoints
+            waypts = seg.getElementsByTagName("wpt")
+            if waypts:
+                self.waypoints.append(START)
+                for i in range (0, len(waypts), 1) :
+                    self.handleTrackPoint(waypts[i], True)
 
         # GPX also allows for routing, rtept, but I don't think we need those.
 
