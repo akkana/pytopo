@@ -61,6 +61,7 @@ VersionString = "PyTopo Version 1.0 by Akkana Peck"
 import sys, os, glob, math
 import gtk, gobject, glib
 import gc
+import pango
 settings = gtk.settings_get_default()
 settings.set_property("gtk-touchscreen-mode", True)
 HaveDOM = True
@@ -425,7 +426,7 @@ TiledMapCollection classes must implement
 
         # Useful when testing:
         if (Debug) :
-            mapwin.set_grid_color()
+            mapwin.set_color(self.grid_color)
             mapwin.draw_rectangle(0, x, y, w, h)
             mapwin.draw_line(x, y, x+w, y+h)
             mapwin.set_bg_color()
@@ -1352,8 +1353,7 @@ This is intended to hold the GTK specific drawing code,
 and to be extensible into other widget libraries.
 To that end, it needs to implement the following methods
 that are expected by the MapCollection classes:
-   win_width, win_height = get_size()
-   set_bg_color(), set_grid_color(), set_map_color()
+   win_width, win_height = get_size(), set_color(),
    draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
    draw_rectangle(fill, x, y, width, height)
    draw_line(x, y, width, height)
@@ -1405,14 +1405,18 @@ that are expected by the MapCollection classes:
         self.click_last_lat = 0
         self.is_dragging = False
 
-        self.bg_color = gtk.gdk.color_parse("black")
-        self.bg_scale_color = gtk.gdk.color_parse("white")
-        self.track_color = gtk.gdk.color_parse("magenta")
-        self.waypoint_color = gtk.gdk.color_parse("blue")
-        self.grid_color = gtk.gdk.color_parse("grey45")
-
         # The timeout for long press events
         self.press_timeout = None
+
+        # Colors and fonts should of course be configurable:
+        # self.bg_color = gtk.gdk.color_parse("black")
+        self.bg_scale_color = gtk.gdk.color_parse("white")
+        self.track_color = gtk.gdk.color_parse("magenta")
+        self.waypoint_color = gtk.gdk.color_parse("blue2")
+        self.grid_color = gtk.gdk.color_parse("grey45")
+
+        self.font_desc = pango.FontDescription ("Sans 9")
+        self.wpt_font_desc = pango.FontDescription ("Sans Italic 10")
 
     def show_window(self, init_width, init_height) :
         """Create the initial window."""
@@ -1501,7 +1505,7 @@ that are expected by the MapCollection classes:
                 cur_y = None
                 self.xgc.line_style = gtk.gdk.LINE_ON_OFF_DASH
                 self.xgc.line_width = 3
-                self.set_track_color()
+                self.set_color(self.track_color)
 
                 for pt in self.trackpoints.points :
                     if pt == START:
@@ -1527,7 +1531,7 @@ that are expected by the MapCollection classes:
                         cur_y = None
 
             if self.show_waypoints and len(self.trackpoints.waypoints) > 0 :
-                self.set_waypoint_color()
+                self.set_color(self.waypoint_color)
                 self.xgc.line_style = gtk.gdk.LINE_SOLID
                 self.xgc.line_width = 2
                 for pt in self.trackpoints.waypoints :
@@ -1539,7 +1543,14 @@ that are expected by the MapCollection classes:
                             + win_height/2)
 
                     if x >= 0 and x < win_width and y >= 0 and y < win_height :
-                        self.draw_string(x, y, pt[2])
+                        layout = self.drawing_area.create_pango_layout(pt[2])
+                        layout.set_font_description (self.wpt_font_desc)
+                        # tw = layout.get_size()[0] / pango.SCALE
+                        th = layout.get_size()[1] / pango.SCALE
+                        self.drawing_area.window.draw_layout(self.xgc,
+                                                             x + th/3,
+                                                             y - th/2,
+                                                             layout)
                         self.draw_rectangle(True, x-3, y-3, 6, 6)
 
     def draw_map_scale(self) :
@@ -1627,16 +1638,14 @@ that are expected by the MapCollection classes:
 
         # Get label length in pixels;
         # length of "0" string is 7.
-        import pango
-        font_desc = pango.FontDescription ("Sans 9")
         layout = self.drawing_area.create_pango_layout (label_mi)
-        layout.set_font_description (font_desc)
+        layout.set_font_description (self.font_desc)
         width, height = layout.get_pixel_size ()
         str_length_mi = width
 
         # Draw white background for miles map-scale
         self.xgc.line_style = gtk.gdk.LINE_SOLID
-        self.set_bg_scale_color()
+        self.set_color(self.bg_scale_color)
         self.xgc.line_width = 20
         self.draw_line(x1-10-7-10, y1, x2+10+str_length_mi+10, y2)
 
@@ -1669,15 +1678,14 @@ that are expected by the MapCollection classes:
 
         # Get label length in pixels;
         # length of "0" string is 7.
-        font_desc = pango.FontDescription ("Sans 9")
         layout = self.drawing_area.create_pango_layout (label_km)
-        layout.set_font_description (font_desc)
+        layout.set_font_description (self.font_desc)
         width, height = layout.get_pixel_size ()
         str_length_km = width
 
         # Draw white background for kilometers map-scale
         self.xgc.line_style = gtk.gdk.LINE_SOLID
-        self.set_bg_scale_color()
+        self.set_color(self.bg_scale_color)
         self.xgc.line_width = 20
         self.draw_line(x1-10-7-10, y1, x2+10+str_length_km+10, y2)
 
@@ -1713,7 +1721,7 @@ that are expected by the MapCollection classes:
         textoffset = self.zoom_btn_size / 5
 
         self.xgc.line_style = gtk.gdk.LINE_SOLID
-        self.set_grid_color()
+        self.set_color(self.grid_color)
         self.xgc.line_width = 3
 
         # Draw the boxes
@@ -2114,21 +2122,8 @@ that are expected by the MapCollection classes:
         #self.xgc.set_rgb_fg_color(self.bg_color)
         self.xgc.foreground = self.xgc.background
 
-    def set_bg_scale_color(self) :
-        """Change to map-scale background color (white)."""
-        self.xgc.set_rgb_fg_color(self.bg_scale_color)
-
-    def set_grid_color(self) :
-        """Change to the color used to show the grid (for debugging)."""
-        self.xgc.set_rgb_fg_color(self.grid_color)
-
-    def set_track_color(self) :
-        """Change to the color used for tracks. May set line thickness too."""
-        self.xgc.set_rgb_fg_color(self.track_color)
-
-    def set_waypoint_color(self) :
-        """Change to the color used for tracks. May set line thickness too."""
-        self.xgc.set_rgb_fg_color(self.waypoint_color)
+    def set_color(self, color) :
+        self.xgc.set_rgb_fg_color(color)
 
     def draw_pixbuf(self, pixbuf, x_off, y_off, x, y, w, h) :
         """Draw the pixbuf at the given position and size,
@@ -2143,20 +2138,10 @@ that are expected by the MapCollection classes:
         """Draw a line."""
         self.drawing_area.window.draw_line(self.xgc, x, y, x2, y2)
 
-    def draw_string(self, x, y, str) :
+    def draw_string_scale(self, x, y, s) :
         """Draw a string."""
-        import pango
-        layout = self.drawing_area.create_pango_layout (str)
-        fontdesc = pango.FontDescription("Sans Bold 12")
-        layout.set_font_description (fontdesc)
-        self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
-
-    def draw_string_scale(self, x, y, str) :
-        """Draw a string."""
-        import pango
-        layout = self.drawing_area.create_pango_layout (str)
-        fontdesc = pango.FontDescription("Sans 9")
-        layout.set_font_description (fontdesc)
+        layout = self.drawing_area.create_pango_layout(s)
+        layout.set_font_description (self.font_desc)
         self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
 
     # Save the current map as something which could be gimped or printed.
