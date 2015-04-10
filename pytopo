@@ -1774,6 +1774,8 @@ that are expected by the MapCollection classes:
 
     def print_location(self, widget=None) :
         print MapUtils.coord2str_dd(self.cur_lon, self.cur_lat)
+        print "%-15s %-15s" % (MapUtils.DecDegToDegMinStr(self.cur_lon),
+                             MapUtils.DecDegToDegMinStr(self.cur_lat))
 
     def context_menu(self, event) :
         '''Create a context menu. This is called anew on every right-click.'''
