@@ -1777,12 +1777,19 @@ that are expected by the MapCollection classes:
         print "%-15s %-15s" % (MapUtils.DecDegToDegMinStr(self.cur_lon),
                              MapUtils.DecDegToDegMinStr(self.cur_lat))
 
+    def zoom(self, widget=None) :
+        self.center_lon = self.cur_lon
+        self.center_lat = self.cur_lat
+        self.collection.zoom(1)
+        self.draw_map()
+
     def context_menu(self, event) :
         '''Create a context menu. This is called anew on every right-click.'''
 
         contextmenu = collections.OrderedDict([
             ( MapUtils.coord2str_dd(self.cur_lon, self.cur_lat),
               self.print_location),
+            ( "Zoom here...", self.zoom),
             ( "Go to pin...", self.set_center_to_pin),
             ( "Pin this location", self.set_pin_by_mouse),
             ( "Save pin location...", self.save_location),
@@ -2331,8 +2338,12 @@ that are expected by the MapCollection classes:
     def mousepress(self, widget, event) :
         """Handle mouse button presses"""
 
+        # We're either about to add a new timeout, or not time out
+        # because we had a doubleclick. Either way, remove any
+        # existing timeout:
         if self.press_timeout :
             gobject.source_remove(self.press_timeout)
+            self.press_timeout = None
 
         # Was it a right click?
         if event.button == 3 :
@@ -2350,11 +2361,9 @@ that are expected by the MapCollection classes:
 
         # Zoom in if we get a double-click.
         win_width, win_height = self.drawing_area.window.get_size()
-        cur_long, cur_lat = self.xy2coords(event.x, event.y,
+        self.center_lon, self.center_lat = self.xy2coords(event.x, event.y,
                                            win_width, win_height)
 
-        self.center_lon = cur_long
-        self.center_lat = cur_lat
         self.collection.zoom(1)
         self.draw_map()
         return True
@@ -2362,6 +2371,7 @@ that are expected by the MapCollection classes:
     def longpress(self) :
         if self.press_timeout :
             gobject.source_remove(self.press_timeout)
+            self.press_timeout = None
         x, y, state = self.drawing_area.window.get_pointer()
         win_width, win_height = self.drawing_area.window.get_size()
         self.cur_lon, self.cur_lat = self.xy2coords(x, y, win_width, win_height)
