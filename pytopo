@@ -1225,6 +1225,17 @@ class MapUtils :
     """
 
     @staticmethod
+    def coord2str_dd(lon, lat) :
+        """Convert a longitude, latitude pair into a pretty string,
+           in decimal degrees"""
+        s = "%.7f E  " % lon
+        if lat >= 0:
+            s += "%.7f N" % lat
+        else:
+            s += "%.57 S" % -lat
+        return s
+
+    @staticmethod
     def DegMinToDecDeg(coord) :
         """Convert degrees.minutes to decimal degrees"""
         deg = MapUtils.intTrunc(coord)
@@ -1761,10 +1772,15 @@ that are expected by the MapCollection classes:
         # Must be between buttons
         return 0
 
+    def print_location(self, widget=None) :
+        print MapUtils.coord2str_dd(self.cur_lon, self.cur_lat)
+
     def context_menu(self, event) :
         '''Create a context menu. This is called anew on every right-click.'''
 
         contextmenu = collections.OrderedDict([
+            ( MapUtils.coord2str_dd(self.cur_lon, self.cur_lat),
+              self.print_location),
             ( "Go to pin...", self.set_center_to_pin),
             ( "Pin this location", self.set_pin_by_mouse),
             ( "Save pin location...", self.save_location),
@@ -1772,7 +1788,7 @@ that are expected by the MapCollection classes:
             ( "My Tracks...", self.mytracks),
             ( "Download Area...", self.download_area),
             ( "Show waypoints...", self.toggle_show_waypoints),
-            ( "Change background map", None),
+            ( "Change background map", self.change_collection),
             ( "Quit", self.graceful_exit)
             ])
 
@@ -1797,8 +1813,13 @@ that are expected by the MapCollection classes:
                     subitem.show()
                 item.set_submenu(submenu)
 
-            else :
+            elif contextmenu[itemname] :
                 item.connect("activate", contextmenu[itemname])
+
+            # Would be nice to make the menu item not selectable,
+            # but this greys it out and makes it hard to read.
+            # else :
+            #     item.set_sensitive(False)
 
             menu.append(item)
             item.show()
