@@ -1452,6 +1452,7 @@ that are expected by the MapCollection classes:
         self.drawing_area.connect("expose-event", self.expose_event)
         self.drawing_area.connect("button-press-event", self.mousepress)
         self.drawing_area.connect("button-release-event", self.mouserelease)
+        self.drawing_area.connect("scroll-event", self.scroll_event)
         self.drawing_area.connect("motion_notify_event", self.drag_event)
 
         # The default focus in/out handlers on drawing area cause
@@ -1782,6 +1783,31 @@ that are expected by the MapCollection classes:
         self.center_lat = self.cur_lat
         self.collection.zoom(1)
         self.draw_map()
+
+    def scroll_event(self, button, event) :
+        if event.direction != gtk.gdk.SCROLL_UP and \
+           event.direction != gtk.gdk.SCROLL_DOWN :
+            return False
+
+        # It would be nice to scroll around the current mouse position.
+        # That's complicated, though: we need to know scaling so we
+        # can set the window coordinates to what will be the new center
+        # after scrolling, which might vary depending on map collection
+        # or latitude. So skip that for now.
+        # It's too surprising to recenter around the current mouse
+        # coordinates; then you have to move the mouse before
+        # continuing to zoom.
+        # win_width, win_height = self.get_size()
+        # self.center_lon, self.center_lat = self.xy2coords(event.x, event.y,
+        #                                                   win_width,
+        #                                                   win_height)
+
+        if event.direction == gtk.gdk.SCROLL_UP :
+            self.collection.zoom(1)
+        else :
+            self.collection.zoom(-1)
+        self.draw_map()
+        return True
 
     def context_menu(self, event) :
         '''Create a context menu. This is called anew on every right-click.'''
@@ -2429,15 +2455,15 @@ that are expected by the MapCollection classes:
                 # Convert to miles using latitude and radius of the earth.
                 dist = dist *2. * math.pi / 360.0 * 7926 \
                        * math.cos(cur_lat*math.pi/180)
-                if Debug and self.use_metric :
-                    print "Distance:", round(dist*1600,2), "meters,", \
-                          round(dist*1.6,2), "km"
-                elif Debug :
-                    print "Distance:", round(dist*5280,2), "feet,", \
-                          round(dist,2), "miles"
-                angle = int(math.atan2(-ydiff, -xdiff) * 180 / math.pi)
-                angle = MapUtils.angle_to_bearing(angle)
-                if Debug :
+                if Debug or event.state & gtk.gdk.SHIFT_MASK :
+                    if self.use_metric :
+                        print "Distance:", round(dist*1600,2), "meters,", \
+                            round(dist*1.6,2), "km"
+                    else :
+                        print "Distance:", round(dist*5280,2), "feet,", \
+                            round(dist,2), "miles"
+                    angle = int(math.atan2(-ydiff, -xdiff) * 180 / math.pi)
+                    angle = MapUtils.angle_to_bearing(angle)
                     print "Bearing:", angle, "=", \
                         MapUtils.angle_to_quadrant(angle)
             self.click_last_long = cur_long
