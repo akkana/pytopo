@@ -3036,6 +3036,17 @@ Collections = [
     OSMMapCollection( "openstreetmap", "~/Maps/openstreetmap",
                       ".png", 256, 256, 10,
                       "http://a.tile.openstreetmap.org" ),
+    OSMMapCollection( "opencyclemap", "~/Maps/opencyclemap",
+                      ".png", 256, 256, 13,
+                      "http://b.tile.opencyclemap.org/cycle",
+                      maxzoom=18),
+    OSMMapCollection( "satellite", "~/Maps/openaerial",
+                      ".jpg", 256, 256, 13,
+                      "http://otile1.mqcdn.com/tiles/1.0.0/sat",
+                      maxzoom=18),
+    OSMMapCollection( "mapquest", "~/Maps/mapquest",
+                      ".jpg", 256, 256, 13,
+                      "http://otile1.mqcdn.com/tiles/1.0.0/map"),
     ]
 
 defaultCollection = "openstreetmap"
