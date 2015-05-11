@@ -2566,7 +2566,6 @@ Click in the map to print the coordinates of the clicked location.
         print "Known Sites:"
         for site in self.KnownSites :
             print " ", site[0], "(", os.path.basename(site[3]), ")"
-            #print site[0], site[1]
         print
         print "Known Tracks:"
         for track in self.KnownTracks :
