@@ -2510,9 +2510,9 @@ class PyTopo :
         global VersionString
         print VersionString
         print """
-Usage: pytopo [-t trackfile] site_name
+Usage: pytopo [-t trackfile] [-c collection] [site_name]
        pytopo [-t trackfile] start_lat start_long collection
-       pytopo -p : list known sites
+       pytopo -p : list known sites and tracks
        pytopo -h : print this message
 
 Use degrees.decimal_minutes format for coordinates.
@@ -2563,9 +2563,14 @@ Click in the map to print the coordinates of the clicked location.
 
     def print_sites(self) :
         """Print the list of known sites."""
+        print "Known Sites:"
         for site in self.KnownSites :
-            print site[0], "(", os.path.basename(site[3]), ")"
+            print " ", site[0], "(", os.path.basename(site[3]), ")"
             #print site[0], site[1]
+        print
+        print "Known Tracks:"
+        for track in self.KnownTracks :
+            print " ", track[0]
         sys.exit(0)
 
     def find_collection(self, collname) :
