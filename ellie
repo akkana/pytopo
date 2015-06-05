@@ -48,37 +48,59 @@ lasttime = None
 moving_time = datetime.timedelta(0)
 stopped_time = datetime.timedelta(0)
 
-def getVal(parent, name) :
+def getVal(parent, name):
     nodeList = parent.getElementsByTagName(name)
-    if len(nodeList) < 1 :
+    if len(nodeList) < 1:
         return "No " + name + " element"
     children = nodeList[0].childNodes
-    if len(children) < 1 :
+    if len(children) < 1:
         return "No " + name + " children"
     node = children[0]
     if node.nodeType != node.TEXT_NODE:
         return name + " isn't a text node"
     return node.data
 
-def accumulate_climb(ele) :
+def tot_climb(arr):
+    tot = 0
+    lastel = -1
+    this_climb = 0
+    this_climb_start = 0
+    for el in arr:
+        if lastel > 0:
+            if el > lastel:
+                if this_climb == 0:
+                    this_climb_start = lastel
+                this_climb += el - lastel
+            elif el < lastel:
+                if this_climb > CLIMB_THRESHOLD:
+                    tot += this_climb
+                    this_climb = 0
+                elif el <= this_climb_start:
+                    this_climb = 0
+
+        lastel = el
+
+    return tot
+
+def accumulate_climb(ele):
     global lastele, total_climb, this_climb, this_climb_start
-    if lastele >= 0 :             # Not the first call
-        if ele > lastele :        # Climbed since last step
-            if this_climb == 0 :
+    if lastele >= 0:             # Not the first call
+        if ele > lastele:        # Climbed since last step
+            if this_climb == 0:
                 this_climb_start = lastele
             this_climb = this_climb + ele - lastele
-        else :
-            if this_climb > CLIMB_THRESHOLD :
+        else:
+            if this_climb > CLIMB_THRESHOLD:
                 total_climb = total_climb + this_climb
                 this_climb = 0
-            elif ele <= this_climb_start :
+            elif ele <= this_climb_start:
                 # We got a little hump but it isn't big enough to count;
                 # probably an artifact like taking the GPS out of its case
                 # or getting off the bike or something. So reset.
                 this_climb = 0
     lastele = ele
 
-def handleTrackPoint(point) :
+def handleTrackPoint(point):
     global lastlat, lastlon, lasttime, total_dist, moving_time, stopped_time
     time = datetime.datetime.strptime(getVal(point, "time"),
                                       '%Y-%m-%dT%H:%M:%SZ')
@@ -87,17 +109,17 @@ def handleTrackPoint(point) :
     ele = float(getVal(point, "ele"))
     ele = round(ele * 3.2808399, 2)      # convert from meters to feet
 
-    if lastlat != 0 and lastlon != 0 :
+    if lastlat != 0 and lastlon != 0:
         dist = math.sqrt((lat - lastlat)**2 + (lon - lastlon)**2) * 69.046767
             # 69.046767 converts nautical miles (arcminutes) to miles
         total_dist += dist
 
         delta_t = time - lasttime   # This is a datetime.timedelta object
         speed = dist / delta_t.seconds * 60 * 60    # miles/hour
-        if speed > SPEED_THRESHOLD :
+        if speed > SPEED_THRESHOLD:
             moving_time += delta_t
             #print "moving\t",
-        else :
+        else:
             stopped_time += delta_t
             #print "stopped\t",
 
@@ -114,14 +136,26 @@ def handleTrackPoint(point) :
     distances.append(total_dist)
     eles.append(ele)
 
-def handleTrackFile(dom) :
+def handleTrackFile(dom):
     points = dom.getElementsByTagName("trkpt")
-    for i in range (0, len(points), 1) :
+    for i in range (0, len(points), 1):
         handleTrackPoint(points[i])
     accumulate_climb(0)
 
-def main(args) :
-    if len(args) < 2 :
+def smooth(x, beta):
+    """ kaiser window smoothing """
+    window_len=11
+    # extending the data at beginning and at the end
+    # to apply the window at the borders
+    s = numpy.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
+    w = numpy.kaiser(window_len,beta)
+    y = numpy.convolve(w/w.sum(),s,mode='valid')
+    return y[5:len(y)-5]
+
+import numpy
+
+def main(args):
+    if len(args) < 2:
         print "Ellie version", VERSION
         print "Usage:", args[0], file.gpx
         return 1
@@ -129,7 +163,7 @@ def main(args) :
     #
     # Parse the file:
     #
-    try :
+    try:
         dom = xml.dom.minidom.parse(args[1])
     except IOError, e:
         print e
@@ -141,15 +175,22 @@ def main(args) :
     #
     # Plot the results:
     #
-    if not have_pylab :
-        print "%.1f miles. Total climb: %d'" % (total_dist, int(total_climb))
-        print "%d minutes moving, %d stopped" % (int(moving_time.seconds / 60),
-                                                 int(stopped_time.seconds / 60))
-        print "Average speed moving: %.1f mph" % (total_dist *60*60
-                                                  / moving_time.seconds)
+    beta = 2
+    smoothed_eles = smooth(eles, beta)
+
+    print "%.1f miles. Total climb: %d'" % (total_dist, int(total_climb))
+    print "Total climb:    %d'" % tot_climb(eles)
+    print "Smoothed climb: %d'" % tot_climb(smoothed_eles)
+    print "%d minutes moving, %d stopped" % (int(moving_time.seconds / 60),
+                                             int(stopped_time.seconds / 60))
+    print "Average speed moving: %.1f mph" % (total_dist *60*60
+                                              / moving_time.seconds)
+    if not have_pylab:
         return 0
 
-    pylab.plot(distances, eles)
+    pylab.plot(distances, eles, label="GPS elevation data")
+
+    pylab.plot(distances, smoothed_eles, label="smoothed (beta = %s)" % beta)
 
     title_string = "Elevation profile (" + str(round(distances[-1], 1)) \
                   + " miles, " + str(int(total_climb)) + "' total climb)"
@@ -159,12 +200,13 @@ def main(args) :
 #    pylab.get_current_fig_manager().window.set_title(os.path.basename(args[0] + ": " + title_string))
     pylab.ylabel("feet")
     pylab.grid(True)
+    pylab.legend()
     pylab.show()
 
     pass
     return 0
 
-if __name__ == "__main__" :
+if __name__ == "__main__":
     try:
         sys.exit(main(sys.argv))
     except KeyboardInterrupt:
