@@ -1422,7 +1422,7 @@ that are expected by the MapCollection classes:
         # Colors and fonts should of course be configurable:
         # self.bg_color = gtk.gdk.color_parse("black")
         self.bg_scale_color = gtk.gdk.color_parse("white")
-        self.track_color = gtk.gdk.color_parse("magenta")
+        self.first_track_color = gtk.gdk.color_parse("magenta")
         self.waypoint_color = gtk.gdk.color_parse("blue2")
         self.grid_color = gtk.gdk.color_parse("grey45")
 
@@ -1508,8 +1508,19 @@ that are expected by the MapCollection classes:
 
         self.draw_map_scale()
 
+    def next_color(self, color) :
+        '''Takes a gtk.gdk.Color (RGB values 0:65535
+            and converts it to a similar saturation and value but different hue
+        '''
+        # Hue is a floating point between 0 and 1. How much should we jump?
+        jump = .37
+
+        return gtk.gdk.color_from_hsv(color.hue + .37,
+                                      color.saturation, color.value)
+
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
+        self.track_color = self.first_track_color
         if self.trackpoints != None :   # may be trackpoints or waypoints
             win_width, win_height = self.drawing_area.window.get_size()
             if len(self.trackpoints.points) > 0 :
@@ -1517,13 +1528,16 @@ that are expected by the MapCollection classes:
                 cur_y = None
                 self.xgc.line_style = gtk.gdk.LINE_ON_OFF_DASH
                 self.xgc.line_width = 3
-                self.set_color(self.track_color)
+                # self.set_color(self.track_color)
 
                 for pt in self.trackpoints.points :
                     if pt == START:
                         cur_x = None
                         cur_y = None
+                        self.set_color(self.track_color)
+                        self.track_color = self.next_color(self.track_color)
                         continue
+
                     x = int((pt[0] - self.center_lon) * self.collection.xscale
                             + win_width/2)
                     y = int((self.center_lat - pt[1]) * self.collection.yscale
