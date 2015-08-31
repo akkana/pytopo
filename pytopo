@@ -222,6 +222,38 @@ map coordinates and need a starting place. Should probably remove it.
         self.location = os.path.expanduser(self.location)
         return os.access(self.location, os.X_OK)
 
+    # Spherical Mercator code,
+    # from http://wiki.openstreetmap.org/wiki/Mercator#Python
+    def y2lat(self, a):
+        return 180.0/math.pi*(2.0*math.atan(math.exp(a*math.pi/180.0))
+                              -math.pi/2.0)
+    def lat2y(self, a):
+        return 180.0/math.pi*math.log(math.tan(math.pi/4.0
+                                               +a*(math.pi/180.0)/2.0))
+
+    def zoom_to_bounds(self, minlon, minlat, maxlon, maxlat) :
+        # http://gis.stackexchange.com/questions/19632/how-to-calculate-the-optimal-zoom-level-to-display-two-or-more-points-on-a-map
+        # Find spherical Mercator distances:
+        xdist = maxlon - minlon
+        ydist = self.lat2y(maxlat) - self.lat2y(minlat)
+        # The equator is about 40m meters long projected and tiles are
+        # 256 pixels wide, so the pixel length of that map at a given
+        # zoom level is about 256 * distance/40000000 * 2^zoom.
+        # But it needs another factor of 100000, determined empirically.
+        mult = 256. * 100000. / 40000000.
+        z = 0
+        while z <= self.maxzoom :
+            powz = pow(2, z)
+            w = xdist * mult * powz
+            h = ydist * mult * powz
+            # print z, ": Size", w, "x", h
+            if w > 800 or h > 600:
+                self.zoom_to(z-1)
+                return
+            z += 1
+        print "Eek, couldn't fit bounding box"
+        self.zoom_to(1)
+
 class TiledMapCollection(MapCollection) :
 
     """Code common to map collections that have raster tiles of a fixed size.
@@ -426,7 +458,7 @@ TiledMapCollection classes must implement
 
         # Useful when testing:
         if (Debug) :
-            mapwin.set_color(self.grid_color)
+            mapwin.set_color(mapwin.grid_color)
             mapwin.draw_rectangle(0, x, y, w, h)
             mapwin.draw_line(x, y, x+w, y+h)
             mapwin.set_bg_color()
@@ -1308,24 +1340,43 @@ class MapUtils :
     @staticmethod
     def ohstring(num, numdigits) :
         """Return a zero-prefixed string of the given number of digits."""
-        fmt_arr = [ "", "%01d", "%02d", "%03d", "%04d",
-                    "%05d", "%06d", "%07d", "%08d" ]
-        if numdigits < len(fmt_arr) :
-            return fmt_arr[numdigits] % int(num)
-        else :
-            s = '%0' + str(numdigits) + 'd'
-            return s % int(num)
+        fmt = '%%0%d' % numdigits
+        return fmt % num
 
     @staticmethod
-    def ohstring_old(num, numdigits) :
-        """Return a zero-prefixed string of the given number of digits."""
-        s = str(num)
-        mult = pow(10, numdigits-1)
-        while (numdigits > 1) :
-            if (num < mult) : s = "0" + s
-            mult = mult / 10
-            numdigits = numdigits-1
-        return s
+    def distance_on_unit_sphere(lat1, long1, lat2, long2):
+        '''Linear distance between two points on a globe, in km.
+           Divide by 1.609 to get miles.
+        '''
+        # Thanks http://www.johndcook.com/blog/python_longitude_latitude/
+
+        # Convert latitude and longitude to 
+        # spherical coordinates in radians.
+        degrees_to_radians = math.pi/180.0
+
+        # phi = 90 - latitude
+        phi1 = (90.0 - lat1)*degrees_to_radians
+        phi2 = (90.0 - lat2)*degrees_to_radians
+
+        # theta = longitude
+        theta1 = long1*degrees_to_radians
+        theta2 = long2*degrees_to_radians
+
+        # Compute spherical distance from spherical coordinates.
+
+        # For two locations in spherical coordinates 
+        # (1, theta, phi) and (1, theta', phi')
+        # cosine( arc length ) = 
+        #    sin phi sin phi' cos(theta-theta') + cos phi cos phi'
+        # distance = rho * arc length
+
+        cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2) + 
+               math.cos(phi1)*math.cos(phi2))
+        arc = math.acos( cos )
+
+        # Remember to multiply arc by the radius of the earth 
+        # in your favorite set of units to get length.
+        return arc * 6373
 
 # End of "MapUtils" pseudo-class.
 
@@ -1422,7 +1473,7 @@ that are expected by the MapCollection classes:
         # Colors and fonts should of course be configurable:
         # self.bg_color = gtk.gdk.color_parse("black")
         self.bg_scale_color = gtk.gdk.color_parse("white")
-        self.track_color = gtk.gdk.color_parse("magenta")
+        self.first_track_color = gtk.gdk.color_parse("magenta")
         self.waypoint_color = gtk.gdk.color_parse("blue2")
         self.grid_color = gtk.gdk.color_parse("grey45")
 
@@ -1508,8 +1559,19 @@ that are expected by the MapCollection classes:
 
         self.draw_map_scale()
 
+    def next_color(self, color) :
+        '''Takes a gtk.gdk.Color (RGB values 0:65535
+            and converts it to a similar saturation and value but different hue
+        '''
+        # Hue is a floating point between 0 and 1. How much should we jump?
+        jump = .37
+
+        return gtk.gdk.color_from_hsv(color.hue + .37,
+                                      color.saturation, color.value)
+
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
+        self.track_color = self.first_track_color
         if self.trackpoints != None :   # may be trackpoints or waypoints
             win_width, win_height = self.drawing_area.window.get_size()
             if len(self.trackpoints.points) > 0 :
@@ -1517,13 +1579,16 @@ that are expected by the MapCollection classes:
                 cur_y = None
                 self.xgc.line_style = gtk.gdk.LINE_ON_OFF_DASH
                 self.xgc.line_width = 3
-                self.set_color(self.track_color)
+                # self.set_color(self.track_color)
 
                 for pt in self.trackpoints.points :
                     if pt == START:
                         cur_x = None
                         cur_y = None
+                        self.set_color(self.track_color)
+                        self.track_color = self.next_color(self.track_color)
                         continue
+
                     x = int((pt[0] - self.center_lon) * self.collection.xscale
                             + win_width/2)
                     y = int((self.center_lat - pt[1]) * self.collection.yscale
@@ -2437,31 +2502,23 @@ that are expected by the MapCollection classes:
                     MapUtils.DecDegToDegMinStr(cur_lat)
 
             # Find angle and distance since last click.
-            # You would think that we could just use the long and lat
-            # differences, but it doesn't work that way, because maps
-            # aren't square: away from the equator, longitude isn't
-            # a great circle so a degree in longitude doesn't equal
-            # a degree in latitude.  (Even at the equator that's true,
-            # due to the earth's oblateness, but that is probably small
-            # enough to ignore.)
-            # So use the current image aspect ratio to convert from angles
-            # to pixels, then we'll convert from there to miles/km.
-            # XXX This is probably still fairly inaccurate, check!
             if self.click_last_long != 0 and self.click_last_lat != 0 :
-                xdiff = (cur_long - self.click_last_long)
-                ydiff = (cur_lat - self.click_last_lat)
-                dist = math.sqrt(xdiff*xdiff + ydiff*ydiff)
-                # dist is now in degrees.
-                # Convert to miles using latitude and radius of the earth.
-                dist = dist *2. * math.pi / 360.0 * 7926 \
-                       * math.cos(cur_lat*math.pi/180)
                 if Debug or event.state & gtk.gdk.SHIFT_MASK :
+                    dist = MapUtils.distance_on_unit_sphere(self.click_last_lat,
+                                                           self.click_last_long,
+                                                            cur_lat, cur_long)
                     if self.use_metric :
-                        print "Distance:", round(dist*1600,2), "meters,", \
-                            round(dist*1.6,2), "km"
+                        print "Distance: %.2f km" % dist
+                        # print "Distance:", round(dist*1600,2), "meters,", \
+                        #     round(dist*1.6,2), "km"
                     else :
-                        print "Distance:", round(dist*5280,2), "feet,", \
-                            round(dist,2), "miles"
+                        print "Distance: %.2f mi" % (dist / 1.609)
+                        # print "Distance:", round(dist*5280,2), "feet,", \
+                        #     round(dist,2), "miles"
+
+                    # Now calculate bearing. I don't know how accurate this is.
+                    xdiff = (cur_long - self.click_last_long)
+                    ydiff = (cur_lat - self.click_last_lat)
                     angle = int(math.atan2(-ydiff, -xdiff) * 180 / math.pi)
                     angle = MapUtils.angle_to_bearing(angle)
                     print "Bearing:", angle, "=", \
@@ -2888,14 +2945,13 @@ Click in the map to print the coordinates of the clicked location.
             mapwin.collection = self.find_collection(self.default_collection)
 
         # If we have a collection and a track but no center point,
-        # center it on the trackpoints:
+        # center it on the trackpoints, and set scale appropriately:
         if mapwin.trackpoints != None and mapwin.collection != None \
                 and not (mapwin.center_lat and mapwin.center_lon) :
             minlon, minlat, maxlon, maxlat = mapwin.trackpoints.get_bounds()
             mapwin.center_lon = (maxlon + minlon) / 2
             mapwin.center_lat = (maxlat + minlat) / 2
-            # XXX Do something useful with min/max
-            # XXX in terms of setting the map's zoom level
+            mapwin.collection.zoom_to_bounds(minlon, minlat, maxlon, maxlat)
 
         # By now, we hope we have the mapwin positioned with a collection
         # and starting coordinates:
