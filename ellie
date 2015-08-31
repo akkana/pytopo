@@ -4,7 +4,7 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-VERSION = 0.3
+VERSION = 0.4
 
 import sys, os, math, datetime, xml.dom.minidom
 
