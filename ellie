@@ -175,25 +175,32 @@ def main(args):
     #
     # Plot the results:
     #
-    beta = 2
-    smoothed_eles = smooth(eles, beta)
+    print "%.1f miles." % (total_dist)
+    tot = tot_climb(eles)
+    print "Unsmoothed total climb: %d'" % tot
+    if have_pylab:
+        pylab.plot(distances, eles, '-y',
+                   label="Raw data, total climb %d" % tot)
 
-    print "%.1f miles. Total climb: %d'" % (total_dist, int(total_climb))
-    print "Total climb:    %d'" % tot_climb(eles)
-    print "Smoothed climb: %d'" % tot_climb(smoothed_eles)
+    betas = (.25, .5, 1., 2.)
+    # betas = [ 1 ]
+    for beta in betas:
+        smoothed_eles = smooth(eles, beta)
+        tot = tot_climb(smoothed_eles)
+        print "Smoothed climb (beta=%.2f): %d'" % (beta, tot)
+        if have_pylab:
+            if len(betas) <= 1:
+                label="smoothed, total climb %d" % (tot)
+            else:
+                label = "smoothed (beta = %s), tot = %d" % (beta, tot)
+            pylab.plot(distances, smoothed_eles, label=label)
+
     print "%d minutes moving, %d stopped" % (int(moving_time.seconds / 60),
                                              int(stopped_time.seconds / 60))
     print "Average speed moving: %.1f mph" % (total_dist *60*60
                                               / moving_time.seconds)
-    if not have_pylab:
-        return 0
 
-    pylab.plot(distances, eles, label="GPS elevation data")
-
-    pylab.plot(distances, smoothed_eles, label="smoothed (beta = %s)" % beta)
-
-    title_string = "Elevation profile (" + str(round(distances[-1], 1)) \
-                  + " miles, " + str(int(total_climb)) + "' total climb)"
+    title_string = "%.1f miles, %d' total climb" % (distances[-1], tot)
 
     pylab.title(title_string)
     pylab.xlabel("miles")
