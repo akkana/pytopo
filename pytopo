@@ -1437,6 +1437,7 @@ that are expected by the MapCollection classes:
         self.cur_lat = 0
         self.trackpoints = None
         self.show_waypoints = True
+        self.selected_track = None
 
         try :
             self.pin = \
@@ -1472,6 +1473,8 @@ that are expected by the MapCollection classes:
 
         # Colors and fonts should of course be configurable:
         # self.bg_color = gtk.gdk.color_parse("black")
+        self.black_color = gtk.gdk.color_parse("black")
+        self.red_color = gtk.gdk.color_parse("red")
         self.bg_scale_color = gtk.gdk.color_parse("white")
         self.first_track_color = gtk.gdk.color_parse("magenta")
         self.waypoint_color = gtk.gdk.color_parse("blue2")
@@ -1535,6 +1538,8 @@ that are expected by the MapCollection classes:
             # Not initialized yet, not ready to draw a map
             return
 
+        self.win_width, self.win_height = self.drawing_area.window.get_size()
+
         # XXX Collection.draw_map wants center, but we only have lower right.
         if (Debug) :
             print ">>>>>>>>>>>>>>>>"
@@ -1549,9 +1554,8 @@ that are expected by the MapCollection classes:
             self.draw_zoom_control()
 
         # draw pin
-        win_width, win_height = self.drawing_area.window.get_size()
         pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat,
-                                      win_width, win_height)
+                                      self.win_width, self.win_height)
 
         if self.pin :
             self.draw_pixbuf(self.pin, 0,0,pin_x+self.pin_xoff,
@@ -1563,49 +1567,87 @@ that are expected by the MapCollection classes:
         '''Takes a gtk.gdk.Color (RGB values 0:65535
             and converts it to a similar saturation and value but different hue
         '''
+        if not color:
+            return self.first_track_color;
+
         # Hue is a floating point between 0 and 1. How much should we jump?
         jump = .37
 
         return gtk.gdk.color_from_hsv(color.hue + .37,
                                       color.saturation, color.value)
 
+    def draw_trackpoint_segment(self, start, linecolor, linewidth=3,
+                                linestyle=gtk.gdk.LINE_ON_OFF_DASH) :
+        '''Draw a trackpoint segment, starting at the given index.
+           Stop drawing if we reach another START, and return the index
+           of that START. Return None if we reach the end of the list.
+        '''
+        self.set_color(linecolor)
+        self.xgc.line_style = linestyle
+        self.xgc.line_width = linewidth
+        cur_x = None
+        cur_y = None
+        i = start
+        if self.trackpoints.points[i] == START :   # This should be true
+            i += 1
+
+        while True :
+            if i >= len(self.trackpoints.points) :
+                return None
+            pt = self.trackpoints.points[i]
+            if pt == START:
+                return i
+            i += 1
+
+            x = int((pt[0] - self.center_lon) * self.collection.xscale
+                    + self.win_width/2)
+            y = int((self.center_lat - pt[1]) * self.collection.yscale
+                    + self.win_height/2)
+
+            if ((x >= 0 and x < self.win_width and
+                 y >= 0 and y < self.win_height) or
+                (cur_x < self.win_width and cur_y < self.win_height)) :
+                if cur_x != None and cur_y != None :
+                    # self.set_color(self.track_color)
+                    self.draw_line(cur_x, cur_y, x, y)
+                    # self.set_color(self.black_color)
+                    # self.draw_circle(True, x, y, 3)
+
+                cur_x = x
+                cur_y = y
+            else :
+                # It's off the screen. Skip it.
+                #print "Skipping", pt[0], pt[1], \
+                #    ": would be", x, ",", y
+                cur_x = None
+                cur_y = None
+
+    def select_track(self, trackindex) :
+        if Debug :
+            print "Selecting track starting at", trackindex
+        self.selected_track = trackindex
+        # self.draw_trackpoint_segment(trackindex, self.red_color, linewidth=6)
+        self.draw_map()
+
     def draw_trackpoints(self) :
         # Now draw any trackpoints that are visible:
-        self.track_color = self.first_track_color
+        self.track_color = None
         if self.trackpoints != None :   # may be trackpoints or waypoints
-            win_width, win_height = self.drawing_area.window.get_size()
+            # win_width, win_height = self.drawing_area.window.get_size()
             if len(self.trackpoints.points) > 0 :
                 cur_x = None
                 cur_y = None
-                self.xgc.line_style = gtk.gdk.LINE_ON_OFF_DASH
-                self.xgc.line_width = 3
-                # self.set_color(self.track_color)
 
-                for pt in self.trackpoints.points :
-                    if pt == START:
-                        cur_x = None
-                        cur_y = None
-                        self.set_color(self.track_color)
-                        self.track_color = self.next_color(self.track_color)
-                        continue
+                next = 0
+                while True:
+                    self.track_color = self.next_color(self.track_color)
+                    next = self.draw_trackpoint_segment(next, self.track_color)
+                    if not next :
+                        break
 
-                    x = int((pt[0] - self.center_lon) * self.collection.xscale
-                            + win_width/2)
-                    y = int((self.center_lat - pt[1]) * self.collection.yscale
-                            + win_height/2)
-
-                    if ((x >= 0 and x < win_width and
-                         y >= 0 and y < win_height) or
-                        (cur_x < win_width and cur_y < win_height)) :
-                        if cur_x != None and cur_y != None :
-                            self.draw_line(cur_x, cur_y, x, y)
-                        cur_x = x
-                        cur_y = y
-                    else :
-                        #print "Skipping", pt[0], pt[1], \
-                        #    ": would be", x, ",", y
-                        cur_x = None
-                        cur_y = None
+            if self.selected_track != None:  # Could be trackpoint 0
+                self.draw_trackpoint_segment(self.selected_track,
+                                             self.red_color, linewidth=6)
 
             if self.show_waypoints and len(self.trackpoints.waypoints) > 0 :
                 self.set_color(self.waypoint_color)
@@ -1615,11 +1657,12 @@ that are expected by the MapCollection classes:
                     if pt == START:
                         continue
                     x = int((pt[0] - self.center_lon) * self.collection.xscale
-                            + win_width/2)
+                            + self.win_width/2)
                     y = int((self.center_lat - pt[1]) * self.collection.yscale
-                            + win_height/2)
+                            + self.win_height/2)
 
-                    if x >= 0 and x < win_width and y >= 0 and y < win_height :
+                    if x >= 0 and x < self.win_width and \
+                       y >= 0 and y < self.win_height :
                         layout = self.drawing_area.create_pango_layout(pt[2])
                         layout.set_font_description (self.wpt_font_desc)
                         # tw = layout.get_size()[0] / pango.SCALE
@@ -1674,12 +1717,11 @@ that are expected by the MapCollection classes:
         ##################################################
 
         # Calculate window width in miles and kilometers
-        win_width, win_height = self.drawing_area.window.get_size()
-        width_mi = win_width/xscale_mi   # (miles)
-        width_km = win_width/xscale_km   # (kilometers)
+        width_mi = self.win_width/xscale_mi   # (miles)
+        width_km = self.win_width/xscale_km   # (kilometers)
 
         # Calculate length of map-scale bars in pixels;
-        # length (pixels) <= win_width/2.
+        # length (pixels) <= self.win_width/2.
         log_width = math.log10(width_mi/2)
         power_10 = math.floor(log_width)
         fraction = log_width - power_10
@@ -1708,8 +1750,8 @@ that are expected by the MapCollection classes:
         ##################################################
 
         # Calculate coordinates of miles map-scale bar
-        x1 = int((win_width - length_mi)/2 + 0.5)
-        y1 = int(win_height - 30 + 0.5)
+        x1 = int((self.win_width - length_mi)/2 + 0.5)
+        y1 = int(self.win_height - 30 + 0.5)
         x2 = int(x1 + length_mi + 0.5)
         y2 = y1
 
@@ -1740,7 +1782,7 @@ that are expected by the MapCollection classes:
 
         # Draw miles map-scale labels
         x = x0 - 10 - 7
-        y = win_height - 36
+        y = self.win_height - 36
         self.draw_string_scale(x, y, "0")
         x = x2 + 10
         self.draw_string_scale(x, y, label_mi)
@@ -1748,8 +1790,8 @@ that are expected by the MapCollection classes:
         ##################################################
 
         # Calculate coordinates of kilometers map-scale bar
-        x1 = int((win_width - length_km)/2 + 0.5)
-        y1 = int(win_height - 10 + 0.5)
+        x1 = int((self.win_width - length_km)/2 + 0.5)
+        y1 = int(self.win_height - 10 + 0.5)
         x2 = int(x1 + length_km + 0.5)
         y2 = y1
 
@@ -1780,7 +1822,7 @@ that are expected by the MapCollection classes:
 
         # Draw kilometers map-scale labels
         x = x0 - 10 - 6
-        y = win_height - 16
+        y = self.win_height - 16
         self.draw_string_scale(x, y, "0")
         x = x2 + 10
         self.draw_string_scale(x, y, label_km)
@@ -1790,8 +1832,7 @@ that are expected by the MapCollection classes:
            and have no keyboard to zoom or move around.
            Also draw any other controls we might need.
         """
-        win_width, win_height = self.drawing_area.window.get_size()
-        self.zoom_btn_size = int(win_width / 25)
+        self.zoom_btn_size = int(self.win_width / 25)
         self.zoom_X1 = 8
         self.zoom_in_Y1 = 10
         self.zoom_out_Y1 = self.zoom_in_Y1 + self.zoom_btn_size * 2
@@ -1862,10 +1903,9 @@ that are expected by the MapCollection classes:
         # It's too surprising to recenter around the current mouse
         # coordinates; then you have to move the mouse before
         # continuing to zoom.
-        # win_width, win_height = self.get_size()
         # self.center_lon, self.center_lat = self.xy2coords(event.x, event.y,
-        #                                                   win_width,
-        #                                                   win_height)
+        #                                                   self.win_width,
+        #                                                   self.win_height)
 
         if event.direction == gtk.gdk.SCROLL_UP :
             self.collection.zoom(1)
@@ -2022,9 +2062,8 @@ that are expected by the MapCollection classes:
             return
 
         # Get default values for area and zoom levels:
-        win_width, win_height = self.get_size()
-        halfwidth = win_width / self.collection.xscale / 2
-        halfheight = win_height / self.collection.yscale / 2
+        halfwidth = self.win_width / self.collection.xscale / 2
+        halfheight = self.win_height / self.collection.yscale / 2
         minlon = self.center_lon - halfwidth
         maxlon = self.center_lon + halfwidth
         minlat = self.center_lat - halfheight
@@ -2259,6 +2298,11 @@ that are expected by the MapCollection classes:
         """Draw a line."""
         self.drawing_area.window.draw_line(self.xgc, x, y, x2, y2)
 
+    def draw_circle(self, fill, xc, yc, r):
+        """Draw a circle, filled or not, centered at xc, yc with radius r."""
+        self.drawing_area.window.draw_arc(self.xgc, fill, xc-r, yc-4,
+                                          r*2, r*2, 0, 23040)  # 64 * 360
+
     def draw_string_scale(self, x, y, s) :
         """Draw a string."""
         layout = self.drawing_area.create_pango_layout(s)
@@ -2272,16 +2316,14 @@ that are expected by the MapCollection classes:
         """Save a static map. Somewhat BROKEN, needs rewriting."""
 
         file_list = ""
-        win_width, win_height = self.get_size()
 
         # Calculate dAngle in decimal degrees
         dAngle = self.collection.img_width / self.collection.xscale
 
         # Calculate number of charts based on window size, and round up
         # so the saved map shows at least as much as the window does.
-        #win_width, win_height = drawing_area.window.get_size()
-        num_lon = int (.8 + float(win_width) / self.collection.img_width)
-        num_lat = int (.8 + float(win_height) / self.collection.img_height)
+        num_lon = int (.8 + float(self.win_width) / self.collection.img_width)
+        num_lat = int (.8 + float(self.win_height) / self.collection.img_height)
 
         ny = 0
         curlat = self.center_lat + dAngle*num_lat * .25
@@ -2439,9 +2481,9 @@ that are expected by the MapCollection classes:
         # Was it a right click?
         if event.button == 3 :
             x, y, state = self.drawing_area.window.get_pointer()
-            win_width, win_height = self.drawing_area.window.get_size()
             self.cur_lon, self.cur_lat = self.xy2coords(x, y,
-                                                        win_width, win_height)
+                                                        self.win_width,
+                                                        self.win_height)
             self.context_menu(event)
             return
 
@@ -2451,9 +2493,8 @@ that are expected by the MapCollection classes:
             return False
 
         # Zoom in if we get a double-click.
-        win_width, win_height = self.drawing_area.window.get_size()
         self.center_lon, self.center_lat = self.xy2coords(event.x, event.y,
-                                           win_width, win_height)
+                                           self.win_width, self.win_height)
 
         self.collection.zoom(1)
         self.draw_map()
@@ -2464,8 +2505,9 @@ that are expected by the MapCollection classes:
             gobject.source_remove(self.press_timeout)
             self.press_timeout = None
         x, y, state = self.drawing_area.window.get_pointer()
-        win_width, win_height = self.drawing_area.window.get_size()
-        self.cur_lon, self.cur_lat = self.xy2coords(x, y, win_width, win_height)
+        self.cur_lon, self.cur_lat = self.xy2coords(x, y,
+                                                    self.win_width,
+                                                    self.win_height)
         self.context_menu(None)
         return True
 
@@ -2493,17 +2535,16 @@ that are expected by the MapCollection classes:
                 self.draw_map()
                 return True
 
-            win_width, win_height = self.drawing_area.window.get_size()
             cur_long, cur_lat = self.xy2coords(event.x, event.y,
-                                               win_width, win_height)
+                                               self.win_width, self.win_height)
             if Debug :
                 print "Click:", \
                     MapUtils.DecDegToDegMinStr(cur_long), \
                     MapUtils.DecDegToDegMinStr(cur_lat)
 
             # Find angle and distance since last click.
-            if self.click_last_long != 0 and self.click_last_lat != 0 :
-                if Debug or event.state & gtk.gdk.SHIFT_MASK :
+            if Debug or event.state & gtk.gdk.SHIFT_MASK :
+                if self.click_last_long != 0 and self.click_last_lat != 0 :
                     dist = MapUtils.distance_on_unit_sphere(self.click_last_lat,
                                                            self.click_last_long,
                                                             cur_lat, cur_long)
@@ -2525,6 +2566,55 @@ that are expected by the MapCollection classes:
                         MapUtils.angle_to_quadrant(angle)
             self.click_last_long = cur_long
             self.click_last_lat = cur_lat
+
+            # Is the click near a track or waypoint we're displaying?
+            halfwidth, halfheight = \
+                      [ x/2 for x in self.drawing_area.window.get_size()]
+            CLOSE = 7    # pixels
+
+            if self.trackpoints != None and self.trackpoints.waypoints != None :
+                for i, pt in enumerate(self.trackpoints.waypoints) :
+                    if pt == START:
+                        continue
+                    tx = int((pt[0] - self.center_lon) * self.collection.xscale
+                             + halfwidth)
+                    ty = int((self.center_lat - pt[1]) * self.collection.yscale
+                             + halfheight)
+                    if abs(event.x - tx) < CLOSE and \
+                       abs(event.y - ty) < CLOSE:
+                        print "Clicked on waypoint #", i
+                        return
+
+            if self.trackpoints != None and len(self.trackpoints.points) > 0 :
+                for i, pt in enumerate(self.trackpoints.points) :
+                    if pt == START:
+                        track_start = i
+                        lastx = None
+                        lasty = None
+                        continue
+
+                    tx = int((pt[0] - self.center_lon) * self.collection.xscale
+                             + halfwidth)
+                    ty = int((self.center_lat - pt[1]) * self.collection.yscale
+                             + halfheight)
+                    if abs(event.x - tx) < CLOSE and \
+                       abs(event.y - ty) < CLOSE:
+                        self.select_track(track_start)
+                        return
+                    # Okay, the click wasn't on a point. Is it on
+                    # a line between this point and the last one?
+                    if lastx and lasty:
+                        m = float(y-lasty) / float(x-lastx)
+                        y1 = m * event.x + lasty  # Predicted position
+                        if abs(event.y - y1) < CLOSE:
+                            self.select_track(track_start)
+                            return
+
+            # If we didn't select any tracks or anything, we might
+            # have selected some earlier, in which case we want to
+            # redraw them now.
+            if (self.selected_track) :
+                self.select_track(None)
 
         return True
 
