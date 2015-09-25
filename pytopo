@@ -1253,11 +1253,11 @@ class TrackPoints:
 class MapUtils:
 
     """MapUtils really just exists to contain a bunch of utility
-    functions useful for mapping classes.
+       functions useful for mapping classes.
     """
 
-    @staticmethod
-    def coord2str_dd(lon, lat):
+    @classmethod
+    def coord2str_dd(cls, lon, lat):
         """Convert a longitude, latitude pair into a pretty string,
            in decimal degrees"""
         s = "%.7f E  " % lon
@@ -1267,45 +1267,45 @@ class MapUtils:
             s += "%.57 S" % -lat
         return s
 
-    @staticmethod
-    def DegMinToDecDeg(coord):
+    @classmethod
+    def DegMinToDecDeg(cls, coord):
         """Convert degrees.minutes to decimal degrees"""
-        deg = MapUtils.intTrunc(coord)
+        deg = cls.intTrunc(coord)
         dec = (coord - deg) / .6
         return deg + dec
 
-    @staticmethod
-    def DecDegToDegMin(coord):
+    @classmethod
+    def DecDegToDegMin(cls, coord):
         """Convert decimal degrees to degrees.minutes"""
         if coord < 0:
             sgn = -1
             coord = -coord
         else:
             sgn = 1
-        deg = MapUtils.intTrunc(coord)
+        deg = cls.intTrunc(coord)
         min = abs(coord - deg) * .6
         return sgn * (deg + min)
 
-    @staticmethod
-    def DecDegToDegMinStr(coord):
+    @classmethod
+    def DecDegToDegMinStr(cls, coord):
         """Convert decimal degrees to a nice degrees/minutes string"""
         if coord < 0:
             sgnstr = '-'
             coord = -coord
         else:
             sgnstr = ''
-        deg = MapUtils.intTrunc(coord)
+        deg = cls.intTrunc(coord)
         min = abs(coord - deg) * 60.
-        min = MapUtils.TruncateToFrac(min, .01)
+        min = cls.TruncateToFrac(min, .01)
         return sgnstr + str(deg) + "^" + str(min) + "'"
 
-    @staticmethod
-    def angle_to_bearing(angle):
+    @classmethod
+    def angle_to_bearing(cls, angle):
         return (450 - angle) % 360
 
     # Convert an angle (deg) to the appropriate quadrant string, e.g. N 57 E.
-    @staticmethod
-    def angle_to_quadrant(angle):
+    @classmethod
+    def angle_to_quadrant(cls, angle):
         if angle > 180:
             angle = angle - 360
         if angle == 0:
@@ -1324,27 +1324,27 @@ class MapUtils:
             return "S " + str(180 + angle) + " W"
         return "S " + str(180 - angle) + " E"
 
-    @staticmethod
-    def intTrunc(num):
+    @classmethod
+    def intTrunc(cls, num):
         """Truncate to an integer, but no .999999 stuff"""
         return int(num + .00001)
 
-    @staticmethod
-    def TruncateToFrac(num, frac):
+    @classmethod
+    def TruncateToFrac(cls, num, frac):
         """Truncate to a multiple of the given fraction"""
         t = float(MapUtils.intTrunc(num / frac)) * frac
         if num < 0:
             t = t - frac
         return t
 
-    @staticmethod
-    def ohstring(num, numdigits):
+    @classmethod
+    def ohstring(cls, num, numdigits):
         """Return a zero-prefixed string of the given number of digits."""
         fmt = '%%0%d' % numdigits
         return fmt % num
 
-    @staticmethod
-    def distance_on_unit_sphere(lat1, long1, lat2, long2):
+    @classmethod
+    def distance_on_unit_sphere(cls, lat1, long1, lat2, long2):
         '''Linear distance between two points on a globe, in km.
            Divide by 1.609 to get miles.
         '''
@@ -1564,7 +1564,7 @@ that are expected by the MapCollection classes:
         self.draw_map_scale()
 
     def next_color(self, color):
-        '''Takes a gtk.gdk.Color (RGB values 0:65535
+        '''Takes a gtk.gdk.Color (RGB values 0:65535)
             and converts it to a similar saturation and value but different hue
         '''
         if not color:
@@ -2652,8 +2652,8 @@ class PyTopo:
         self.config_dir = os.path.expanduser("~/.config/pytopo",)
         self.savefilename = os.path.join(self.config_dir, "saved.sites")
 
-    @staticmethod
-    def Usage():
+    @classmethod
+    def Usage(cls):
         global VersionString
         print VersionString
         print """
@@ -2673,8 +2673,8 @@ Click in the map to print the coordinates of the clicked location.
 's' will attempt to save the current map as a GIF file in ~/Topo/."""
         sys.exit(1)
 
-    @staticmethod
-    def error_out(errstr):
+    @classmethod
+    def error_out(cls, errstr):
         """Print an error and exit cleanly."""
         print "==============="
         print errstr
