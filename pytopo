@@ -1563,7 +1563,7 @@ that are expected by the MapCollection classes:
 
         self.draw_map_scale()
 
-    def next_color(self, color):
+    def contrasting_color(self, color):
         '''Takes a gtk.gdk.Color (RGB values 0:65535)
             and converts it to a similar saturation and value but different hue
         '''
@@ -1573,7 +1573,7 @@ that are expected by the MapCollection classes:
         # Hue is a floating point between 0 and 1. How much should we jump?
         jump = .37
 
-        return gtk.gdk.color_from_hsv(color.hue + .37,
+        return gtk.gdk.color_from_hsv(color.hue + jump,
                                       color.saturation, color.value)
 
     def draw_trackpoint_segment(self, start, linecolor, linewidth=3,
@@ -1640,7 +1640,7 @@ that are expected by the MapCollection classes:
 
                 next = 0
                 while True:
-                    self.track_color = self.next_color(self.track_color)
+                    self.track_color = self.contrasting_color(self.track_color)
                     next = self.draw_trackpoint_segment(next, self.track_color)
                     if not next:
                         break
