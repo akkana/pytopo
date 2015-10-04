@@ -1180,13 +1180,14 @@ class TrackPoints:
         self.minlat = 91
         self.maxlat = -91
 
-    def handleTrackPoint(self, point, waypoint=False):
-        #time = getVal(point, "time")
-        lat = float(point.getAttribute("lat"))
-        lon = float(point.getAttribute("lon"))
-        #ele = float(getVal(point, "ele"))
-        #ele = round(ele * 3.2808399, 2)      # convert from meters to feet
+    def get_bounds(self):
+        return self.minlon, self.minlat, self.maxlon, self.maxlat
 
+    def handleTrackPoint(self, lat, lon, ele, waypoint_name=False):
+        '''Add a new trackpoint or waypoint after some basic sanity checks.
+           If waypoint_name, we assume this is a waypoint,
+           otherwise assume it's a track point.
+        '''
         if lon < self.minlon:
             self.minlon = lon
         if lon > self.maxlon:
@@ -1196,23 +1197,19 @@ class TrackPoints:
         if lat > self.maxlat:
             self.maxlat = lat
 
-        if (waypoint):
-            name = "WP"
-            n = point.getElementsByTagName("name")
-            if len(n) > 0:
-                n = n[0].childNodes
-                if len(n) >= 1 and n[0].nodeType == n[0].TEXT_NODE:
-                    name = n[0].data
-
-            self.waypoints.append([lon, lat, name])
+        if (waypoint_name):
+            self.waypoints.append([lon, lat, waypoint_name])
         else:
             self.points.append([lon, lat])
 
-    def get_bounds(self):
-        return self.minlon, self.minlat, self.maxlon, self.maxlat
-
     def readTrackFile(self, filename):
         """Read a track file. Throw IOError if the file doesn't exist."""
+        if filename.lower().endswith('.kml'):
+            return self.readTrackFileKML(filename)
+        return self.readTrackFileGPX(filename)
+
+    def readTrackFileGPX(self, filename):
+        """Read a GPX track file. Throw IOError if the file doesn't exist."""
         global Debug
 
         if not os.path.exists(filename):
@@ -1237,18 +1234,104 @@ class TrackPoints:
             # draw lines from the end of one track to the beginning of the next.
             if trkpts:
                 self.points.append(START)
-
-                for i in range (0, len(trkpts), 1):
-                    self.handleTrackPoint(trkpts[i], False)
+                for pt in trkpts:
+                    # self.handleTrackPointGPX(pt, False)
+                    lat, lon, ele, time = self.GPX_point_coords(pt)
+                    self.handleTrackPoint(lat, lon, ele, None)
 
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
         if waypts:
             self.waypoints.append(START)
-            for i in range (0, len(waypts), 1):
-                self.handleTrackPoint(waypts[i], True)
+            for pt in waypts:
+                lat, lon, ele, time = self.GPX_point_coords(pt)
+                name = "WP"
+                n = pt.getElementsByTagName("name")
+                if len(n) > 0:
+                    n = n[0].childNodes
+                    if len(n) >= 1 and n[0].nodeType == n[0].TEXT_NODE:
+                        name = n[0].data
+                self.handleTrackPoint(lat, lon, ele, name)
 
         # GPX also allows for routing, rtept, but I don't think we need those.
+
+    def GPX_point_coords(self, point):
+        '''Add a new trackpoint or waypoint from a GPX node'''
+        lat = float(point.getAttribute("lat"))
+        lon = float(point.getAttribute("lon"))
+        #ele = float(getVal(point, "ele"))
+        #ele = round(ele * 3.2808399, 2)      # convert from meters to feet
+        #time = getVal(point, "time")
+        return lat, lon, 0, 0
+
+    def readTrackFileKML(self, filename):
+        """Read a KML track file.
+           Just read Placemarks (which cover both paths and points);
+           ignore all styles.
+           Throw IOError if the file doesn't exist.
+        """
+        global Debug
+
+        if not os.path.exists(filename):
+            raise IOError("Can't open track file %s" % filename)
+
+        if (Debug):
+            print "Using track file", filename
+
+        if not HaveDOM:
+            print "WARNING: Can't read track file: need module xml.dom.minidom"
+            return
+        if (Debug):
+            print "Reading track file", filename
+        dom = xml.dom.minidom.parse(filename)
+
+        # Features we care about are <Placemark> containing either
+        # <LineString> (tracks) or <Point> (waypoints).
+        # A Placemark also contains <name>The name</name>.
+        # Placemarks are apparently grouped inside a <Document>
+        # but let's not worry about that now.
+
+        placemarks = dom.getElementsByTagName("Placemark")
+        for placemark in placemarks:
+            # Handle tracks:
+            linestrings = placemark.getElementsByTagName("LineString")
+            for linestring in linestrings:
+                coord_triples = self.get_KML_coordinates(linestring)
+                if not coord_triples:
+                    continue
+                self.points.append(START)
+                for triple in coord_triples:
+                    self.handleTrackPoint(triple[1], triple[0], triple[2], None)
+
+            # Handle waypoints:
+            try:
+                name = placemark.getElementsByTagName("name")[0].childNodes[0].data.strip()
+                if not name:
+                    name = "WP"
+            except:
+                # print "Couldn't get name:", placemark.toprettyxml()
+                name = "wp"
+            points = placemark.getElementsByTagName("Point")
+            for point in points:
+                coord_triples = self.get_KML_coordinates(point)
+                for triple in coord_triples:
+                    self.handleTrackPoint(triple[1], triple[0], triple[2], name)
+
+    def get_KML_coordinates(self, el):
+        '''From inside an element of a KML file, get the contents
+           of the first <coordinates> triple.
+           Return a list of triples [[lat, lon, ele], [lat, lon, ele] ...]
+        '''
+        coords = el.getElementsByTagName("coordinates")
+        if not coords or len(coords) < 1:
+            return None
+        coord_triples = coords[0].childNodes[0].data.strip().split(' ')
+        ret = []
+        for s in coord_triples:
+            triple = s.split(',')
+            ret.append(map(float, triple))
+
+        return ret
 
 class MapUtils:
 
@@ -1494,6 +1577,8 @@ that are expected by the MapCollection classes:
         win.add(vbox)
 
         self.drawing_area = gtk.DrawingArea()
+        # This sets the window's initial size -- but also makes it the minimum
+        # size. How do we set initial size without constraining minimum?
         self.drawing_area.set_size_request(init_width, init_height)
         vbox.pack_start(self.drawing_area)
 
@@ -2987,8 +3072,8 @@ Click in the map to print the coordinates of the clicked location.
                 args = args[1:]
                 continue
 
-            # args[0] doesn't start with '-'. Is it a gpx file?
-            if len(args[0]) > 4 and args[0][-4:] == '.gpx':
+            # args[0] doesn't start with '-'. Is it a gpx or kml file?
+            if args[0].endswith(".gpx") or args[0].endswith(".kml"):
                 if mapwin.trackpoints == None:
                     mapwin.trackpoints = TrackPoints()
                 try:
