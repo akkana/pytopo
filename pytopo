@@ -1164,13 +1164,15 @@ Topo2MapCollection: data from local-area Topo! packages that
                                    _ser7prefix=_prefix, _ser15prefix=None,
                                    _img_ext=".jpg")
 
-START = "start"
-
 class TrackPoints:
 
     """Parsing and handling of GPS track files.
     Currently only GPX format is supported.
     """
+
+    # A special variable to indicate the start of a track,
+    # in case a track doesn't have a name.
+    START = "start"
 
     def __init__(self):
         self.points = []
@@ -1182,6 +1184,14 @@ class TrackPoints:
 
     def get_bounds(self):
         return self.minlon, self.minlat, self.maxlon, self.maxlat
+
+    def is_start(self, point):
+        '''Is this the start of a new track segment?
+           If so, it's a string (or unicode),
+           either the name of the track section
+           or the special string TrackPoints.START.
+        '''
+        return (isinstance(point, str) or isinstance(point, unicode))
 
     def handleTrackPoint(self, lat, lon, ele, waypoint_name=False):
         '''Add a new trackpoint or waypoint after some basic sanity checks.
@@ -1233,7 +1243,19 @@ class TrackPoints:
             # need to keep different track files and segments separate -- don't
             # draw lines from the end of one track to the beginning of the next.
             if trkpts:
-                self.points.append(START)
+                # See if the parent track has a name.
+                trk = seg
+                while trk.nodeName != "trk":
+                    trk = trk.parentNode
+                trkname = trk.getElementsByTagName("name")
+                if trkname and \
+                   trkname[0].hasChildNodes() and \
+                   trkname[0].firstChild.nodeName == '#text' and \
+                   trkname[0].firstChild.wholeText:
+                    self.points.append(trkname[0].firstChild.wholeText)
+                else:
+                    self.points.append(TrackPoints.START)
+
                 for pt in trkpts:
                     # self.handleTrackPointGPX(pt, False)
                     lat, lon, ele, time = self.GPX_point_coords(pt)
@@ -1242,7 +1264,7 @@ class TrackPoints:
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
         if waypts:
-            self.waypoints.append(START)
+            self.waypoints.append(TrackPoints.START)
             for pt in waypts:
                 lat, lon, ele, time = self.GPX_point_coords(pt)
                 name = "WP"
@@ -1299,7 +1321,7 @@ class TrackPoints:
                 coord_triples = self.get_KML_coordinates(linestring)
                 if not coord_triples:
                     continue
-                self.points.append(START)
+                self.points.append(TrackPoints.START)
                 for triple in coord_triples:
                     self.handleTrackPoint(triple[1], triple[0], triple[2], None)
 
@@ -1563,8 +1585,9 @@ that are expected by the MapCollection classes:
         self.waypoint_color = gtk.gdk.color_parse("blue2")
         self.grid_color = gtk.gdk.color_parse("grey45")
 
-        self.font_desc = pango.FontDescription ("Sans 9")
-        self.wpt_font_desc = pango.FontDescription ("Sans Italic 10")
+        self.font_desc = pango.FontDescription("Sans 9")
+        self.wpt_font_desc = pango.FontDescription("Sans Italic 10")
+        self.select_font_desc = pango.FontDescription("Sans Bold 15")
 
     def show_window(self, init_width, init_height):
         """Create the initial window."""
@@ -1638,6 +1661,24 @@ that are expected by the MapCollection classes:
         if not self.is_dragging:
             self.draw_zoom_control()
 
+        # Is there a selected track?
+        if self.selected_track:
+            trackname = self.trackpoints.points[self.selected_track]
+            tracklabel = "Selected track: " + trackname
+
+            label_margin = 15
+            layout = self.drawing_area.create_pango_layout(tracklabel)
+            layout.set_font_description(self.select_font_desc)
+            label_width, label_height = layout.get_pixel_size()
+            self.xgc.set_rgb_fg_color(self.red_color)
+            self.drawing_area.window.draw_layout(self.xgc,
+                                                 self.win_width - label_width - label_margin,
+                                                 label_margin,
+                                                 layout)
+            # self.draw_string_scale(self.win_width - label_width - label_margin,
+            #                        label_margin,
+            #                        tracklabel)
+
         # draw pin
         pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat,
                                       self.win_width, self.win_height)
@@ -1673,14 +1714,15 @@ that are expected by the MapCollection classes:
         cur_x = None
         cur_y = None
         i = start
-        if self.trackpoints.points[i] == START :   # This should be true
+        if self.trackpoints.is_start(self.trackpoints.points[i]):
+            # This should be true
             i += 1
 
         while True:
             if i >= len(self.trackpoints.points):
                 return None
             pt = self.trackpoints.points[i]
-            if pt == START:
+            if self.trackpoints.is_start(pt):
                 return i
             i += 1
 
@@ -1739,7 +1781,7 @@ that are expected by the MapCollection classes:
                 self.xgc.line_style = gtk.gdk.LINE_SOLID
                 self.xgc.line_width = 2
                 for pt in self.trackpoints.waypoints:
-                    if pt == START:
+                    if self.trackpoints.is_start(pt):
                         continue
                     x = int((pt[0] - self.center_lon) * self.collection.xscale
                             + self.win_width/2)
@@ -2659,7 +2701,7 @@ that are expected by the MapCollection classes:
 
             if self.trackpoints != None and self.trackpoints.waypoints != None:
                 for i, pt in enumerate(self.trackpoints.waypoints):
-                    if pt == START:
+                    if self.trackpoints.is_start(pt):
                         continue
                     tx = int((pt[0] - self.center_lon) * self.collection.xscale
                              + halfwidth)
@@ -2672,7 +2714,7 @@ that are expected by the MapCollection classes:
 
             if self.trackpoints != None and len(self.trackpoints.points) > 0:
                 for i, pt in enumerate(self.trackpoints.points):
-                    if pt == START:
+                    if self.trackpoints.is_start(pt):
                         track_start = i
                         lastx = None
                         lasty = None
