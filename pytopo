@@ -2492,14 +2492,15 @@ that are expected by the MapCollection classes:
 
         return True
 
-    def key_quit(self, *args):
-        """Callback when the user types q."""
-        self.graceful_exit()
-
     def key_press_event(self, widget, event):
         """Handle any key press."""
         if event.string == "q":
             self.graceful_exit()
+            # Must return here ... gtk.main_quit() (called from graceful_exit())
+            # won't actually return immediately, so without a return
+            # we'll fall through and end up drawing the map again
+            # before exiting.
+            return True
         elif event.string == "+" or event.string == "=":
             self.collection.zoom(1)
         elif event.string == "-":
@@ -2758,6 +2759,10 @@ that are expected by the MapCollection classes:
 
         gtk.main_quit()
         # The python profilers don't work if you call sys.exit here.
+
+        # Too bad, because gtk.main_quit() doesn't actually exit
+        # until later. So any function that calls this must be sure
+        # to guard against anything like extra map redraws.
 #
 # End of MapWindow class
 #
