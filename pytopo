@@ -2022,22 +2022,27 @@ that are expected by the MapCollection classes:
            event.direction != gtk.gdk.SCROLL_DOWN:
             return False
 
-        # It would be nice to scroll around the current mouse position.
-        # That's complicated, though: we need to know scaling so we
-        # can set the window coordinates to what will be the new center
-        # after scrolling, which might vary depending on map collection
-        # or latitude. So skip that for now.
-        # It's too surprising to recenter around the current mouse
-        # coordinates; then you have to move the mouse before
-        # continuing to zoom.
-        # self.center_lon, self.center_lat = self.xy2coords(event.x, event.y,
-        #                                                   self.win_width,
-        #                                                   self.win_height)
-
         if event.direction == gtk.gdk.SCROLL_UP:
-            self.collection.zoom(1)
+            direc = 1
         else:
-            self.collection.zoom(-1)
+            direc = -1
+
+        # Save off the coordinates currently under the mouse,
+        # so we can arrange for it to be under the mouse again after zoom.
+        curmouselon, curmouselat = self.xy2coords(event.x, event.y,
+                                                  self.win_width,
+                                                  self.win_height)
+
+        self.collection.zoom(direc)
+
+        # What are the coordinates for the current mouse pos after zoom?
+        newmouselon, newmouselat = self.xy2coords(event.x, event.y,
+                                                  self.win_width,
+                                                  self.win_height)
+        # Shift the map over so the old point will be under the mouse.
+        self.center_lon += (curmouselon - newmouselon)
+        self.center_lat += (curmouselat - newmouselat)
+
         self.draw_map()
         return True
 
@@ -2536,19 +2541,28 @@ that are expected by the MapCollection classes:
         self.draw_map()
         return True
 
-    def xy2coords(self, x, y, win_width, win_height):
+    def xy2coords(self, x, y, win_width, win_height, xscale=None, yscale=None):
         """Convert pixels to longitude/latitude."""
         # collection.x_scale is in pixels per degree.
+        if not xscale:
+            xscale = self.collection.xscale
+        if not yscale:
+            yscale = self.collection.yscale
         return (self.center_lon - \
-                    float(win_width/2 - x) / self.collection.xscale,
+                    float(win_width/2 - x) / xscale,
                 self.center_lat + \
-                    float(win_height/2 - y) / self.collection.yscale)
+                    float(win_height/2 - y) / yscale)
 
-    def coords2xy(self, lon, lat, win_width, win_height):
+    def coords2xy(self, lon, lat, win_width, win_height,
+                  xscale=None, yscale=None):
         """Convert lon/lat to pixels."""
-        return (int((lon - self.center_lon) * self.collection.xscale
+        if not xscale:
+            xscale = self.collection.xscale
+        if not yscale:
+            yscale = self.collection.yscale
+        return (int((lon - self.center_lon) * xscale
                     + win_width/2),
-                int((self.center_lat - lat) * self.collection.yscale
+                int((self.center_lat - lat) * yscale
                     + win_height/2) )
 
     def drag_event(self, widget, event):
