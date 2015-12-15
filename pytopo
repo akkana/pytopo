@@ -1,35 +1,14 @@
 #!/usr/bin/env python
 
-# pytopo: show topographic maps using data files from Topo! CD
-# to generate a map at the specified coordinates.
-# Home page: http://shallowsky.com/software/topo/
-
-# Copyright 2005 - 2011 by Akkana Peck, akkana@shallowsky.com
-# Please feel free to use, distribute or modify this program
-# under the terms of the GPL v2 or, at your option, a later GPL version.
-# I'd appreciate hearing about it if you make any changes.
-
-# We will do all calculations in decimal degrees,
-# but take inputs in deg.decimal_minutes.
-
 """
-1.1 Release notes:
+pytopo: show topographic maps using data files from Topo! CD
+to generate a map at the specified coordinates.
+Home page and more documentation: http://shallowsky.com/software/topo/
 
-This is mostly a reliability/stability release. Fixed a lot of little
-bugs associated with some of the new features: bulk downloading works
-better (though still needs more work), saved sites and loaded track
-logs work much better, no error if pin.png isn't in the right place, etc.
-
-1.0 Release notes:
-
-PyTopo now supports dragging the map! Wahoo!
-
-0.9 Release notes:
-
-NEW FORMAT
-
-OSMMapCollection handles collections of tiles (maplets) downloaded
-from the openstreetmap project
+Copyright 2005 - 2015 by Akkana Peck, akkana@shallowsky.com
+Please feel free to use, distribute or modify this program
+under the terms of the GPL v2 or, at your option, a later GPL version.
+I'd appreciate hearing about it if you make any changes.
 
 Finding zero-length files:
  find Maps/opencyclemap/13 -size 0
@@ -56,7 +35,10 @@ end
 TODO: allow configuration of colors, line thickness etc.
 """
 
-VersionString = "PyTopo Version 1.0 by Akkana Peck"
+# We will do all calculations in decimal degrees,
+# but take inputs in deg.decimal_minutes.
+
+VersionString = "PyTopo Version 1.2 by Akkana Peck"
 
 import sys, os, glob, math
 import gtk, gobject, glib
@@ -1449,6 +1431,28 @@ class MapUtils:
         return fmt % num
 
     @classmethod
+    def haversine_distance(cls, latitude_1, longitude_1,
+                                latitude_2, longitude_2):
+        """
+        Haversine distance between two points, expressed in meters.
+        From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
+        Implemented from http://www.movable-type.co.uk/scripts/latlong.html
+        """
+        d_lat = math.radians(latitude_1 - latitude_2)
+        d_lon = math.radians(longitude_1 - longitude_2)
+        lat1 = math.radians(latitude_1)
+        lat2 = math.radians(latitude_2)
+
+        a = math.sin(d_lat/2) * math.sin(d_lat/2) + \
+            math.sin(d_lon/2) * math.sin(d_lon/2) * \
+            math.cos(lat1) * math.cos(lat2)
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        EARTH_RADIUS = 3959.     # miles
+        d = EARTH_RADIUS * c
+
+        return d
+
+    @classmethod
     def distance_on_unit_sphere(cls, lat1, long1, lat2, long2):
         '''Linear distance between two points on a globe, in km.
            Divide by 1.609 to get miles.
@@ -2690,14 +2694,14 @@ that are expected by the MapCollection classes:
                     dist = MapUtils.distance_on_unit_sphere(self.click_last_lat,
                                                            self.click_last_long,
                                                             cur_lat, cur_long)
+                    dist2 = MapUtils.haversine_distance(self.click_last_lat,
+                                                           self.click_last_long,
+                                                            cur_lat, cur_long)
                     if self.use_metric:
                         print "Distance: %.2f km" % dist
-                        # print "Distance:", round(dist*1600,2), "meters,", \
-                        #     round(dist*1.6,2), "km"
                     else:
                         print "Distance: %.2f mi" % (dist / 1.609)
-                        # print "Distance:", round(dist*5280,2), "feet,", \
-                        #     round(dist,2), "miles"
+                        print "Haversine Distance: %.2f mi" % dist2
 
                     # Now calculate bearing. I don't know how accurate this is.
                     xdiff = (cur_long - self.click_last_long)
