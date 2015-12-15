@@ -46,11 +46,9 @@ import gc
 import pango
 settings = gtk.settings_get_default()
 settings.set_property("gtk-touchscreen-mode", True)
-HaveDOM = True
-try:
-    import xml.dom.minidom
-except ImportError:
-    HaveDOM = False
+
+import xml.dom.minidom
+import zipfile
 
 import types, urllib, re
 import collections
@@ -1196,7 +1194,8 @@ class TrackPoints:
 
     def readTrackFile(self, filename):
         """Read a track file. Throw IOError if the file doesn't exist."""
-        if filename.lower().endswith('.kml'):
+        if filename.lower().endswith('.kml') or \
+           filename.lower().endswith('.kmz'):
             return self.readTrackFileKML(filename)
         return self.readTrackFileGPX(filename)
 
@@ -1210,9 +1209,6 @@ class TrackPoints:
         if (Debug):
             print "Using track file", filename
 
-        if not HaveDOM:
-            print "WARNING: Can't read track file: need module xml.dom.minidom"
-            return
         if (Debug):
             print "Reading track file", filename
         dom = xml.dom.minidom.parse(filename)
@@ -1280,15 +1276,24 @@ class TrackPoints:
             raise IOError("Can't open track file %s" % filename)
 
         if (Debug):
-            print "Using track file", filename
-
-        if not HaveDOM:
-            print "WARNING: Can't read track file: need module xml.dom.minidom"
-            return
-        if (Debug):
             print "Reading track file", filename
 
-        dom = xml.dom.minidom.parse(filename)
+        # Handle kmz compressed files, which are much more common in practice
+        # than actual KML files:
+        if filename.lower().endswith(".kmz") and zipfile.is_zipfile(filename):
+            zip = zipfile.ZipFile(filename)
+            namelist = zip.namelist()
+            if "doc.kml" not in namelist:
+                raise ValueError("No doc.kml in %s" % filename)
+            if len(namelist) > 1:
+                print "Warning: ignoring files other than doc.kml in", filename
+            kmlfp = zip.open("doc.kml")
+            doc_kml = kmlfp.read()
+            kmlfp.close()
+            dom = xml.dom.minidom.parseString(doc_kml)
+            doc_kml = None
+        else:
+            dom = xml.dom.minidom.parse(filename)
 
         # Features we care about are <Placemark> containing either
         # <LineString> (tracks) or <Point> (waypoints).
@@ -3142,7 +3147,8 @@ Click in the map to print the coordinates of the clicked location.
 
             # args[0] doesn't start with '-'. Is it a gpx or kml file?
             if args[0].endswith(".gpx") \
-               or args[0].endswith(".kml"):
+               or args[0].endswith(".kml") \
+               or args[0].endswith(".kmz"):
                 try:
                     if mapwin.trackpoints:
                         mapwin.trackpoints.readTrackFile(args[0])
@@ -3154,7 +3160,8 @@ Click in the map to print the coordinates of the clicked location.
                     print "Can't read track file", args[0]
                 except xml.parsers.expat.ExpatError:
                     print "Can't read %s: syntax error." % args[0]
-                    if args[0].lower().endswith(".kml"):
+                    if args[0].lower().endswith(".kml") or \
+                       args[0].lower().endswith(".kmz"):
                         print """
 Is this a KML made with ArcGIS?
 It may have an illegal xsi:schemaLocation.
