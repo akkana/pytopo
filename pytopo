@@ -1287,6 +1287,7 @@ class TrackPoints:
             return
         if (Debug):
             print "Reading track file", filename
+
         dom = xml.dom.minidom.parse(filename)
 
         # Features we care about are <Placemark> containing either
@@ -2888,6 +2889,8 @@ Click in the map to print the coordinates of the clicked location.
         return collection
 
     def selection_window(self, mapwin):
+        '''Show a window that lets the user choose a known starting point.
+        '''
         dialog = gtk.Dialog("Choose a point", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -3138,13 +3141,24 @@ Click in the map to print the coordinates of the clicked location.
                 continue
 
             # args[0] doesn't start with '-'. Is it a gpx or kml file?
-            if args[0].endswith(".gpx") or args[0].endswith(".kml"):
-                if mapwin.trackpoints == None:
-                    mapwin.trackpoints = TrackPoints()
+            if args[0].endswith(".gpx") \
+               or args[0].endswith(".kml"):
                 try:
-                    mapwin.trackpoints.readTrackFile(args[0])
+                    if mapwin.trackpoints:
+                        mapwin.trackpoints.readTrackFile(args[0])
+                    else:
+                        trackpoints = TrackPoints()
+                        trackpoints.readTrackFile(args[0])
+                        mapwin.trackpoints = trackpoints
                 except IOError:
                     print "Can't read track file", args[0]
+                except xml.parsers.expat.ExpatError:
+                    print "Can't read %s: syntax error." % args[0]
+                    if args[0].lower().endswith(".kml"):
+                        print """
+Is this a KML made with ArcGIS?
+It may have an illegal xsi:schemaLocation.
+If so, try changing xsi:schemaLocation to just schemaLocation."""
                 args = args[1:]
                 continue
 
@@ -3201,7 +3215,7 @@ Click in the map to print the coordinates of the clicked location.
         # Didn't match any known run mode:
         # start in GUI mode choosing a location:
         if not self.selection_window(mapwin):
-            self.Usage()
+            sys.exit(0)
 
 # Check for a user config file named .pytopo
 # in either $HOME/.config/pytopo or $HOME.
