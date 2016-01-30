@@ -222,6 +222,13 @@ map coordinates and need a starting place. Should probably remove it.
         # But it needs another factor of 100000, determined empirically.
         mult = 256. * 100000. / 40000000.
         z = 0
+
+        # Handle the case of a single point
+        if xdist == 0 or ydist == 0:
+            print "Single point! Zooming to maxzoom", self.maxzoom
+            self.zoom_to(self.maxzoom)
+            return
+
         while z <= self.maxzoom:
             powz = pow(2, z)
             w = xdist * mult * powz
@@ -232,7 +239,7 @@ map coordinates and need a starting place. Should probably remove it.
                 return
             z += 1
         print "Eek, couldn't fit bounding box"
-        self.zoom_to(1)
+        self.zoom_to(12)
 
 class TiledMapCollection(MapCollection):
 
@@ -708,7 +715,13 @@ class OSMMapCollection(TiledMapCollection):
         try:
             pixbuf = gtk.gdk.pixbuf_new_from_file(path)
         except gobject.GError:
-            return None
+            pixbuf = None
+            # return None
+
+        # In case something went wrong, don't keep a bad file around:
+        if not pixbuf or pixbuf.get_width() <= 0 or pixbuf.get_height() <= 0:
+            print "Couldn't open pixbuf from", path
+            os.rename(path, path + ".bad")
 
         return pixbuf
 
