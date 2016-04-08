@@ -1341,14 +1341,16 @@ class TrackPoints:
                     self.handleTrackPoint(triple[1], triple[0], triple[2], name)
 
     def get_KML_coordinates(self, el):
-        '''From inside an element of a KML file, get the contents
-           of the first <coordinates> triple.
+        '''Get the contents of the first <coordinates> triple
+           inside the given element (which is inside a KML file).
+           Inside a LineString, coordinate pairs or triples are separated
+           by whitespace, which may include newlines.
            Return a list of triples [[lat, lon, ele], [lat, lon, ele] ...]
         '''
         coords = el.getElementsByTagName("coordinates")
         if not coords or len(coords) < 1:
             return None
-        coord_triples = coords[0].childNodes[0].data.strip().split(' ')
+        coord_triples = coords[0].childNodes[0].data.strip().split()
         ret = []
         for s in coord_triples:
             triple = s.split(',')
