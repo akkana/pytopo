@@ -4,7 +4,7 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-VERSION = 0.3
+VERSION = "0.3-smooth"
 
 import sys, os, math, datetime, xml.dom.minidom
 
@@ -142,15 +142,18 @@ def handleTrackFile(dom):
         handleTrackPoint(points[i])
     accumulate_climb(0)
 
-def smooth(x, beta):
-    """ kaiser window smoothing """
-    window_len=11
+def smooth(x, halfwin, beta):
+    """ Kaiser window smoothing.
+        Unfortunately, this only smooths by a tiny bit,
+        and changing beta doesn't affect that much.
+    """
+    window_len = 2 * halfwin + 1
     # extending the data at beginning and at the end
     # to apply the window at the borders
     s = numpy.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
     w = numpy.kaiser(window_len,beta)
     y = numpy.convolve(w/w.sum(),s,mode='valid')
-    return y[5:len(y)-5]
+    return y[halfwin:len(y)-halfwin]
 
 import numpy
 
@@ -175,32 +178,27 @@ def main(args):
     #
     # Plot the results:
     #
-    print "%.1f miles." % (total_dist)
-    tot = tot_climb(eles)
-    print "Unsmoothed total climb: %d'" % tot
-    if have_pylab:
-        pylab.plot(distances, eles, '-y',
-                   label="Raw data, total climb %d" % tot)
+    beta = 2
+    halfwin = 40
+    smoothed_eles = smooth(eles, halfwin, beta)
 
-    betas = (.25, .5, 1., 2.)
-    # betas = [ 1 ]
-    for beta in betas:
-        smoothed_eles = smooth(eles, beta)
-        tot = tot_climb(smoothed_eles)
-        print "Smoothed climb (beta=%.2f): %d'" % (beta, tot)
-        if have_pylab:
-            if len(betas) <= 1:
-                label="smoothed, total climb %d" % (tot)
-            else:
-                label = "smoothed (beta = %s), tot = %d" % (beta, tot)
-            pylab.plot(distances, smoothed_eles, label=label)
-
+    print "%.1f miles. Raw total climb: %d'" % (total_dist, int(total_climb))
+    smoothed_climb = tot_climb(smoothed_eles)
+    print "Raw climb:    %d'" % tot_climb(eles)
+    print "Smoothed climb: %d'" % smoothed_climb
     print "%d minutes moving, %d stopped" % (int(moving_time.seconds / 60),
                                              int(stopped_time.seconds / 60))
     print "Average speed moving: %.1f mph" % (total_dist *60*60
                                               / moving_time.seconds)
+    if not have_pylab:
+        return 0
 
-    title_string = "%.1f miles, %d' total climb" % (distances[-1], tot)
+    pylab.plot(distances, eles, label="GPS elevation data", color="gray")
+
+    pylab.plot(distances, smoothed_eles, label="smoothed", color="red")
+
+    title_string = "Elevation profile (" + str(round(distances[-1], 1)) \
+                  + " miles, " + str(int(smoothed_climb)) + "' smoothed climb)"
 
     pylab.title(title_string)
     pylab.xlabel("miles")
