@@ -194,8 +194,7 @@ def main(args):
         return 0
 
     pylab.plot(distances, eles, label="GPS elevation data", color="gray")
-
-    pylab.plot(distances, smoothed_eles, label="smoothed", color="red")
+    pylab.plot(distances, smoothed_eles, label="smoothed", color="green")
 
     title_string = "Elevation profile (" + str(round(distances[-1], 1)) \
                   + " miles, " + str(int(smoothed_climb)) + "' smoothed climb)"
