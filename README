@@ -1,48 +1,33 @@
-This is PyTopo, an application for exploring maps using local data.
+This is PyTopo, an application for exploring tiled maps using local data.
 See the project home page at http://shallowsky.com/software/topo
 for more information.
 
-==================================
-PyTopo quick start guide:
+It can download data from OpenStreetMap (default), or you can use
+tiles from programs like the commercial Topo! or tiles you've
+generated yourself.
 
-To run pytopo, you need some local map data.
+It can also display GPX, KML or KMZ track logs, and can measure
+distances and angles between points or give you the coordinates of
+a point.
 
-Eventually PyTopo will be able to download map data from openstreetmap,
-but until that happens, you need to get it one of these ways:
+Installing: all you really need is the script itself, pytopo
+but if you want to see pin images, create a directory
+/usr/share/pytopo and copy pytopo-pin.png into it.
+Or just have pytopo-pin.png in the current directory when you run pytopo.
 
-- Take a large map (a raster image, PDF, etc.) and split it into
-  small tiles (using something like the "mapsplit" script, provided here)
-  then figure out appropriate coordinates for the top left;
+The first time you run it, pytopo will create a ~/.config/pytopo
+directory for its configuration files, and a Maps directory for
+map data.
 
-- Download OpenStreetMap tiles using a program such as TangoGPS;
+pytopo -h gives usage.
 
-- Use commercial Topo! regional map sets, e.g. "San Francisco Bay Area"
+If you need custom maps., edit ~/.config/pytopo/pytopo.sites to add
+new map Collections.
 
-Since that can be tricky, you can use some sample tiles, provided here,
-which were downloaded from OpenStreetMap.
+See http://shallowsky.com/software/topo for more information on
+things you can do and some hints how to create more map data if you
+need custom tiles beyond what you can get from OpenStreetMap.
 
-If you have this source in ~/src/pytopo, then do the following:
-
-mkdir ~/Maps
-ln -s ~/src/pytopo/data/opencyclemap ~/Maps/
-mkdir ~/.config/pytopo
-cp ~/src/pytopo/sample.pytopo ~/.config/pytopo
-  (If you prefer, you can put .pytopo directly in your home directory.)
-
-IMPORTANT: You must edit ~/.config/pytopo and change "user" to your
-login name.
-
-That will give you an entry called "cimatest" pointing to the
-opencyclemap data for Cima Dome, in the Mojave desert.
-
-pytopo cimatest
-should run pytopo starting at that location.
-
-Arrow keys navigate you around. See the home page for more information
-on things you can do and how to create more map data.
-
-More documentation coming soon.
-Contributions appreciated (code, documentation or map data) --
-please join the project on http://code.google.com/p/pytopo/
+Contributions appreciated!
 
 Have fun!
