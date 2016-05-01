@@ -30,4 +30,8 @@ need custom tiles beyond what you can get from OpenStreetMap.
 
 Contributions appreciated!
 
+Also in this project: ellie, a little script for reporting and plotting
+statistics (distance and elevation change) read from a GPX track log.
+More information: http://shallowsky.com/software/ellie/
+
 Have fun!
