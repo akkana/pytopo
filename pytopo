@@ -238,8 +238,8 @@ map coordinates and need a starting place. Should probably remove it.
                 self.zoom_to(z-1)
                 return
             z += 1
-        print "Eek, couldn't fit bounding box"
-        self.zoom_to(12)
+        print "Couldn't fit bounding box; using maximum zoom"
+        self.zoom_to(self.maxzoom)
 
 class TiledMapCollection(MapCollection):
 
