@@ -3198,13 +3198,15 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
             # Doesn't match a known site. Maybe the args are coordinates?
             try:
                 if len(args) >= 2 and \
-                   len(args[0] > 1 and args[0][1].isdigit) and \
-                   len(args[1] > 1 and args[1][1].isdigit):
+                   len(args[0]) > 1 and args[0][1].isdigit() and \
+                   len(args[1]) > 1 and args[1][1].isdigit():
                     mapwin.center_lon = MapUtils.DegMinToDecDeg(float(args[0]))
                     mapwin.center_lat = MapUtils.DegMinToDecDeg(float(args[2]))
                     mapwin.collection = self.find_collection(args[3])
                     args = args[2:]
                     continue
+                print "Can't make sense of argument:", args[0]
+                PyTopo.Usage()
 
             except ValueError, e:
                 print "Couldn't parse coordinates"
@@ -3212,7 +3214,7 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
 
             # If we get here, we still have an argument but it doesn't
             # match anything we know: flag, collection, site or coordinate.
-            print "Remaining args:", args
+            print "Problem parsing arguments. Remaining args:", args
             PyTopo.Usage()
 
         # Now we've parsed all the arguments.
