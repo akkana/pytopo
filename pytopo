@@ -53,6 +53,8 @@ import zipfile
 import types, urllib, re
 import collections
 
+import time
+
 # If we download files, we'll try to use the magic library to make
 # sure we got the right file type. But no need to import it
 # if we're not downloading anything.
@@ -259,6 +261,22 @@ TiledMapCollection classes must implement
         self.download_tiles = DownloadTileQueue()
         self.download_func = None
         self.download_failures = 0
+
+        # If reload_tiles is set, it should be set to a Unix datestamp,
+        # e.g. from when the program was started.
+        # Any file older than that will be re-downloaded.
+        self.reload_tiles = False
+
+    def set_reload_tiles(self, p):
+        if p:
+            if 'download_url' in dir(self) and self.download_url:
+                print "Will re-download all map tiles"
+                self.reload_tiles = p
+            else:
+                print "Error: can't reload tiles without a download URL"
+                self.reload_tiles = False
+        else:
+            self.reload_tiles = False
 
     def draw_map(self, center_lon, center_lat, mapwin):
         """Draw maplets at the specified coordinates, to fill the mapwin."""
@@ -698,12 +716,21 @@ class OSMMapCollection(TiledMapCollection):
             + xdir + '/' + basename
 
     def fetch_or_download_maplet(self, path):
-        """Return a pixbuf if the file is on disk, else (url, path)"""
-        if not os.access(path, os.R_OK):
+        """Return a pixbuf if the file is on disk, else download"""
+        # Do we need to download?
+        try:
+            needs_download = ((self.reload_tiles and
+                               os.stat(path).st_mtime < self.reload_tiles)
+                              or not os.access(path, os.R_OK))
+        except OSError:
+            needs_download = True
+
+        if needs_download:
             if not self.download_url:
                 if Debug:
                     print "Downloads not enabled; skipping", path
-                return None
+                if not self.reload_tiles:
+                    return None
 
             # path is a full path on the local filesystem, OS independent.
             # We need to turn it into a url (Unix path) with slashes.
@@ -960,11 +987,11 @@ class TopoMapCollection(TiledMapCollection):
             print "get_next_maplet:", fullpathname, dX, dY
         pathname, filename = os.path.split(fullpathname)
         collecdir, mapdir = os.path.split(pathname)
-        maplat = mapdir[1:3]
-        maplon = mapdir[3:6]
+        maplat = int(mapdir[1:3])
+        maplon = int(mapdir[3:6])
         name, ext = os.path.splitext(filename)
         xdir = int(mapdir[-1])
-        ydir = ord(mapdir[-2]) - ord('a')     # ydir is a letter a-h
+        ydir = ord(mapdir[-2]) - ord('a')     # convert from letter a-h
         if self.series == 7.5:
             serstr = self.ser7prefix
             grid = 10
@@ -1464,7 +1491,7 @@ class MapUtils:
     @classmethod
     def ohstring(cls, num, numdigits):
         """Return a zero-prefixed string of the given number of digits."""
-        fmt = '%%0%d' % numdigits
+        fmt = '%%0%dd' % numdigits
         return fmt % num
 
     @classmethod
@@ -2838,13 +2865,15 @@ class PyTopo:
         self.needs_saving = False
         self.config_dir = os.path.expanduser("~/.config/pytopo",)
         self.savefilename = os.path.join(self.config_dir, "saved.sites")
+        self.reload_tiles = False
 
     @classmethod
     def Usage(cls):
         global VersionString
         print VersionString
         print """
-Usage: pytopo [-t trackfile] [-c collection] [site_name]
+Usage: pytopo [-t trackfile] [-c collection] [-r] [site_name]
+           -r : re-download all map tiles
        pytopo [-t trackfile] start_lat start_long collection
        pytopo -p : list known sites and tracks
        pytopo -h : print this message
@@ -3152,6 +3181,8 @@ Click in the map to print the coordinates of the clicked location.
 
                 elif args[0] == "-d":
                     Debug = True
+                elif args[0] == "-r":
+                    self.reload_tiles = time.time()
                 elif args[0] == "-t" and len(args) > 1:
                     if mapwin.trackpoints == None:
                         mapwin.trackpoints = TrackPoints()
@@ -3246,6 +3277,11 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
             mapwin.center_lon = (maxlon + minlon) / 2
             mapwin.center_lat = (maxlat + minlat) / 2
             mapwin.collection.zoom_to_bounds(minlon, minlat, maxlon, maxlat)
+
+        if 'set_reload_tiles' in dir(mapwin.collection):
+            mapwin.collection.set_reload_tiles(self.reload_tiles)
+        elif self.reload_tiles:
+            print "Collection can't re-download tiles"
 
         # By now, we hope we have the mapwin positioned with a collection
         # and starting coordinates:
@@ -3535,7 +3571,6 @@ def download_job(url, localpath, callback):
     callback(path)
 
 
-# Conditional main:
 if __name__ == "__main__":
     p = PyTopo()
     p.main(sys.argv)
