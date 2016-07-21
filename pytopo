@@ -1207,6 +1207,7 @@ class TrackPoints:
 
     def readTrackFile(self, filename):
         """Read a track file. Throw IOError if the file doesn't exist."""
+        # XXX Should read magic number rather than depending on extension
         if filename.lower().endswith('.kml') or \
            filename.lower().endswith('.kmz'):
             return self.readTrackFileKML(filename)
@@ -1310,30 +1311,45 @@ class TrackPoints:
 
         # Features we care about are <Placemark> containing either
         # <LineString> (tracks) or <Point> (waypoints).
-        # A Placemark also contains <name>The name</name>.
+        # A Placemark also contains <name>The name</name>,
         # Placemarks are apparently grouped inside a <Document>
         # but let's not worry about that now.
 
         placemarks = dom.getElementsByTagName("Placemark")
         for placemark in placemarks:
+            # Try to get a trail name.
+            name = None
+            try:
+                name = placemark.getElementsByTagName("name")[0].childNodes[0].data.strip()
+            except:
+                # no <name> tag, try for more esoteric schemes.
+                # Lynn's USFS trail data has a scheme like
+                # <ExtendedData><SchemaData ...><<SimpleData name="TrailName">
+                # where the name might be TrailName or TrailNam_1
+                try:
+                    sdata = placemark.getElementsByTagName("ExtendedData")[0].getElementsByTagName("SimpleData")
+                    for tag in sdata:
+                        if tag.getAttribute("name").startswith("TrailNam"):
+                            name = tag.childNodes[0].data.strip()
+                            break
+                except:
+                    pass
+
             # Handle tracks:
+            if not name:
+                name = "unnamed"
             linestrings = placemark.getElementsByTagName("LineString")
             for linestring in linestrings:
                 coord_triples = self.get_KML_coordinates(linestring)
                 if not coord_triples:
                     continue
-                self.points.append(TrackPoints.START)
+                self.points.append(name)
                 for triple in coord_triples:
                     self.handleTrackPoint(triple[1], triple[0], triple[2], None)
 
             # Handle waypoints:
-            try:
-                name = placemark.getElementsByTagName("name")[0].childNodes[0].data.strip()
-                if not name:
-                    name = "WP"
-            except:
-                # print "Couldn't get name:", placemark.toprettyxml()
-                name = "wp"
+            if not name:
+                name = "WP"
             points = placemark.getElementsByTagName("Point")
             for point in points:
                 coord_triples = self.get_KML_coordinates(point)
