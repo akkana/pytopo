@@ -1193,10 +1193,6 @@ class TrackPoints:
     Supports GPX, KML, KMZ and GeoJSON.
     """
 
-    # A special variable to indicate the start of a track,
-    # in case a track doesn't have a name.
-    START = "start"
-
     def __init__(self):
         self.points = []
         self.waypoints = []
@@ -1210,9 +1206,7 @@ class TrackPoints:
 
     def is_start(self, point):
         '''Is this the start of a new track segment?
-           If so, it's a string (or unicode),
-           either the name of the track section
-           or the special string TrackPoints.START.
+           If so, it's a string (or unicode), the name of the track section.
         '''
         return (isinstance(point, str) or isinstance(point, unicode))
 
@@ -1290,7 +1284,7 @@ class TrackPoints:
                    trkname[0].firstChild.wholeText:
                     self.points.append(trkname[0].firstChild.wholeText)
                 else:
-                    self.points.append(TrackPoints.START)
+                    self.points.append(os.path.basename(filename))
 
                 for pt in trkpts:
                     # self.handleTrackPointGPX(pt, False)
@@ -1300,7 +1294,7 @@ class TrackPoints:
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
         if waypts:
-            self.waypoints.append(TrackPoints.START)
+            self.waypoints.append(os.path.basename(filename))
             for pt in waypts:
                 lat, lon, ele, time = self.GPX_point_coords(pt)
                 name = "WP"
@@ -1794,7 +1788,7 @@ that are expected by the MapCollection classes:
             self.draw_zoom_control()
 
         # Is there a selected track?
-        if self.selected_track:
+        if self.selected_track != None:
             trackname = self.trackpoints.points[self.selected_track]
             tracklabel = "Selected track: " + trackname
 
@@ -1838,7 +1832,7 @@ that are expected by the MapCollection classes:
                                 linestyle=gtk.gdk.LINE_ON_OFF_DASH):
         '''Draw a trackpoint segment, starting at the given index.
            Stop drawing if we reach another start string, and return the index
-           of that START. Return None if we reach the end of the list.
+           of that string. Return None if we reach the end of the list.
         '''
         self.set_color(linecolor)
         self.xgc.line_style = linestyle
@@ -1887,7 +1881,9 @@ that are expected by the MapCollection classes:
 
     def select_track(self, trackindex):
         if Debug:
-            if trackindex:
+            # Test against None specifically, else we won't be able
+            # to select the first track starting at index 0.
+            if trackindex != None:
                 print "Selecting track starting at", trackindex
             else:
                 print "De-selecting track"
@@ -1940,49 +1936,53 @@ that are expected by the MapCollection classes:
         d.hide()
 
     def draw_trackpoints(self):
-        # Now draw any trackpoints that are visible:
+        if not self.trackpoints:
+            return
+
+        # Now draw any trackpoints that are visible.
+        # self.trackpoints may be trackpoints or waypoints
         self.track_color = None
-        if self.trackpoints != None :   # may be trackpoints or waypoints
-            # win_width, win_height = self.drawing_area.window.get_size()
-            if len(self.trackpoints.points) > 0:
-                cur_x = None
-                cur_y = None
 
-                next = 0
-                while True:
-                    self.track_color = self.contrasting_color(self.track_color)
-                    next = self.draw_trackpoint_segment(next, self.track_color)
-                    if not next:
-                        break
+        # win_width, win_height = self.drawing_area.window.get_size()
+        if len(self.trackpoints.points) > 0:
+            cur_x = None
+            cur_y = None
 
-            if self.selected_track != None:  # Could be trackpoint 0
-                self.draw_trackpoint_segment(self.selected_track,
-                                             self.red_color, linewidth=6)
+            next = 0
+            while True:
+                self.track_color = self.contrasting_color(self.track_color)
+                next = self.draw_trackpoint_segment(next, self.track_color)
+                if not next:
+                    break
 
-            if self.show_waypoints and len(self.trackpoints.waypoints) > 0:
-                self.set_color(self.waypoint_color)
-                self.xgc.line_style = gtk.gdk.LINE_SOLID
-                self.xgc.line_width = 2
-                for pt in self.trackpoints.waypoints:
-                    if self.trackpoints.is_start(pt) or \
-                       self.trackpoints.is_attributes(pt):
-                        continue
-                    x = int((pt[0] - self.center_lon) * self.collection.xscale
-                            + self.win_width/2)
-                    y = int((self.center_lat - pt[1]) * self.collection.yscale
-                            + self.win_height/2)
+        if self.selected_track != None:  # None vs. trackpoint 0
+            self.draw_trackpoint_segment(self.selected_track,
+                                         self.red_color, linewidth=6)
 
-                    if x >= 0 and x < self.win_width and \
-                       y >= 0 and y < self.win_height:
-                        layout = self.drawing_area.create_pango_layout(pt[2])
-                        layout.set_font_description (self.wpt_font_desc)
-                        # tw = layout.get_size()[0] / pango.SCALE
-                        th = layout.get_size()[1] / pango.SCALE
-                        self.drawing_area.window.draw_layout(self.xgc,
-                                                             x + th/3,
-                                                             y - th/2,
-                                                             layout)
-                        self.draw_rectangle(True, x-3, y-3, 6, 6)
+        if self.show_waypoints and len(self.trackpoints.waypoints) > 0:
+            self.set_color(self.waypoint_color)
+            self.xgc.line_style = gtk.gdk.LINE_SOLID
+            self.xgc.line_width = 2
+            for pt in self.trackpoints.waypoints:
+                if self.trackpoints.is_start(pt) or \
+                   self.trackpoints.is_attributes(pt):
+                    continue
+                x = int((pt[0] - self.center_lon) * self.collection.xscale
+                        + self.win_width/2)
+                y = int((self.center_lat - pt[1]) * self.collection.yscale
+                        + self.win_height/2)
+
+                if x >= 0 and x < self.win_width and \
+                   y >= 0 and y < self.win_height:
+                    layout = self.drawing_area.create_pango_layout(pt[2])
+                    layout.set_font_description (self.wpt_font_desc)
+                    # tw = layout.get_size()[0] / pango.SCALE
+                    th = layout.get_size()[1] / pango.SCALE
+                    self.drawing_area.window.draw_layout(self.xgc,
+                                                         x + th/3,
+                                                         y - th/2,
+                                                         layout)
+                    self.draw_rectangle(True, x-3, y-3, 6, 6)
 
     def draw_map_scale(self):
         ########################################################################
@@ -2943,7 +2943,7 @@ that are expected by the MapCollection classes:
             # If we didn't select any tracks or anything, we might
             # have selected some earlier, in which case we want to
             # redraw them now.
-            if (self.selected_track):
+            if (self.selected_track != None):
                 self.select_track(None)
 
         return True
