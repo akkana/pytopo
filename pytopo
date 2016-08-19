@@ -1190,7 +1190,7 @@ Topo2MapCollection: data from local-area Topo! packages that
 class TrackPoints:
 
     """Parsing and handling of GPS track files.
-    Currently only GPX format is supported.
+    Supports GPX, KML, KMZ and GeoJSON.
     """
 
     # A special variable to indicate the start of a track,
@@ -1215,6 +1215,18 @@ class TrackPoints:
            or the special string TrackPoints.START.
         '''
         return (isinstance(point, str) or isinstance(point, unicode))
+
+    def is_attributes(self, point):
+        return isinstance(point, dict)
+
+    def attributes(self, trackindex):
+        '''Does the indicated track have attributes? Then return them.
+        '''
+        # Currently attributes are represented by a dictionary
+        # as the next item after the name in the trackpoints list.
+        if self.is_attributes(self.points[trackindex+1]):
+            return self.points[trackindex+1]
+        return None
 
     def handleTrackPoint(self, lat, lon, ele, waypoint_name=False):
         '''Add a new trackpoint or waypoint after some basic sanity checks.
@@ -1334,7 +1346,6 @@ class TrackPoints:
                     kl = key.lower()
                     if kl == "name" or kl == "trailname":
                         name = props[key]
-                    propstring += "%s: %s\n" % (key, props[key])
 
             # Properties may specify a null name, but we need something.
             if not name:
@@ -1342,12 +1353,16 @@ class TrackPoints:
 
             if type == "LineString":
                 self.points.append(name)
+                if "properties" in feature:
+                    self.points.append(feature["properties"])
                 for coords in feature["geometry"]["coordinates"]:
                     lon, lat, ele = coords
                     self.handleTrackPoint(lat, lon, ele, None)
             elif type == "MultiLineString":
                 for linestring in feature["geometry"]["coordinates"]:
                     self.points.append(name)
+                    if "properties" in feature:
+                        self.points.append(feature["properties"])
                     for coords in linestring:
                         lon, lat, ele = coords
                         self.handleTrackPoint(lat, lon, ele, None)
@@ -1659,6 +1674,8 @@ that are expected by the MapCollection classes:
         self.show_waypoints = True
         self.selected_track = None
 
+        self.traildialog = None
+
         try:
             self.pin = \
                 gtk.gdk.pixbuf_new_from_file("/usr/share/pytopo/pytopo-pin.png")
@@ -1820,7 +1837,7 @@ that are expected by the MapCollection classes:
     def draw_trackpoint_segment(self, start, linecolor, linewidth=3,
                                 linestyle=gtk.gdk.LINE_ON_OFF_DASH):
         '''Draw a trackpoint segment, starting at the given index.
-           Stop drawing if we reach another START, and return the index
+           Stop drawing if we reach another start string, and return the index
            of that START. Return None if we reach the end of the list.
         '''
         self.set_color(linecolor)
@@ -1840,6 +1857,10 @@ that are expected by the MapCollection classes:
             if self.trackpoints.is_start(pt):
                 return i
             i += 1
+
+            # Skip over dictionaries of attributes
+            if self.trackpoints.is_attributes(pt):
+                continue
 
             x = int((pt[0] - self.center_lon) * self.collection.xscale
                     + self.win_width/2)
@@ -1866,10 +1887,57 @@ that are expected by the MapCollection classes:
 
     def select_track(self, trackindex):
         if Debug:
-            print "Selecting track starting at", trackindex
+            if trackindex:
+                print "Selecting track starting at", trackindex
+            else:
+                print "De-selecting track"
         self.selected_track = trackindex
         # self.draw_trackpoint_segment(trackindex, self.red_color, linewidth=6)
         self.draw_map()
+
+        if not trackindex:
+            return
+
+        # Does the selected track have attributes? If so, pop up a dialog.
+        attrs = self.trackpoints.attributes(trackindex)
+        if not attrs:
+            return
+
+        # Pop up a dialog showing attributes.
+        attrstr = '\n'.join(["%s: %s" % (key, attrs[key]) for key in attrs])
+        self.show_traildialog(attrstr)
+
+    def show_traildialog(self, attrstr):
+        trailname = self.trackpoints.points[self.selected_track]
+        if not self.traildialog:
+            self.traildialog = gtk.Dialog(trailname,
+                                          None, 0,
+                                          (gtk.STOCK_CLOSE,
+                                           gtk.RESPONSE_CANCEL))
+            self.traildialog.set_size_request(400, 300)
+
+            sw = gtk.ScrolledWindow()
+            sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
+            sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+
+            textview = gtk.TextView()
+            self.attributes_textbuffer = textview.get_buffer()
+            sw.add(textview)
+            sw.show()
+            textview.show()
+            self.traildialog.vbox.pack_start(sw, expand=True)
+            self.traildialog.connect("response", self.hide_traildialog)
+
+        else:
+            self.traildialog.set_title(trailname)
+
+        self.attributes_textbuffer.set_text("== %s ==\n%s" % (trailname,
+                                                              attrstr))
+
+        self.traildialog.show_all()
+
+    def hide_traildialog(self, d, responseid=None):
+        d.hide()
 
     def draw_trackpoints(self):
         # Now draw any trackpoints that are visible:
@@ -1896,7 +1964,8 @@ that are expected by the MapCollection classes:
                 self.xgc.line_style = gtk.gdk.LINE_SOLID
                 self.xgc.line_width = 2
                 for pt in self.trackpoints.waypoints:
-                    if self.trackpoints.is_start(pt):
+                    if self.trackpoints.is_start(pt) or \
+                       self.trackpoints.is_attributes(pt):
                         continue
                     x = int((pt[0] - self.center_lon) * self.collection.xscale
                             + self.win_width/2)
@@ -2831,7 +2900,8 @@ that are expected by the MapCollection classes:
 
             if self.trackpoints != None and self.trackpoints.waypoints != None:
                 for i, pt in enumerate(self.trackpoints.waypoints):
-                    if self.trackpoints.is_start(pt):
+                    if self.trackpoints.is_start(pt) or \
+                       self.trackpoints.is_attributes(pt):
                         continue
                     tx = int((pt[0] - self.center_lon) * self.collection.xscale
                              + halfwidth)
@@ -2848,6 +2918,9 @@ that are expected by the MapCollection classes:
                         track_start = i
                         lastx = None
                         lasty = None
+                        continue
+
+                    if self.trackpoints.is_attributes(pt):
                         continue
 
                     tx = int((pt[0] - self.center_lon) * self.collection.xscale
