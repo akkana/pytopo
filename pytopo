@@ -298,7 +298,7 @@ TiledMapCollection classes must implement
         # so the coordinates will span a greater area than the visible window.
         if (Debug):
             print "Calculating boundaries: min =", \
-                   MapUtils.DecDegToDegMinStr(center_lon), \
+                   MapUtils.dec_deg2deg_min_str(center_lon), \
                    center_lon, "+/-", win_width, \
                    "/", self.xscale, "/ 2"
         min_lon = center_lon - win_width / self.xscale / 2
@@ -307,10 +307,10 @@ TiledMapCollection classes must implement
         max_lat = center_lat + win_height / self.yscale / 2
 
         if (Debug):
-            print "Map from", min_lon, MapUtils.DecDegToDegMinStr(min_lon), \
-                   MapUtils.DecDegToDegMinStr(min_lat), \
-                   "to", MapUtils.DecDegToDegMinStr(max_lon), \
-                   MapUtils.DecDegToDegMinStr(max_lat)
+            print "Map from", min_lon, MapUtils.dec_deg2deg_min_str(min_lon), \
+                   MapUtils.dec_deg2deg_min_str(min_lat), \
+                   "to", MapUtils.dec_deg2deg_min_str(max_lon), \
+                   MapUtils.dec_deg2deg_min_str(max_lat)
 
         # Start from the upper left: min_lon, max_lat
 
@@ -446,8 +446,8 @@ TiledMapCollection classes must implement
 
             # if (Debug):
             #     print "Drawing maplet for",
-            #     print MapUtils.DecDegToDegMinStr(curlon),
-            #     print MapUtils.DecDegToDegMinStr(curlat),
+            #     print MapUtils.dec_deg2deg_min_str(curlon),
+            #     print MapUtils.dec_deg2deg_min_str(curlat),
             #     print "at", x, y, "offset", x_off, y_off,
             #     print "size", w, h
 
@@ -861,9 +861,9 @@ class GenericMapCollection(TiledMapCollection):
         """Given coordinates in decimal degrees, map to the closest filename"""
         if self.left_longitude > longitude or self.top_latitude < latitude:
             return None
-        x_grid = MapUtils.intTrunc((longitude - self.left_longitude) *
+        x_grid = MapUtils.int_trunc((longitude - self.left_longitude) *
                                    self.xscale / self.img_width)
-        y_grid = MapUtils.intTrunc((self.top_latitude - latitude) *
+        y_grid = MapUtils.int_trunc((self.top_latitude - latitude) *
                                    self.yscale / self.img_height)
         if not self.latfirst:
             temp = x_grid
@@ -944,8 +944,8 @@ class TopoMapCollection(TiledMapCollection):
         filename = self.coords_to_filename(longitude - self.lon_correction,
                                          latitude - self.lat_correction)
         if (Debug):
-            print "T1MC get_maplet(", MapUtils.DecDegToDegMinStr(longitude),
-            print  ",", MapUtils.DecDegToDegMinStr(latitude), "):", filename
+            print "T1MC get_maplet(", MapUtils.dec_deg2deg_min_str(longitude),
+            print  ",", MapUtils.dec_deg2deg_min_str(latitude), "):", filename
 
         # Calculate offsets.
         # Maplets are self.series minutes wide and tall,
@@ -957,20 +957,20 @@ class TopoMapCollection(TiledMapCollection):
         # XXX the WGS84 part doesn't work right yet.
 
         # longitude increases rightward:
-        x_off = int((longitude - MapUtils.TruncateToFrac(longitude, self.frac)
+        x_off = int((longitude - MapUtils.truncate2frac(longitude, self.frac)
                      - self.lon_correction) * self.xscale)
         if (Debug):
-            print "truncated", MapUtils.DecDegToDegMinStr(longitude), "to",
-            print MapUtils.DecDegToDegMinStr(MapUtils.TruncateToFrac(longitude,
+            print "truncated", MapUtils.dec_deg2deg_min_str(longitude), "to",
+            print MapUtils.dec_deg2deg_min_str(MapUtils.truncate2frac(longitude,
                                                                      self.frac))
 
         # Latitude decreases downward:
-        y_off = int((MapUtils.TruncateToFrac(latitude, self.frac) +
+        y_off = int((MapUtils.truncate2frac(latitude, self.frac) +
                      self.frac - latitude - self.lat_correction) * self.yscale)
 
         if (Debug):
-            print "truncated", MapUtils.DecDegToDegMinStr(latitude), "to",
-            print MapUtils.DecDegToDegMinStr(MapUtils.TruncateToFrac(latitude,
+            print "truncated", MapUtils.dec_deg2deg_min_str(latitude), "to",
+            print MapUtils.dec_deg2deg_min_str(MapUtils.truncate2frac(latitude,
                                                                      self.frac))
             print "y_off is", y_off
 
@@ -1074,8 +1074,8 @@ class TopoMapCollection(TiledMapCollection):
         containing filename, e.g. q37122c2/012t0501.gif.
         """
 
-        latDeg = MapUtils.intTrunc(latitude)
-        longDeg = MapUtils.intTrunc(-longitude)
+        latDeg = MapUtils.int_trunc(latitude)
+        longDeg = MapUtils.int_trunc(-longitude)
         latMin = (latitude - latDeg ) * 60.
         longMin = (-longitude - longDeg) * 60.
 
@@ -1083,8 +1083,8 @@ class TopoMapCollection(TiledMapCollection):
         # (we're getting the offset of this image from the origin of
         # the 7.5-series map covered by the directory),
         # not the map series we're actually plotting now.
-        longMinOrd = MapUtils.intTrunc(longMin / 7.5)
-        latMinOrd = MapUtils.intTrunc(latMin / 7.5)
+        longMinOrd = MapUtils.int_trunc(longMin / 7.5)
+        latMinOrd = MapUtils.int_trunc(latMin / 7.5)
 
         dirname = "q" + MapUtils.ohstring(latDeg, 2) \
             + MapUtils.ohstring(longDeg, 3) \
@@ -1096,8 +1096,8 @@ class TopoMapCollection(TiledMapCollection):
         latMinDiff = latMin - (latMinOrd * 7.5)
         longMinDiff = longMin - (longMinOrd * 7.5)
 
-        latOffset = MapUtils.intTrunc(latMinDiff * 10 / self.series)
-        longOffset = MapUtils.intTrunc(longMinDiff * 10 / self.series)
+        latOffset = MapUtils.int_trunc(latMinDiff * 10 / self.series)
+        longOffset = MapUtils.int_trunc(longMinDiff * 10 / self.series)
 
         # Now calculate the current filename.
         # Note that series is either 7.5 or 15
@@ -1222,7 +1222,7 @@ class TrackPoints:
             return self.points[trackindex+1]
         return None
 
-    def handleTrackPoint(self, lat, lon, ele, waypoint_name=False):
+    def handle_track_point(self, lat, lon, ele, waypoint_name=False):
         '''Add a new trackpoint or waypoint after some basic sanity checks.
            If waypoint_name, we assume this is a waypoint,
            otherwise assume it's a track point.
@@ -1241,17 +1241,17 @@ class TrackPoints:
         else:
             self.points.append([lon, lat])
 
-    def readTrackFile(self, filename):
+    def read_track_file(self, filename):
         """Read a track file. Throw IOError if the file doesn't exist."""
         # XXX Should read magic number rather than depending on extension
         if filename.lower().endswith('.kml') or \
            filename.lower().endswith('.kmz'):
-            return self.readTrackFileKML(filename)
+            return self.read_track_file_KML(filename)
         elif filename.lower().endswith('json'):
-            return self.readTrackFileGeoJSON(filename)
-        return self.readTrackFileGPX(filename)
+            return self.read_track_file_GeoJSON(filename)
+        return self.read_track_file_GPX(filename)
 
-    def readTrackFileGPX(self, filename):
+    def read_track_file_GPX(self, filename):
         """Read a GPX track file. Throw IOError if the file doesn't exist."""
         global Debug
 
@@ -1287,9 +1287,9 @@ class TrackPoints:
                     self.points.append(os.path.basename(filename))
 
                 for pt in trkpts:
-                    # self.handleTrackPointGPX(pt, False)
+                    # self.handle_track_pointGPX(pt, False)
                     lat, lon, ele, time = self.GPX_point_coords(pt)
-                    self.handleTrackPoint(lat, lon, ele, None)
+                    self.handle_track_point(lat, lon, ele, None)
 
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
@@ -1303,7 +1303,7 @@ class TrackPoints:
                     n = n[0].childNodes
                     if len(n) >= 1 and n[0].nodeType == n[0].TEXT_NODE:
                         name = n[0].data
-                self.handleTrackPoint(lat, lon, ele, name)
+                self.handle_track_point(lat, lon, ele, name)
 
         # GPX also allows for routing, rtept, but I don't think we need those.
 
@@ -1316,7 +1316,7 @@ class TrackPoints:
         #time = getVal(point, "time")
         return lat, lon, 0, 0
 
-    def readTrackFileGeoJSON(self, filename):
+    def read_track_file_GeoJSON(self, filename):
         """Read a GeoJSON track file.
         """
         with open(filename) as fp:
@@ -1351,7 +1351,7 @@ class TrackPoints:
                     self.points.append(feature["properties"])
                 for coords in feature["geometry"]["coordinates"]:
                     lon, lat, ele = coords
-                    self.handleTrackPoint(lat, lon, ele, None)
+                    self.handle_track_point(lat, lon, ele, None)
             elif type == "MultiLineString":
                 for linestring in feature["geometry"]["coordinates"]:
                     self.points.append(name)
@@ -1359,9 +1359,9 @@ class TrackPoints:
                         self.points.append(feature["properties"])
                     for coords in linestring:
                         lon, lat, ele = coords
-                        self.handleTrackPoint(lat, lon, ele, None)
+                        self.handle_track_point(lat, lon, ele, None)
 
-    def readTrackFileKML(self, filename):
+    def read_track_file_KML(self, filename):
         """Read a KML or KMZ track file.
            Just read Placemarks (which cover both paths and points);
            ignore all styles.
@@ -1428,7 +1428,8 @@ class TrackPoints:
                     continue
                 self.points.append(name)
                 for triple in coord_triples:
-                    self.handleTrackPoint(triple[1], triple[0], triple[2], None)
+                    self.handle_track_point(triple[1], triple[0], triple[2],
+                                            None)
 
             # Handle waypoints:
             if not name:
@@ -1437,7 +1438,8 @@ class TrackPoints:
             for point in points:
                 coord_triples = self.get_KML_coordinates(point)
                 for triple in coord_triples:
-                    self.handleTrackPoint(triple[1], triple[0], triple[2], name)
+                    self.handle_track_point(triple[1], triple[0], triple[2],
+                                            name)
 
     def get_KML_coordinates(self, el):
         '''Get the contents of the first <coordinates> triple
@@ -1475,35 +1477,35 @@ class MapUtils:
         return s
 
     @classmethod
-    def DegMinToDecDeg(cls, coord):
+    def deg_min2dec_deg(cls, coord):
         """Convert degrees.minutes to decimal degrees"""
-        deg = cls.intTrunc(coord)
+        deg = cls.int_trunc(coord)
         dec = (coord - deg) / .6
         return deg + dec
 
     @classmethod
-    def DecDegToDegMin(cls, coord):
+    def dec_deg2deg_min(cls, coord):
         """Convert decimal degrees to degrees.minutes"""
         if coord < 0:
             sgn = -1
             coord = -coord
         else:
             sgn = 1
-        deg = cls.intTrunc(coord)
+        deg = cls.int_trunc(coord)
         min = abs(coord - deg) * .6
         return sgn * (deg + min)
 
     @classmethod
-    def DecDegToDegMinStr(cls, coord):
+    def dec_deg2deg_min_str(cls, coord):
         """Convert decimal degrees to a nice degrees/minutes string"""
         if coord < 0:
             sgnstr = '-'
             coord = -coord
         else:
             sgnstr = ''
-        deg = cls.intTrunc(coord)
+        deg = cls.int_trunc(coord)
         min = abs(coord - deg) * 60.
-        min = cls.TruncateToFrac(min, .01)
+        min = cls.truncate2frac(min, .01)
         return sgnstr + str(deg) + "^" + str(min) + "'"
 
     @classmethod
@@ -1532,14 +1534,14 @@ class MapUtils:
         return "S " + str(180 - angle) + " E"
 
     @classmethod
-    def intTrunc(cls, num):
+    def int_trunc(cls, num):
         """Truncate to an integer, but no .999999 stuff"""
         return int(num + .00001)
 
     @classmethod
-    def TruncateToFrac(cls, num, frac):
+    def truncate2frac(cls, num, frac):
         """Truncate to a multiple of the given fraction"""
-        t = float(MapUtils.intTrunc(num / frac)) * frac
+        t = float(MapUtils.int_trunc(num / frac)) * frac
         if num < 0:
             t = t - frac
         return t
@@ -1778,8 +1780,8 @@ that are expected by the MapCollection classes:
         if (Debug):
             print ">>>>>>>>>>>>>>>>"
             print "window draw_map centered at",
-            print MapUtils.DecDegToDegMinStr(self.center_lon),
-            print MapUtils.DecDegToDegMinStr(self.center_lat)
+            print MapUtils.dec_deg2deg_min_str(self.center_lon),
+            print MapUtils.dec_deg2deg_min_str(self.center_lat)
         self.collection.draw_map(self.center_lon, self.center_lat, self)
 
         self.draw_trackpoints()
@@ -2192,8 +2194,8 @@ that are expected by the MapCollection classes:
 
     def print_location(self, widget=None):
         print MapUtils.coord2str_dd(self.cur_lon, self.cur_lat)
-        print "%-15s %-15s" % (MapUtils.DecDegToDegMinStr(self.cur_lon),
-                             MapUtils.DecDegToDegMinStr(self.cur_lat))
+        print "%-15s %-15s" % (MapUtils.dec_deg2deg_min_str(self.cur_lon),
+                             MapUtils.dec_deg2deg_min_str(self.cur_lat))
 
     def zoom(self, widget=None):
         self.center_lon = self.cur_lon
@@ -2346,8 +2348,8 @@ that are expected by the MapCollection classes:
 
                 # Add to KnownSites
                 self.controller.append_known_site( [name,
-                    MapUtils.DecDegToDegMin(self.pin_lon),
-                    MapUtils.DecDegToDegMin(self.pin_lat),
+                    MapUtils.dec_deg2deg_min(self.pin_lon),
+                    MapUtils.dec_deg2deg_min(self.pin_lat),
                     self.collection.name,
                     self.collection.zoomlevel] )
 
@@ -2358,7 +2360,7 @@ that are expected by the MapCollection classes:
                 return True
 
     def mytracks(self, widget):
-        self.controller.TrackSelect(self)
+        self.controller.track_select(self)
         if self.trackpoints != None:
             self.trackpoints_center()
         self.draw_map()
@@ -2865,8 +2867,8 @@ that are expected by the MapCollection classes:
                                                self.win_width, self.win_height)
             if Debug:
                 print "Click:", \
-                    MapUtils.DecDegToDegMinStr(cur_long), \
-                    MapUtils.DecDegToDegMinStr(cur_lat)
+                    MapUtils.dec_deg2deg_min_str(cur_long), \
+                    MapUtils.dec_deg2deg_min_str(cur_lat)
 
             # Find angle and distance since last click.
             if Debug or event.state & gtk.gdk.SHIFT_MASK:
@@ -3131,7 +3133,7 @@ Click in the map to print the coordinates of the clicked location.
             dialog.destroy()
         return False
 
-    def TrackSelect(self, mapwin):
+    def track_select(self, mapwin):
         dialog = gtk.Dialog("Tracks", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -3168,7 +3170,7 @@ Click in the map to print the coordinates of the clicked location.
             if iter:
                 trackfile = store.get_value(iter, 1)
                 mapwin.trackpoints = TrackPoints()
-                mapwin.trackpoints.readTrackFile(trackfile)
+                mapwin.trackpoints.read_track_file(trackfile)
                 # XXX Might want to handle IOError in case file doesn't exist
                 dialog.destroy()
                 return True
@@ -3241,15 +3243,15 @@ Click in the map to print the coordinates of the clicked location.
 
         # site[1] and site[2] are the long and lat in deg.minutes
         #print site[0], site[1], site[2]
-        mapwin.center_lon = MapUtils.DegMinToDecDeg(site[1])
-        mapwin.center_lat = MapUtils.DegMinToDecDeg(site[2])
+        mapwin.center_lon = MapUtils.deg_min2dec_deg(site[1])
+        mapwin.center_lat = MapUtils.deg_min2dec_deg(site[2])
         mapwin.pin_lon = mapwin.center_lon
         mapwin.pin_lat = mapwin.center_lat
         #print "Center in decimal degrees:", centerLon, centerLat
         if (Debug):
             print site[0] + ":", \
-                MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
-                MapUtils.DecDegToDegMinStr(mapwin.center_lat)
+                MapUtils.dec_deg2deg_min_str(mapwin.center_lon), \
+                MapUtils.dec_deg2deg_min_str(mapwin.center_lat)
         if len(site) > 4 and collection.zoom_to:
             collection.zoom_to(site[4])
         mapwin.draw_map()
@@ -3295,8 +3297,8 @@ Click in the map to print the coordinates of the clicked location.
                     if (Debug):
                         print "Collection", mapwin.collection.name,
                         print "Starting at", \
-                            MapUtils.DecDegToDegMinStr(mapwin.center_lon), \
-                            ", ", MapUtils.DecDegToDegMinStr(mapwin.center_lat)
+                            MapUtils.dec_deg2deg_min_str(mapwin.center_lon), \
+                            ", ", MapUtils.dec_deg2deg_min_str(mapwin.center_lat)
                     args = args[1:]
 
                 elif args[0] == "-d":
@@ -3316,7 +3318,7 @@ Click in the map to print the coordinates of the clicked location.
                             break
 
                     try:
-                        mapwin.trackpoints.readTrackFile(args[1])
+                        mapwin.trackpoints.read_track_file(args[1])
                     except IOError:
                         print "Can't read track file", args[1]
                     args = args[1:]
@@ -3334,10 +3336,10 @@ Click in the map to print the coordinates of the clicked location.
                or args[0].endswith("json"):
                 try:
                     if mapwin.trackpoints:
-                        mapwin.trackpoints.readTrackFile(args[0])
+                        mapwin.trackpoints.read_track_file(args[0])
                     else:
                         trackpoints = TrackPoints()
-                        trackpoints.readTrackFile(args[0])
+                        trackpoints.read_track_file(args[0])
                         mapwin.trackpoints = trackpoints
                 except IOError:
                     print "Can't read track file", args[0]
@@ -3368,8 +3370,8 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
                 if len(args) >= 2 and \
                    len(args[0]) > 1 and args[0][1].isdigit() and \
                    len(args[1]) > 1 and args[1][1].isdigit():
-                    mapwin.center_lon = MapUtils.DegMinToDecDeg(float(args[0]))
-                    mapwin.center_lat = MapUtils.DegMinToDecDeg(float(args[2]))
+                    mapwin.center_lon = MapUtils.deg_min2dec_deg(float(args[0]))
+                    mapwin.center_lat = MapUtils.deg_min2dec_deg(float(args[2]))
                     mapwin.collection = self.find_collection(args[3])
                     args = args[2:]
                     continue
