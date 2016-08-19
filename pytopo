@@ -44,11 +44,14 @@ import sys, os, glob, math
 import gtk, gobject, glib
 import gc
 import pango
+
+# For running on tablets:
 settings = gtk.settings_get_default()
 settings.set_property("gtk-touchscreen-mode", True)
 
 import xml.dom.minidom
 import zipfile
+import simplejson
 
 import types, urllib, re
 import collections
@@ -1238,6 +1241,8 @@ class TrackPoints:
         if filename.lower().endswith('.kml') or \
            filename.lower().endswith('.kmz'):
             return self.readTrackFileKML(filename)
+        elif filename.lower().endswith('json'):
+            return self.readTrackFileGeoJSON(filename)
         return self.readTrackFileGPX(filename)
 
     def readTrackFileGPX(self, filename):
@@ -1305,8 +1310,50 @@ class TrackPoints:
         #time = getVal(point, "time")
         return lat, lon, 0, 0
 
+    def readTrackFileGeoJSON(self, filename):
+        """Read a GeoJSON track file.
+        """
+        with open(filename) as fp:
+            gj = simplejson.loads(fp.read())
+        if gj["type"] != "FeatureCollection":
+            print filename, "isn't a FeatureCollection"
+            return
+        if "features" not in gj:
+            print "No features in geojson file", filename
+            return
+        for feature in gj["features"]:
+            type = feature["geometry"]["type"]
+            if type != "LineString" and type != "MultiLineString":
+                continue
+            # It's a track. Add it.
+            name = None
+            propstring = ""
+            if "properties" in feature:
+                props = feature["properties"]
+                for key in props:
+                    kl = key.lower()
+                    if kl == "name" or kl == "trailname":
+                        name = props[key]
+                    propstring += "%s: %s\n" % (key, props[key])
+
+            # Properties may specify a null name, but we need something.
+            if not name:
+                name = "unnamed"
+
+            if type == "LineString":
+                self.points.append(name)
+                for coords in feature["geometry"]["coordinates"]:
+                    lon, lat, ele = coords
+                    self.handleTrackPoint(lat, lon, ele, None)
+            elif type == "MultiLineString":
+                for linestring in feature["geometry"]["coordinates"]:
+                    self.points.append(name)
+                    for coords in linestring:
+                        lon, lat, ele = coords
+                        self.handleTrackPoint(lat, lon, ele, None)
+
     def readTrackFileKML(self, filename):
-        """Read a KML track file.
+        """Read a KML or KMZ track file.
            Just read Placemarks (which cover both paths and points);
            ignore all styles.
            Throw IOError if the file doesn't exist.
@@ -3207,10 +3254,11 @@ Click in the map to print the coordinates of the clicked location.
                 args = args[1:]
                 continue
 
-            # args[0] doesn't start with '-'. Is it a gpx or kml file?
+            # args[0] doesn't start with '-'. Is it a track file?
             if args[0].endswith(".gpx") \
                or args[0].endswith(".kml") \
-               or args[0].endswith(".kmz"):
+               or args[0].endswith(".kmz") \
+               or args[0].endswith("json"):
                 try:
                     if mapwin.trackpoints:
                         mapwin.trackpoints.readTrackFile(args[0])
