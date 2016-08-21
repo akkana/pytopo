@@ -1,70 +1,51 @@
 <html>
 <head>
 <title>pytopo: Topographic Maps for Linux</title>
+<style type="text/css">
+table { table-layout: fixed; }
+</style>
 </head>
 <body>
 
 <img align=right src="topoicon.jpg" width=218 height=290
  alt="[PyTopo for Linux]">
 
-<h1>pytopo: Topographic Maps for Linux</h1>
+<h1>pytopo: A Map Viewer for Linux</h1>
 
 <p>
-<b>PyTopo</b> is a Python-gtk script which interprets
-local tiled map data (for instance, from a <i>Topo!</i> data CD),
+<b>PyTopo</b> is a Python-gtk map viewer which interprets local tiled map data
 and displays it in an interactive viewer, where you can scroll
 to adjacent maps, switch between resolutions, or produce a map
 image for printing or editing.
 <p>
 <b>Why does PyTopo exist?</b>
-There were several existing Linux mapping applications which take data
-from online web sites or roads databases, and others which take GPS
-data and correlate it with online maps.
-But I typically need maps when I'm travelling and don't have
-net access!
-I couldn't find any apps that would display data for any location,
-without requiring a GPS, using local map sources with no net connection
-needed.
-(There are a few possibilities but nothing that really solves the problem:
-GPSdrive claims it can do local mapping now, 
-but I've tried three versions with no luck getting it to run at all.
-And there's a neat little
-program called TangoGPS that can download and show OSM maps, but it has a
-difficult interface that's optimized for cellphones.)
+I needed a local, offline mapping program that worked on Linux.
+<p>
+I like to travel to remote locations with no network access,
+and of course I want maps once I'm there.
+When I first started PyTopo, smartphones didn't exist yet,
+and even in the smartphone age I often want a larger map than
+I can show on a phone screen, with a user interface that's easier
+to use for showing things like track logs.
+<p>
+Originally PyTopo was written to use data from National Geographic's
+commercial <i>Topo!</i> data CDs. Since then, it has expanded to use
+<a href="http://openstreetmap.org">OpenStreetMap</a> tiles as well
+as several other tile open sources. (Not Google Maps, since Google's
+terms of service doesn't permit other programs to use their tiles.)
 
 <p>
-<b>Download: The current version is <a href="pytopo-1.1">PyTopo 1.1</a>.</b>
+<b>Download:</b>
+<b><a href="https://github.com/akkana/pytopo">PyTopo hosted
+on Github</a></b>.
 
+<!-- 
 <p>
-1.0 got all kinds of cool new stuff, including map dragging, more user
-interface for zooming and saving sites, track logs saved in ~/Tracks,
-etc. so it's usable without a keyboard, e.g. on a tablet.
-Embarassingly, we were so intent on adding new features that
-we never got around to making a formal release! So 1.1 has all
-those features, plus a lot of reliability enhancements to make
-everything work more solidly.
-
-<p>
-The big news in 0.9 is the new OSM Map Collection, which can download map
-tiles from the <a href="http://openstreetmap.org">OpenStreetMap project</a>.
-(Aside: this is a great project, so if you're interested in mapping, join
-up and help add to the public map!) You no longer need your own big set
-of map data; just set up an OSM Map Collection with appropriate download
-URL, point at a longitude/latitude and specify the zoom level, and pytopo
-will download the tiles you need. These are cached forever (unless you delete
-them yourself), so once you've downloaded an area you're good to go offline
-and your maps will still work.
-
-<p>
-The latest and greatest is always in the current SVN version:
-<b><a href="http://code.google.com/p/pytopo/">PyTopo is hosted
-on Google Code</a></b>.
-
-<p>
-There's an experimental MeeGo package for
+There's a really old experimental MeeGo package for
 anyone interested in trying it, and I'd be interested to know if it
 works on other RPM platforms as well:
 <a href="PyTopo-1.0-1-beta1.noarch.rpm">PyTopo-1.0-1-beta1.noarch.rpm</a>.
+ -->
 
 <h2>Using PyTopo</h2>
 <p>
@@ -91,39 +72,38 @@ this is mostly to show you how to add your own points of interest.
 <td>Scroll the map in the indicated direction.
 <tr>
 <th>+/=, -
-<td>Zoom in to the 7.5 minute series, or out to the 15 minute series.
-(Zooming isn't supported in other map formats yet.)
+<td>Zoom in or out.
 <tr>
 <th>s
 <td>Save the current map to a file under <i>$HOME/Topo</i>
 <tr>
 <th>Space
 <td>Print (to standard output) the current coordinates of map center.
+<tr>
+<th>q
+<td>Quit
 </table>
 
 <p>
-<b>Clicking</b> in the map displays the coordinates of where you
-clicked, as well as the distance and bearing from the last clicked
-point.
+Dragging and mousewheel move and scroll the map, as you'd expect.
+<b>Right-clicking</b> in the map pops up a menu of various other options.
 
 <p>
-<b>Note that dragging in the map doesn't move the map.</b>
-You need to use arrow keys to move around.
-I do plan to implement dragging at some point, and I don't think
-it's that hard; I've just been more concerned about getting the OSM
-collections working first.
+Click on a track or waypoint to select it and see what's known about it.
 
 <h3>Usage (commandline arguments)</h3>
 <pre>
-Usage: pytopo [trackfile...] site_name
+Usage: pytopo site_name
+       pytopo trackfile...
        pytopo [trackfile...] start_lat start_long collection
        pytopo -p
 Use degrees.decimal_minutes format for coordinates.
 Set up site names in ~/.pytopo
 Print list of known sites with pytopo -p
 
-Track files are GPX files which may contain track points and/or waypoints;
-multiple track files are allowed.
+PyTopo can handle track files in GPX, KML, KMZ or GeoJSON formats.
+They may contain track points and/or waypoints, and you can multiple
+track files.
 </pre>
 
 <h2>Screenshots</h2>
@@ -135,17 +115,17 @@ multiple track files are allowed.
 <img align=left src="screenshots/sf-ssT.jpg" width=259 height=204
  border=0 alt="[San Francisco/OpenStreetMap screenshot]"></a>
 <td>
-<a href="screenshots/castlepks-ss.jpg">
-<img align=left src="screenshots/castlepks-ssT.jpg" width=259 height=204
- border=0 alt="[Castle Peaks/OpenCycleMap screenshot]"></a>
+<a href="screenshots/doe-ss.jpg">
+<img align=left src="screenshots/castlepks-ssT.jpg" width=260 height=194
+ border=0 alt="[White Rock DOE/OpenCycleMap screenshot]"></a>
 <td>
 <a href="screenshots/lexington-ss.jpg">
 <img align=left src="screenshots/lexington-ssT.jpg" width=259 height=190
  border=0 alt="[Trails above Lexington reservoir/USGS screenshot]"></a>
 <tr>
 <td>San Francisco from the default setup.
-<td>Several tracklogs and waypoints hiking to Castle Peaks in 
-    Mojave National Preserve, using OpenCycleMap data
+<td>Several tracklogs and waypoints hiking in the DOE-owned lands
+    near White Rock, NM.
 <td>Tacklogs and waypoints above Lexington reservoir near Los Gatos, 
      using USGS/Topo! dara
 </table>
@@ -204,6 +184,14 @@ or a command like
 gs -sDEVICE=jpeg -r300 -sOutputFile=output-map.jpg input-map.pdf
 </pre>
 
+<h2>API Documentation</h2>
+<p>
+If you want to contribute to PyTopo, or use the code for something else,
+you'll probably want to know more about the classes it uses, in the
+<a href="pytopo-api/">PyTopo API Documentation</a>.
+(This is generated with <code>epydoc --no-frames pytopo</code>
+and is not guaranteed to be up to date.)
+
 <h2>Non-interactive mapping scripts</h2>
 <p>
 I wrote some older commandline helper scripts, but honestly, I don't use them
@@ -226,40 +214,32 @@ gdk-pixbuf, and PyGTK. I've tried to make the code as portable as
 I can, but I've only tested it on Linux.
 If it doesn't work for you, please let me know.
 
-<h2>Coming Soon</h2>
-<i>(Stuff I want that should be easy to implement or is already
-    in progress.)</i>
-<ul>
-<li>Navigating by dragging with the mouse, like people expect these days,
-    rather than moving only with arrow keys by multiples of a whole maplet.
-<li>Zoom farther out or in (i.e. scale the map images rather
-    than always displaying them at 1:1).
-</ul>
-
 <h2>Bugs / Wishlist</h2>
 <i>(Stuff that would be nifty, but is either difficult,
 or requires additional map data that I'd have to pay for.
 If you want something on this list, bribing me with interesting
 map data would be an excellent approach.)</i>
 <ul>
-<li>Track logs don't always line up exactly with Topo! map collections;
-    I think the Topo! maps may use a different "datum" (coordinate system)
-    from the WGS 84 that most GPS devices use. They should line up with
-    OSM map collections.
 <li>Draw maps from non-tiled openstreetmap vector data.
 <li>Combine with elevation data to make pretty maps.
     (The limiting factor here is finding an open source of elevation data
     that pytopo can read easily.)
-<li>Flip back and forth between two sets of maps of the same area,
-    e.g. road map/topographic map/geologic map.
-    (Limiting factor: getting enough useful map data, preferably geologic,
-    to make it worth putting in the work.)
 <li>Better control over projections and datum -- PyTopo isn't smart
     about those at all.
 </ul>
 
 <h2>Change Log</h2>
 <dl>
+
+<dt>1.2, May 1 2016:
+<dd>
+Move by dragging, zoom with the mousewheel.
+Switch between different background maps.
+Much better track log and waypoint handling, with multiple colors
+for different tracks, and selection by clicking on a track.
+Accept KML and KMZ as well as GPX track logs.
+Pin and remember specific locations.
+Probably lots of other things I've forgotten.
 
 <dt>1.1, November 16 2011
 <dd>
