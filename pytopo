@@ -1438,8 +1438,12 @@ class TrackPoints:
             for point in points:
                 coord_triples = self.get_KML_coordinates(point)
                 for triple in coord_triples:
-                    self.handle_track_point(triple[1], triple[0], triple[2],
-                                            name)
+                    if len(triple) == 3:
+                        self.handle_track_point(triple[1], triple[0], triple[2],
+                                                name)
+                    elif len(triple) == 2:
+                        self.handle_track_point(triple[1], triple[0], None,
+                                                name)
 
     def get_KML_coordinates(self, el):
         '''Get the contents of the first <coordinates> triple
