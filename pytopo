@@ -1732,9 +1732,10 @@ that are expected by the MapCollection classes:
         win.add(vbox)
 
         self.drawing_area = gtk.DrawingArea()
-        # This sets the window's initial size -- but also makes it the minimum
-        # size. How do we set initial size without constraining minimum?
-        self.drawing_area.set_size_request(init_width, init_height)
+        # There doesn't seem to be any way to resize a window below
+        # the initial size of the drawing area. So make the drawing area
+        # initially tiny, then just before showing we'll resize the window.
+        # self.drawing_area.size(10, 10)
         vbox.pack_start(self.drawing_area)
 
         self.drawing_area.set_events(gtk.gdk.EXPOSURE_MASK |
@@ -1761,7 +1762,11 @@ that are expected by the MapCollection classes:
         self.drawing_area.set_flags(gtk.CAN_FOCUS)
         self.drawing_area.connect("key-press-event", self.key_press_event)
 
+        # Resize the window now to the desired initial size:
+        win.resize(init_width, init_height)
+
         win.show_all()
+
         gtk.main()
 
     #
