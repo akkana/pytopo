@@ -180,7 +180,13 @@ map coordinates and need a starting place. Should probably remove it.
 
     def draw_map(self, center_lon, center_lat, drawwin):
         """Draw a map in a window, centered around the specified coordinates.
-        drawwin is a DrawWin object."""
+        drawwin is a DrawWin object.
+        """
+        return
+
+    def draw_attribution(self, drawwin):
+        """Draw attribution/copyright for the map tiles used in this collection.
+        """
         return
 
     def get_top_left(self):
@@ -598,6 +604,12 @@ class OSMMapCollection(TiledMapCollection):
 
         # Call zoom so we set all scales appropriately:
         self.zoom(0)
+
+    def draw_attribution(self, mapwin):
+        mapwin.draw_string_scale(-10, -10,
+                                 "Map tiles copyright Openstreetmap.org",
+                                 whichfont="waypoint")
+        return
 
     # Utilities for mapping tiles to/from degrees.
     # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
@@ -1816,6 +1828,9 @@ that are expected by the MapCollection classes:
             #                        label_margin,
             #                        tracklabel)
 
+        # Copyright info or other attribution
+        self.collection.draw_attribution(self)
+
         # draw pin
         pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat,
                                       self.win_width, self.win_height)
@@ -2630,10 +2645,26 @@ that are expected by the MapCollection classes:
         self.drawing_area.window.draw_arc(self.xgc, fill, xc-r, yc-4,
                                           r*2, r*2, 0, 23040)  # 64 * 360
 
-    def draw_string_scale(self, x, y, s):
-        """Draw a string."""
+    def draw_string_scale(self, x, y, s, whichfont=None):
+        """Draw a string at the specified location.
+           If x or y is negative, we'll draw from the right or bottom edge.
+           If whichfont is "waypoint" it'll be a little bigger and italic;
+           if it's "select" it'll be a lot bigger.
+        """
         layout = self.drawing_area.create_pango_layout(s)
-        layout.set_font_description (self.font_desc)
+        if whichfont == "waypoint":
+            layout.set_font_description (self.wpt_font_desc)
+        elif whichfont == "select":
+            layout.set_font_description (self.select_font_desc)
+        else:
+            layout.set_font_description (self.font_desc)
+        if x < 0 or y < 0:
+            win_width, win_height = self.get_size()
+            lw, lh = layout.get_pixel_size()
+            if x < 0:
+                x = win_width - lw + x
+            if y < 0:
+                y = win_height - lh + y
         self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
 
     # Save the current map as something which could be gimped or printed.
