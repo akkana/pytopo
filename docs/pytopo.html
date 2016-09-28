@@ -26,12 +26,14 @@ and of course I want maps once I'm there.
 When I first started PyTopo, smartphones didn't exist yet,
 and even in the smartphone age I often want a larger map than
 I can show on a phone screen, with a user interface that's easier
-to use for showing things like track logs.
+to use for showing things like track logs. I use PyTopo at home for
+reviewing logs from where I've hiked and exploring track and waypoint
+data for places I plan to go.
 <p>
 Originally PyTopo was written to use data from National Geographic's
 commercial <i>Topo!</i> data CDs. Since then, it has expanded to use
 <a href="http://openstreetmap.org">OpenStreetMap</a> tiles as well
-as several other tile open sources. (Not Google Maps, since Google's
+as several other open tile sources. (Not Google Maps, since Google's
 terms of service doesn't permit other programs to use their tiles.)
 
 <p>
@@ -116,18 +118,18 @@ track files.
  border=0 alt="[San Francisco/OpenStreetMap screenshot]"></a>
 <td>
 <a href="screenshots/doe-ss.jpg">
-<img align=left src="screenshots/castlepks-ssT.jpg" width=260 height=194
+<img align=left src="screenshots/doe-ssT.jpg" width=200 height=194
  border=0 alt="[White Rock DOE/OpenCycleMap screenshot]"></a>
 <td>
 <a href="screenshots/lexington-ss.jpg">
 <img align=left src="screenshots/lexington-ssT.jpg" width=259 height=190
  border=0 alt="[Trails above Lexington reservoir/USGS screenshot]"></a>
 <tr>
-<td>San Francisco from the default setup.
-<td>Several tracklogs and waypoints hiking in the DOE-owned lands
-    near White Rock, NM.
-<td>Tacklogs and waypoints above Lexington reservoir near Los Gatos, 
-     using USGS/Topo! dara
+<td>San Francisco from the default setup (OpenStreetMap tiles).
+<td>Trails and a waypoint in the DOE-owned lands near White Rock, NM,
+    using OpenCycleMap tiles.
+<td>Tacklogs and waypoints from a Garmin GPS above Lexington reservoir
+    near Los Gatos, CA, using USGS/Topo! topographic maps.
 </table>
 
 <h2>Preloaded Map Data</h2>
@@ -135,37 +137,29 @@ track files.
 Aside from OpenStreetMap data, pytopo can use local map data
 on disk or CD.
 <p>
-The <i>Topo!</i> local area and specific park map packages
+PyTopo can also use tiled map data from sources like the
+<i>Topo!</i> local area and specific park map packages
 sold in camping/hiking stores
-(sometimes under the aegis of National Geographic) are
-reasonably priced as a source of map data.
-They come with Windows software, but Linux users can ignore
-the software and use the data files, which are
-standard GIF, named in a fairly straightforward way.
-They're a good source of US map data.
-<p>
+(sometimes under the aegis of National Geographic).
 <b>Caution: the <i>Topo! Back Roads Explorer</i> and the statewide
-explorer collections are <i>not</i> in this friendly format.</b>
-They use large data files
-in a proprietary ".tpq" format.
+explorer collections are <i>not</i> in this friendly tiled format.</b>
+They use large data files in a proprietary ".tpq" format.
 <a href="http://cholla.mmto.org/computers/topomaps/">Tom Trebisky
 has analyzed the format and has written an extractor</a>,
 and he also has <a href="http://cholla.mmto.org/gtopo/">a C GTK
 viewer</a> for this format. (Eventually I hope to integrate
 direct support for them into pytopo as well.)
 
-<h3>Making Your Own Map Collections</h3>
+<h2>Making Your Own Map Collections</h2>
 <p>
-You can buy map bits directly from the USGS, but they have
-a hefty setup fee so it's not cost effective unless you're buying
-quite a lot.
-<p>
-For some areas, you can download topo maps; for instance,
-for California you can get maps in TIFF format from the
+For some areas, you can download USGS topo maps free. 
+For instance, for California you can get maps in TIFF format from the
 <a href="http://casil.ucdavis.edu/casil/gis.ca.gov/drg/">California
-Spatial Information Library</a>. You still have to split up the
-maps into maplets, though; if you have ImageMagick, you can use
-a command like
+Spatial Information Library</a>. You also may need to use specialized
+maps, such as geologic or land-use maps.
+<p>
+To use this sort of map, you have to split the large map into tiles.
+One way is to use ImageMagick, with a command like
 <pre wrap>
 convert in-map.jpg -rotate 90 -crop 300x300 -repage +0+0 out-map%02d.jpg
 </pre>
@@ -173,9 +167,8 @@ convert in-map.jpg -rotate 90 -crop 300x300 -repage +0+0 out-map%02d.jpg
 Note: previously I included <i>-trim</i> as part of that line, and
 a lot of pages you'll find googling for image splitting will tell you
 to use -trim. Don't: it will give you maps of inconsistent sizes,
-and pytopo has no way to tell where the origin of the map should be.
+and pytopo will have no way to tell where the origin of the map should be.
 <p>
-A map split this way can be read with PyTopo 0.5 or later.
 Maps downloaded as PDF (such as USGS geologic maps) might work
 in imagemagick, but if not, try converting them
 to a raster format before splitting, using a program like GIMP
@@ -209,25 +202,28 @@ combines the maplets into one complete USGS 7.5-minute map.
 
 <p>
 <h2>Is it Only For Linux?</h2>
+<p>
 PyTopo should run fine on any system which has Python, gtk,
 gdk-pixbuf, and PyGTK. I've tried to make the code as portable as
 I can, but I've only tested it on Linux.
 If it doesn't work for you, please let me know.
 
 <h2>Bugs / Wishlist</h2>
+<p>
 <i>(Stuff that would be nifty, but is either difficult,
 or requires additional map data that I'd have to pay for.
 If you want something on this list, bribing me with interesting
 map data would be an excellent approach.)</i>
 <ul>
 <li>Draw maps from non-tiled openstreetmap vector data.
-<li>Combine with elevation data to make pretty maps.
-    (The limiting factor here is finding an open source of elevation data
-    that pytopo can read easily.)
+<li>Combine with elevation data to make pretty maps, like the OpenCycleMap
+    tiles but usable with any map tiles.
 <li>Better control over projections and datum -- PyTopo isn't smart
-    about those at all.
+    about those at all. It also may have bugs when used in the
+    southern hemisphere.
 </ul>
 
+<!-- 
 <h2>Change Log</h2>
 <dl>
 
@@ -298,12 +294,13 @@ windows. Bug fixes. Code refactoring.
 <dd>Coordinate handling routines mostly working.
     Store coordinates of center, not edge, so zoom works.
 </dl>
+ -->
 
 <hr>
 <a href="../ellie/">Ellie: Plot GPS elevation profiles</a><br>
-<a href="../">More Software</a><br>
-<a href="/">Shallowsky Home</a><br>
-<a href="/mailme.html">mail me</a>
+<a href="../">More of Akkana's Software</a><br>
+<a href="/">Shallow Sky Home</a><br>
+<a href="/mailme.html">mail Akkana</a>
 
 </body>
 </html>
