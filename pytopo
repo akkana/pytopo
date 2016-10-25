@@ -1685,6 +1685,7 @@ that are expected by the MapCollection classes:
         self.trackpoints = None
         self.show_waypoints = True
         self.selected_track = None
+        self.selected_waypoint = None
 
         self.traildialog = None
 
@@ -1817,22 +1818,23 @@ that are expected by the MapCollection classes:
             self.draw_zoom_control()
 
         # Is there a selected track?
-        if self.selected_track != None:
-            trackname = self.trackpoints.points[self.selected_track]
-            tracklabel = "Selected track: " + trackname
+        def draw_selected_label(name, labelstring, x, y):
+            tracklabel = labelstring + name
 
-            label_margin = 15
             layout = self.drawing_area.create_pango_layout(tracklabel)
             layout.set_font_description(self.select_font_desc)
             label_width, label_height = layout.get_pixel_size()
             self.xgc.set_rgb_fg_color(self.red_color)
             self.drawing_area.window.draw_layout(self.xgc,
-                                                 self.win_width - label_width - label_margin,
-                                                 label_margin,
+                                                 self.win_width-label_width-x,
+                                                 y,
                                                  layout)
-            # self.draw_string_scale(self.win_width - label_width - label_margin,
-            #                        label_margin,
-            #                        tracklabel)
+
+        if self.selected_track != None:
+            draw_selected_label(self.trackpoints.points[self.selected_track],
+                                "Track: ", 15, 15)
+        if self.selected_waypoint != None:
+            draw_selected_label(self.trackpoints.waypoints[self.selected_waypoint][2], "Waypoint: ", 15, 40)
 
         # Copyright info or other attribution
         self.collection.draw_attribution(self)
@@ -1849,7 +1851,7 @@ that are expected by the MapCollection classes:
 
     def contrasting_color(self, color):
         '''Takes a gtk.gdk.Color (RGB values 0:65535)
-            and converts it to a similar saturation and value but different hue
+           and converts it to a similar saturation and value but different hue
         '''
         if not color:
             return self.first_track_color;
@@ -1920,8 +1922,6 @@ that are expected by the MapCollection classes:
             else:
                 print "De-selecting track"
         self.selected_track = trackindex
-        # self.draw_trackpoint_segment(trackindex, self.red_color, linewidth=6)
-        self.draw_map()
 
         if not trackindex:
             return
@@ -2038,7 +2038,7 @@ that are expected by the MapCollection classes:
             x = halfwidth
         if y == None:
             y = halfheight
-        CLOSE = 20    # pixels
+        CLOSE = 6    # pixels
 
         if not self.trackpoints:
             return None, None, None
@@ -2055,8 +2055,8 @@ that are expected by the MapCollection classes:
             tx, ty = self.coords2xy(pt[0], pt[1],
                                     self.win_width, self.win_height)
 
-            # if abs(x - tx) > CLOSE or abs(y - ty) > CLOSE:
-            #     return None
+            if abs(x - tx) > CLOSE or abs(y - ty) > CLOSE:
+                return None
 
             dist = math.sqrt((x-tx)**2 + (y-ty)**2)
             if dist < sm_dist:
@@ -2073,7 +2073,7 @@ that are expected by the MapCollection classes:
                 d = closer_dist(pt, smallest_dist)
                 if d:
                     smallest_dist = d
-                    nearest_waypoint = pt
+                    nearest_waypoint = i
 
         # Find closest track and index of the closest point on the track
         if len(self.trackpoints.points) > 0:
@@ -2438,10 +2438,16 @@ that are expected by the MapCollection classes:
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
         if near_point != None:
-            print "Near point is", near_point, "of", len(self.trackpoints.points)
+            # Make a name for the new track segment
+            trackname = self.trackpoints.points[near_track]
+            match = re.search('(.*) (\d+)$', trackname)
+            if match:
+                trackname = "%s %d" % (match.group(1), int(match.group(2))+1)
+            else:
+                trackname += " 2"
+
             # Split the track there
-            self.trackpoints.points.insert(near_point, "New track")
-            # print self.trackpoints.points
+            self.trackpoints.points.insert(near_point, trackname)
 
         self.draw_map()
 
@@ -2951,7 +2957,6 @@ that are expected by the MapCollection classes:
     def mousepress(self, widget, event):
         """Handle mouse button presses"""
 
-        print "mouse press", event.x, event.y
         # We're either about to add a new timeout, or not time out
         # because we had a doubleclick. Either way, remove any
         # existing timeout:
@@ -2997,7 +3002,7 @@ that are expected by the MapCollection classes:
     def mouserelease(self, widget, event):
         """Handle button releases."""
 
-        print "Setting context coords to", self.context_x, self.context_y
+        # print "Setting context coords to", self.context_x, self.context_y
         if self.press_timeout:
             gobject.source_remove(self.press_timeout)
             self.press_timeout = None
@@ -3056,19 +3061,16 @@ that are expected by the MapCollection classes:
             # Is the click near a track or waypoint we're displaying?
             near_track, near_point, near_waypoint = \
                 self.find_nearest_trackpoint(event.x, event.y)
-            print near_track, near_point, near_waypoint
             if near_track != None:
                 self.select_track(near_track)
             else:
                 self.select_track(None)
             if near_waypoint != None:
-                print "Clicked on waypoint", near_waypoint
+                self.selected_waypoint = near_waypoint
+            else:
+                self.selected_waypoint = None
 
-            # Ignore near_point, it's for splitting tracks
-            if near_point != None:
-                print "Near point is", near_point, "of", len(self.trackpoints.points)
-                # Split the track there
-                self.trackpoints.points.insert(near_point, "New track")
+            self.draw_map()
 
         return True
 
