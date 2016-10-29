@@ -38,7 +38,8 @@ TODO: allow configuration of colors, line thickness etc.
 # We will do all calculations in decimal degrees,
 # but take inputs in deg.decimal_minutes.
 
-VersionString = "PyTopo Version 1.2 by Akkana Peck"
+Version = "1.2"
+VersionString = "PyTopo Version %s by Akkana Peck" % Version
 
 import sys, os, glob, math
 import gtk, gobject, glib
@@ -1328,6 +1329,42 @@ class TrackPoints:
         #time = getVal(point, "time")
         return lat, lon, 0, 0
 
+    def save_GPX(self, filename):
+        '''Save all known tracks and waypoints as a GPX file.
+           XXX We don't have valid <time> saved for these points.
+        '''
+        with open(filename, "w") as outfp:
+            print >>outfp, '''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+<gpx version="1.1" creator="PyTopo %s~" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+''' % Version
+            if self.points:
+                print >>outfp, "  <trk>"
+                started = False
+                for pt in self.points:
+                    if self.is_start(pt):
+                        if started:
+                            print >>outfp, "    </trkseg>"
+                        else:
+                            started = True
+                        print >>outfp, "    <trkseg>"
+                    else:
+                        print >>outfp, '      <trkpt lat="%f" lon="%f">' % (pt[1], pt[0])
+                        # print >>outfp, '        <ele>0</ele>'
+                        print >>outfp, '        <time>2015-12-02T16:50:34Z</time>'
+                        print >>outfp, '      </trkpt>'
+                print >>outfp, "    </trkseg>"
+                print >>outfp, "  </trk>"
+
+            for pt in self.waypoints:
+                if self.is_start(pt):
+                    continue
+                print >>outfp, '''  <wpt lat="%f" lon="%f">
+    <time>2015-12-02T16:50:34Z</time>
+    <name>%s</name>
+  </wpt>''' % (pt[1], pt[0], pt[2])
+
+            print >>outfp, "</gpx>"
+
     def read_track_file_GeoJSON(self, filename):
         """Read a GeoJSON track file.
         """
@@ -2367,6 +2404,7 @@ that are expected by the MapCollection classes:
             ( "My Tracks...", self.mytracks),
             ( "Download Area...", self.download_area),
             ( "Show waypoints...", self.toggle_show_waypoints),
+            ( "Save tracks/points as...", self.save_tracks_as),
             ( "Change background map", self.change_collection),
             ( "Quit", self.graceful_exit)
             ])
@@ -2430,8 +2468,67 @@ that are expected by the MapCollection classes:
     def mylocations(self, widget):
         self.controller.location_select(self)
 
+    def save_tracks_as(self, widget):
+        '''Prompt for a filename to save all tracks and waypoints.'''
+        dialog = gtk.FileChooserDialog(title="Save GPX",
+                                       action=gtk.FILE_CHOOSER_ACTION_SAVE,
+                                       buttons=(gtk.STOCK_CANCEL,
+                                                  gtk.RESPONSE_CANCEL,
+                                                gtk.STOCK_OPEN,
+                                                  gtk.RESPONSE_OK))
+        dialog.set_current_folder(self.controller.config_dir)
+        filter = gtk.FileFilter()
+        filter.set_name("GPX Files")
+        filter.add_pattern("*.gpx")
+        dialog.add_filter(filter)
+
+        while True:
+            response = dialog.run()
+
+            if response != gtk.RESPONSE_OK:
+                dialog.destroy()
+                return
+
+            outfile = dialog.get_filename()
+            if os.path.exists(outfile):
+                d = gtk.MessageDialog(None, gtk.DIALOG_MODAL,
+                                      gtk.MESSAGE_QUESTION,
+                                      gtk.BUTTONS_YES_NO)
+
+                # This doesn't work:
+                # d = gtk.Dialog("Overwrite?",
+                #               gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
+                #                (gtk.STOCK_CANCEL, gtk.RESPONSE_NO,
+                #                 "Overwrite", gtk.RESPONSE_YES),
+                #                "File exists. Overwrite?")
+
+                # This doesn't work: it returns an integer
+                # like -8 (yes) or -5 (ok),
+                # not a reponse enum like gtk.RESPONSE_OK,
+                # and there seems to be no documentation on what
+                # those negative integers map to.
+                d = gtk.MessageDialog(None, 0,
+                                      gtk.MESSAGE_QUESTION,
+                                      gtk.BUTTONS_YES_NO,
+                                      "File exists. Overwrite?")
+                d.set_default_response(gtk.RESPONSE_YES)
+
+                response = d.run()
+                # In practice, response is -6 or -5,
+                # whereas gtk.RESPONSE_OK is <enum GTK_RESPONSE_OK of type GtkResponseType>
+                d.destroy()
+                print "Reponse was", response, "OK is", gtk.RESPONSE_OK, "YES is", gtk.RESPONSE_YES
+                if response != gtk.RESPONSE_OK:
+                    continue
+
+        # At this point we have a filename, and either it's unique
+        # or we've confirmed overwriting.
+        # Now save all our tracks and waypoints as a GPX file in outfile.
+        dialog.destroy()
+        self.trackpoints.save_GPX(outfile)
+
     def split_track_by_mouse(self, widget):
-        """Split a track at the current mouse location"""
+        """Split a track at the current mouse location."""
 
         self.draw_map()
         near_track, near_point, near_waypoint = \
