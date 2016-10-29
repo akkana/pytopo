@@ -1203,7 +1203,24 @@ Topo2MapCollection: data from local-area Topo! packages that
 class TrackPoints:
 
     """Parsing and handling of GPS track files.
-    Supports GPX, KML, KMZ and GeoJSON.
+       Supports GPX, KML, KMZ and GeoJSON.
+       A TrackPoints object can include a track (points[])
+       and a list of waypoints (waypoints[]).
+
+       Each point in a track can be either a trackpoint or the beginning
+       of a new track segment.
+
+       Beginnings of segments are represented by the name of the
+       segment as a string or unicode, but use is_start() to test for
+       that in case of future changes.
+
+       A trackpoint is an array where the first two elements are
+       longitude and latitude, as floatings.
+       Following longitude there may be an optional elevation, a float,
+       or waypoint name, a string or unicode.
+       Finally, a dictionary may be present, containing additional
+       elements like time (timestamp).
+
     """
 
     def __init__(self):
@@ -1235,7 +1252,8 @@ class TrackPoints:
             return self.points[trackindex+1]
         return None
 
-    def handle_track_point(self, lat, lon, ele, waypoint_name=False):
+    def handle_track_point(self, lat, lon, ele=None, waypoint_name=False,
+                           timestamp=None):
         '''Add a new trackpoint or waypoint after some basic sanity checks.
            If waypoint_name, we assume this is a waypoint,
            otherwise assume it's a track point.
@@ -1249,10 +1267,43 @@ class TrackPoints:
         if lat > self.maxlat:
             self.maxlat = lat
 
-        if (waypoint_name):
-            self.waypoints.append([lon, lat, waypoint_name])
+        point = [lon, lat]
+
+        if waypoint_name:
+            point.append(waypoint_name)
+
+        if ele:
+            point.append(ele)
+
+        if timestamp:
+            point.append({ "time": timestamp })
         else:
-            self.points.append([lon, lat])
+            print "No timestamp!"
+
+        if waypoint_name:
+            self.waypoints.append(point)
+        else:
+            self.points.append(point)
+
+    def get_ele(self, pt):
+        """Get the saved elevation of a point, if any.
+        """
+        if len(pt) < 3:
+            return None
+        ele = pt[2]
+        if (isinstance(ele, str) or isinstance(ele, unicode)):
+            return ele
+        return None
+
+    def get_timestamp(self, pt):
+        """Does the point have a dict with a time element? If so, return it.
+        """
+        d = pt[-1]
+        if type(d) is not dict:
+            return None
+        if "time" not in d:
+            return None
+        return d["time"]
 
     def read_track_file(self, filename):
         """Read a track file. Throw IOError if the file doesn't exist."""
@@ -1301,8 +1352,8 @@ class TrackPoints:
 
                 for pt in trkpts:
                     # self.handle_track_pointGPX(pt, False)
-                    lat, lon, ele, time = self.GPX_point_coords(pt)
-                    self.handle_track_point(lat, lon, ele, None)
+                    lat, lon, ele, ts = self.GPX_point_coords(pt)
+                    self.handle_track_point(lat, lon, ele, None, timestamp=ts)
 
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
@@ -1311,23 +1362,38 @@ class TrackPoints:
             for pt in waypts:
                 lat, lon, ele, time = self.GPX_point_coords(pt)
                 name = "WP"
-                n = pt.getElementsByTagName("name")
-                if len(n) > 0:
-                    n = n[0].childNodes
-                    if len(n) >= 1 and n[0].nodeType == n[0].TEXT_NODE:
-                        name = n[0].data
-                self.handle_track_point(lat, lon, ele, name)
+                name = self.get_DOM_text(pt, "name")
+                self.handle_track_point(lat, lon, ele, name, timestamp=time)
 
         # GPX also allows for routing, rtept, but I don't think we need those.
+
+    def get_DOM_text(self, node, childname=None):
+        '''Get the text out of a DOM node.
+           Or, if childname is specified, get the text out of a child
+           node with node name childname.
+        '''
+        # print "get_DOM_text", node
+        if childname:
+            nodes = node.getElementsByTagName(childname)
+            # print "node has", len(nodes), childname, "children"
+            if not nodes:
+                return None
+            node = nodes[0]
+        if not node:
+            return None
+        n = node.childNodes
+        if len(n) >= 1 and n[0].nodeType == n[0].TEXT_NODE:
+            return n[0].data
+        return None
 
     def GPX_point_coords(self, point):
         '''Add a new trackpoint or waypoint from a GPX node'''
         lat = float(point.getAttribute("lat"))
         lon = float(point.getAttribute("lon"))
-        #ele = float(getVal(point, "ele"))
-        #ele = round(ele * 3.2808399, 2)      # convert from meters to feet
-        #time = getVal(point, "time")
-        return lat, lon, 0, 0
+        ele = self.get_DOM_text(point, "ele")
+        time = self.get_DOM_text(point, "time")
+        # For now, keep elevation and time as unchanged strings.
+        return lat, lon, ele, time
 
     def save_GPX(self, filename):
         '''Save all known tracks and waypoints as a GPX file.
@@ -1349,8 +1415,12 @@ class TrackPoints:
                         print >>outfp, "    <trkseg>"
                     else:
                         print >>outfp, '      <trkpt lat="%f" lon="%f">' % (pt[1], pt[0])
-                        # print >>outfp, '        <ele>0</ele>'
-                        print >>outfp, '        <time>2015-12-02T16:50:34Z</time>'
+                        ele = self.get_ele(pt)
+                        if ele:
+                            print >>outfp, '        <ele>%s</ele>' % ele
+                        ts = self.get_timestamp(pt)
+                        if ts:
+                            print >>outfp, '        <time>%s</time>' % ts
                         print >>outfp, '      </trkpt>'
                 print >>outfp, "    </trkseg>"
                 print >>outfp, "  </trk>"
@@ -2404,7 +2474,7 @@ that are expected by the MapCollection classes:
             ( "My Tracks...", self.mytracks),
             ( "Download Area...", self.download_area),
             ( "Show waypoints...", self.toggle_show_waypoints),
-            ( "Save tracks/points as...", self.save_tracks_as),
+            ( "Save GPX...", self.save_tracks_as),
             ( "Change background map", self.change_collection),
             ( "Quit", self.graceful_exit)
             ])
@@ -2474,7 +2544,7 @@ that are expected by the MapCollection classes:
                                        action=gtk.FILE_CHOOSER_ACTION_SAVE,
                                        buttons=(gtk.STOCK_CANCEL,
                                                   gtk.RESPONSE_CANCEL,
-                                                gtk.STOCK_OPEN,
+                                                gtk.STOCK_SAVE,
                                                   gtk.RESPONSE_OK))
         dialog.set_current_folder(self.controller.config_dir)
         filter = gtk.FileFilter()
@@ -2495,18 +2565,6 @@ that are expected by the MapCollection classes:
                                       gtk.MESSAGE_QUESTION,
                                       gtk.BUTTONS_YES_NO)
 
-                # This doesn't work:
-                # d = gtk.Dialog("Overwrite?",
-                #               gtk.DIALOG_MODAL | gtk.DIALOG_DESTROY_WITH_PARENT,
-                #                (gtk.STOCK_CANCEL, gtk.RESPONSE_NO,
-                #                 "Overwrite", gtk.RESPONSE_YES),
-                #                "File exists. Overwrite?")
-
-                # This doesn't work: it returns an integer
-                # like -8 (yes) or -5 (ok),
-                # not a reponse enum like gtk.RESPONSE_OK,
-                # and there seems to be no documentation on what
-                # those negative integers map to.
                 d = gtk.MessageDialog(None, 0,
                                       gtk.MESSAGE_QUESTION,
                                       gtk.BUTTONS_YES_NO,
@@ -2514,17 +2572,21 @@ that are expected by the MapCollection classes:
                 d.set_default_response(gtk.RESPONSE_YES)
 
                 response = d.run()
-                # In practice, response is -6 or -5,
-                # whereas gtk.RESPONSE_OK is <enum GTK_RESPONSE_OK of type GtkResponseType>
                 d.destroy()
-                print "Reponse was", response, "OK is", gtk.RESPONSE_OK, "YES is", gtk.RESPONSE_YES
-                if response != gtk.RESPONSE_OK:
+
+                if response != gtk.RESPONSE_YES:
                     continue
+                else:
+                    break
+            else:
+                break
 
         # At this point we have a filename, and either it's unique
         # or we've confirmed overwriting.
         # Now save all our tracks and waypoints as a GPX file in outfile.
         dialog.destroy()
+        if Debug:
+            print "Saving GPX to", outfile
         self.trackpoints.save_GPX(outfile)
 
     def split_track_by_mouse(self, widget):
