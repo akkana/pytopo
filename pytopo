@@ -573,7 +573,8 @@ class OSMMapCollection(TiledMapCollection):
 
     def __init__(self, _name, _location, _ext,
                  _img_width, _img_height, _init_zoom,
-                 _download_url=None, maxzoom=19):
+                 _download_url=None, maxzoom=19,
+                 attribution=None):
         """arguments:
         name         -- user-visible name of the collection
         location     -- directory on disk where the maps reside
@@ -593,6 +594,11 @@ class OSMMapCollection(TiledMapCollection):
         self.download_url = _download_url
         self.maxzoom = maxzoom
 
+        if attribution:
+            self.attribution = attribution
+        else:
+            self.attribution = "Map tiles copyright Openstreetmap.org"
+
         self.location = os.path.expanduser(self.location)
 
         # Handle ~ format for location
@@ -607,9 +613,8 @@ class OSMMapCollection(TiledMapCollection):
         self.zoom(0)
 
     def draw_attribution(self, mapwin):
-        mapwin.draw_string_scale(-10, -10,
-                                 "Map tiles copyright Openstreetmap.org",
-                                 whichfont="waypoint")
+        mapwin.draw_string_scale(-10, 1, self.attribution,
+                                 whichfont="attribution")
         return
 
     # Utilities for mapping tiles to/from degrees.
@@ -1277,8 +1282,7 @@ class TrackPoints:
 
         if timestamp:
             point.append({ "time": timestamp })
-        else:
-            print "No timestamp!"
+        # Note: GPX files imported from KML may have no timestamps.
 
         if waypoint_name:
             self.waypoints.append(point)
@@ -1570,6 +1574,7 @@ class TrackPoints:
            Inside a LineString, coordinate pairs or triples are separated
            by whitespace, which may include newlines.
            Return a list of triples [[lat, lon, ele], [lat, lon, ele] ...]
+           Not all KMLs have elevation, so use None in that case.
         '''
         coords = el.getElementsByTagName("coordinates")
         if not coords or len(coords) < 1:
@@ -1578,7 +1583,10 @@ class TrackPoints:
         ret = []
         for s in coord_triples:
             triple = s.split(',')
-            ret.append(map(float, triple))
+            triple = map(float, triple)
+            if len(triple) == 2:
+                triple.append(None)
+            ret.append(triple)
 
         return ret
 
@@ -1845,6 +1853,7 @@ that are expected by the MapCollection classes:
 
         self.font_desc = pango.FontDescription("Sans 9")
         self.wpt_font_desc = pango.FontDescription("Sans Italic 10")
+        self.attr_font_desc = pango.FontDescription("Sans Bold Italic 12")
         self.select_font_desc = pango.FontDescription("Sans Bold 15")
 
     def show_window(self, init_width, init_height):
@@ -1944,6 +1953,7 @@ that are expected by the MapCollection classes:
             draw_selected_label(self.trackpoints.waypoints[self.selected_waypoint][2], "Waypoint: ", 15, 40)
 
         # Copyright info or other attribution
+        self.set_color(self.grid_color)
         self.collection.draw_attribution(self)
 
         # draw pin
@@ -2926,11 +2936,14 @@ that are expected by the MapCollection classes:
         """Draw a string at the specified location.
            If x or y is negative, we'll draw from the right or bottom edge.
            If whichfont is "waypoint" it'll be a little bigger and italic;
+           if "attribution" even bigger and also italic;
            if it's "select" it'll be a lot bigger.
         """
         layout = self.drawing_area.create_pango_layout(s)
         if whichfont == "waypoint":
             layout.set_font_description (self.wpt_font_desc)
+        elif whichfont == "attribution":
+            layout.set_font_description (self.attr_font_desc)
         elif whichfont == "select":
             layout.set_font_description (self.select_font_desc)
         else:
@@ -3832,14 +3845,6 @@ Collections = [
     OSMMapCollection( "openstreetmap", "~/Maps/openstreetmap",
                       ".png", 256, 256, 10,
                       "http://a.tile.openstreetmap.org" ),
-    OSMMapCollection( "opencyclemap", "~/Maps/opencyclemap",
-                      ".png", 256, 256, 13,
-                      "http://b.tile.opencyclemap.org/cycle",
-                      maxzoom=18),
-    OSMMapCollection( "satellite", "~/Maps/openaerial",
-                      ".jpg", 256, 256, 13,
-                      "http://otile1.mqcdn.com/tiles/1.0.0/sat",
-                      maxzoom=18),
     OSMMapCollection( "mapquest", "~/Maps/mapquest",
                       ".jpg", 256, 256, 13,
                       "http://otile1.mqcdn.com/tiles/1.0.0/map"),
