@@ -728,13 +728,28 @@ class OSMMapCollection(TiledMapCollection):
         return pixbuf, newpath
 
     def url_from_path(self, path, zoomlevel=None):
-        """URL we need to get the given tile file"""
+        """URL we need to get the given tile file.
+           URLs can be specified like
+           "http://a.tile.openstreetmap.org", and we will append /zoom/x/y.ext
+           or they can be specified like
+           "https://tile.thunderforest.com/outdoors/{z}/{x}/{y}.png?apikey=X"
+           and we will substitute {z}, {x} and {y}.
+        """
         if not zoomlevel:
             zoomlevel = self.zoomlevel
-        xdir, basename = os.path.split(path)
+
+        xdir, filename = os.path.split(path)
         xdir = os.path.basename(xdir)
-        return self.download_url + '/' + str(zoomlevel) + '/' \
-            + xdir + '/' + basename
+        y, ext = os.path.splitext(filename)
+
+        url = self.download_url.format(z=zoomlevel, x=xdir, y=y)
+
+        if url == self.download_url:
+            # Didn't replace anything, so do it old-style
+            return url + '/' + str(zoomlevel) + '/' \
+                + xdir + '/' + filename
+        else:
+            return url
 
     def fetch_or_download_maplet(self, path):
         """Return a pixbuf if the file is on disk, else download"""
@@ -3845,9 +3860,14 @@ Collections = [
     OSMMapCollection( "openstreetmap", "~/Maps/openstreetmap",
                       ".png", 256, 256, 10,
                       "http://a.tile.openstreetmap.org" ),
-    OSMMapCollection( "mapquest", "~/Maps/mapquest",
-                      ".jpg", 256, 256, 13,
-                      "http://otile1.mqcdn.com/tiles/1.0.0/map"),
+
+    # You will need an API key to get the excellent OpenCycleMap tiles
+    # from http://thunderforest.com.
+    # OSMMapCollection( "opencyclemap", "~/Maps/opencyclemap",
+    #                   ".png", 256, 256, 13,
+    #                   "https://tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=YOUR_API_KEY_HERE",
+    #                   maxzoom=22,
+    #                   attribution="Maps © www.thunderforest.com, Data © www.osm.org/copyright"),
     ]
 
 defaultCollection = "openstreetmap"
