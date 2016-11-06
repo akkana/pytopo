@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 """
 pytopo: show topographic maps using data files from Topo! CD
@@ -262,6 +263,10 @@ TiledMapCollection classes must implement
 """
 
     def __init__(self, _name, _location, _tile_w, _tile_h):
+        '''
+           reload_if_older: if set, tiles older than this (in days)
+                            will be reloaded.
+        '''
         MapCollection.__init__(self, _name, _location)
         self.img_width = _tile_w
         self.img_height = _tile_h
@@ -271,11 +276,6 @@ TiledMapCollection classes must implement
         self.download_tiles = DownloadTileQueue()
         self.download_func = None
         self.download_failures = 0
-
-        # If reload_tiles is set, it should be set to a Unix datestamp,
-        # e.g. from when the program was started.
-        # Any file older than that will be re-downloaded.
-        self.reload_tiles = False
 
     def set_reload_tiles(self, p):
         if p:
@@ -574,7 +574,7 @@ class OSMMapCollection(TiledMapCollection):
     def __init__(self, _name, _location, _ext,
                  _img_width, _img_height, _init_zoom,
                  _download_url=None, maxzoom=19,
-                 attribution=None):
+                 reload_if_older=None, attribution=None):
         """arguments:
         name         -- user-visible name of the collection
         location     -- directory on disk where the maps reside
@@ -583,6 +583,7 @@ class OSMMapCollection(TiledMapCollection):
         img_height   -- height of each maplet
         init_zoom    -- default initial zoom level
         download_url -- try to download missing maplets from here
+        reload_if_older: if set, reload tiles older than this (in days)
         """
         TiledMapCollection.__init__(self, _name, _location,
                                     _img_width, _img_height)
@@ -593,6 +594,15 @@ class OSMMapCollection(TiledMapCollection):
         self.powzoom = 2.0 ** self.zoomlevel   # to avoid re-re-calculating
         self.download_url = _download_url
         self.maxzoom = maxzoom
+
+        # If reload_tiles is set, it should be set to a Unix datestamp,
+        # e.g. from when the program was started.
+        # Any file older than that will be re-downloaded.
+        # By default, never reload tiles.
+        if reload_if_older:
+            self.reload_tiles = time.time() - reload_if_older * 60*60*24
+        else:
+            self.reload_tiles = False
 
         if attribution:
             self.attribution = attribution
@@ -2724,7 +2734,7 @@ that are expected by the MapCollection classes:
         #dialog.vbox.set_spacing(10)
         frame = gtk.Frame("Current zoom = %d" % self.collection.zoomlevel)
         dialog.vbox.pack_start(frame, True, True, 0)
-    
+
         table = gtk.Table(4, 3, False)
         table.set_border_width(5)
         table.set_row_spacings(5)
@@ -3712,7 +3722,7 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
             mapwin.center_lat = (maxlat + minlat) / 2
             mapwin.collection.zoom_to_bounds(minlon, minlat, maxlon, maxlat)
 
-        if 'set_reload_tiles' in dir(mapwin.collection):
+        if self.reload_tiles and 'set_reload_tiles' in dir(mapwin.collection):
             mapwin.collection.set_reload_tiles(self.reload_tiles)
         elif self.reload_tiles:
             print "Collection can't re-download tiles"
@@ -3866,7 +3876,7 @@ Collections = [
     # OSMMapCollection( "opencyclemap", "~/Maps/opencyclemap",
     #                   ".png", 256, 256, 13,
     #                   "https://tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=YOUR_API_KEY_HERE",
-    #                   maxzoom=22,
+    #                   maxzoom=22, reload_if_older=60,  # reload if > 60 days
     #                   attribution="Maps © www.thunderforest.com, Data © www.osm.org/copyright"),
     ]
 
