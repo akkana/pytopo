@@ -3385,21 +3385,28 @@ class PyTopo:
         global VersionString
         print VersionString
         print """
-Usage: pytopo [-t trackfile] [-c collection] [-r] [site_name]
-           -r : re-download all map tiles
+Usage: pytopo
+       pytopo trackfile
+       pytopo known_site
+       pytopo [-t trackfile] [-c collection] [-r] [site_name]
        pytopo [-t trackfile] start_lat start_long collection
-       pytopo -p : list known sites and tracks
-       pytopo -h : print this message
+       pytopo -p :     list known sites and tracks
+       pytopo -r :     re-download all map tiles
+       pytopo -h :     print this message
+
+With no arguments, will display a list of known sites.
+
+Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
+track points and/or waypoints; multiple track files are allowed.
 
 Use degrees.decimal_minutes format for coordinates.
-Set up site names in ~/.config/pytopo.sites, track logs in ~/Tracks.
+Set up favorite site names in ~/.config/pytopo.sites,
+favorite track logs in ~/Tracks
 
-Track files may contain track points and/or waypoints;
-multiple track files are allowed.
-
-Move around using arrow keys.  q quits.
-Click in the map to print the coordinates of the clicked location.
-'s' will attempt to save the current map as a GIF file in ~/Topo/."""
+Move around by dragging or using arrow keys.  q quits.
+Right-click gives a context menu.
+Shift-click in the map to print the coordinates of the clicked location.
+"""
         sys.exit(1)
 
     @classmethod
