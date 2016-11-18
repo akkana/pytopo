@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>pytopo: Topographic Maps for Linux</title>
+<title>pytopo: Open-Source Tiled Map Viewer</title>
 <style type="text/css">
 table { table-layout: fixed; }
 </style>
@@ -10,13 +10,20 @@ table { table-layout: fixed; }
 <img align=right src="topoicon.jpg" width=218 height=290
  alt="[PyTopo for Linux]">
 
-<h1>pytopo: A Map Viewer for Linux</h1>
+<h1>PyTopo: An Open-Source Tiled Map Viewer</h1>
 
 <p>
-<b>PyTopo</b> is a Python-gtk map viewer which interprets local tiled map data
-and displays it in an interactive viewer, where you can scroll
-to adjacent maps, switch between resolutions, or produce a map
-image for printing or editing.
+<b>PyTopo</b> is an open source tiled map viewer,
+written in Python and GRK. It can download and cache tiles from
+OpenStreetMap or other map tile servers, or you can make your own
+local tiled maps or use commercial datasets.
+<p>
+PyTopo can also show tracks and waypoints in several different formats,
+can save favorite places, and has some rudimentary track editing ability.
+<p>
+Downloaded map tiles are cached forever (or until you remove them),
+so you can download tiles and then use PyTopo offline if, like me,
+you often travel to places where there's little or no internet access.
 <p>
 <b>Why does PyTopo exist?</b>
 I needed a local, offline mapping program that worked on Linux.
@@ -24,22 +31,29 @@ I needed a local, offline mapping program that worked on Linux.
 I like to travel to remote locations with no network access,
 and of course I want maps once I'm there.
 When I first started PyTopo, smartphones didn't exist yet,
-and even in the smartphone age I often want a larger map than
-I can show on a phone screen, with a user interface that's easier
-to use for showing things like track logs. I use PyTopo at home for
-reviewing logs from where I've hiked and exploring track and waypoint
-data for places I plan to go.
+bug even in the smartphone age I often want a larger map than
+I can show on a phone screen.
+I use PyTopo at home for reviewing logs from hikes, and for exploring
+track and waypoint data for places I plan to go.
+(In the field, I use OsmAnd, an excellent open-source Android offline
+mapping app.)
 <p>
 Originally PyTopo was written to use data from National Geographic's
 commercial <i>Topo!</i> data CDs. Since then, it has expanded to use
-<a href="http://openstreetmap.org">OpenStreetMap</a> tiles as well
-as several other open tile sources. (Not Google Maps, since Google's
-terms of service doesn't permit other programs to use their tiles.)
+tiles from <a href="http://openstreetmap.org">OpenStreetMap</a> and
+any other tile server that uses the same naming conventions.
+(But not Google Maps, since Google's terms of service doesn't permit
+other programs to use their tiles.)
 
 <p>
+Want to try it?
 <b>Download:</b>
-<b><a href="https://github.com/akkana/pytopo">PyTopo hosted
-on Github</a></b>.
+<b><a href="https://github.com/akkana/pytopo">PyTopo hosted on Github</a></b>.
+<p>
+(PyTopo is all in one file: click on pytopo, then click on <i>raw</i>
+in the upper right and save to a file on your local disk.
+If you're on Linux or Mac you'll probably have to make it executable,
+and you'll need PyGTK installed.)
 
 <!-- 
 <p>
@@ -62,8 +76,8 @@ Of course, you can change that.
 See the <a href="fileformats.html">PyTopo File Formats</a> page
 for more details.
 <p>
-<code>pytopo -p</code> will print out a list of known sites. 
-With the initial default configuration you'll just have a few cities like 
+<code>pytopo -p</code> will print out a list of known sites.
+With the initial default configuration you'll just have a few cities like
 san-francisco, new-york, london, sydney;
 this is mostly to show you how to add your own points of interest.
 
@@ -79,8 +93,8 @@ this is mostly to show you how to add your own points of interest.
 <th>s
 <td>Save the current map to a file under <i>$HOME/Topo</i>
 <tr>
-<th>Space
-<td>Print (to standard output) the current coordinates of map center.
+<th>Space, m
+<td>Jump back to the pinned location.
 <tr>
 <th>q
 <td>Quit
@@ -88,24 +102,30 @@ this is mostly to show you how to add your own points of interest.
 
 <p>
 Dragging and mousewheel move and scroll the map, as you'd expect.
-<b>Right-clicking</b> in the map pops up a menu of various other options.
+Right-clicking in the map pops up a menu of various other options.
 
 <p>
 Click on a track or waypoint to select it and see what's known about it.
 
 <h3>Usage (commandline arguments)</h3>
 <pre>
-Usage: pytopo site_name
-       pytopo trackfile...
-       pytopo [trackfile...] start_lat start_long collection
-       pytopo -p
-Use degrees.decimal_minutes format for coordinates.
-Set up site names in ~/.pytopo
-Print list of known sites with pytopo -p
+Usage: pytopo
+       pytopo trackfile
+       pytopo known_site
+       pytopo [-t trackfile] [-c collection] [-r] [site_name]
+       pytopo [-t trackfile] start_lat start_long collection
+       pytopo -p :     list known sites and tracks
+       pytopo -r :     re-download all map tiles
+       pytopo -h :     print this message
 
-PyTopo can handle track files in GPX, KML, KMZ or GeoJSON formats.
-They may contain track points and/or waypoints, and you can multiple
-track files.
+With no arguments, will display a list of known sites.
+
+Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
+track points and/or waypoints; multiple track files are allowed.
+
+Use degrees.decimal_minutes format for coordinates.
+Set up favorite site names in ~/.config/pytopo.sites,
+favorite track logs in ~/Tracks
 </pre>
 
 <h2>Screenshots</h2>
@@ -132,27 +152,139 @@ track files.
     near Los Gatos, CA, using USGS/Topo! topographic maps.
 </table>
 
-<h2>Preloaded Map Data</h2>
+<h2>Some Additional Features</h2>
+
+<h3>Track and Waypoint Files</h3>
 <p>
-Aside from OpenStreetMap data, pytopo can use local map data
-on disk or CD.
+Pytopo can read tracks and waypoints from GPX, KML, KMZ, and GeoJSON files,
+and you can load multiple track files at once.
+It shows each track in a different color.
+You can toggle waypoint visibility with the right-click context menu
+(for when there are too many waypoints and they get in the way of
+reading the map).
 <p>
-PyTopo can also use tiled map data from sources like the
+You can select a track by clicking on it,
+split a track (right-click context menu again),
+and save a track as GPX after you've split it.
+
+<h3>Pinning</h3>
+<p>
+You can "Pin" a spot on the map and save it as a pinned location
+in your PyTopo configuration.
+
+<h3>Switching Background Maps</h3>
+<p>
+<i>Change Background Map</i> in the context menu will list all the
+MapCollections you have defined, and you can switch between them
+interactively.
+<p>
+When you first run PyTopo, it will create a file called
+<i>config/pytopo/pytopo.sites</i> giving you one MapCollection,
+for the basic OpenStreetMap tile set, and a few major cities as Known Sites.
+<p>
+You'll probably want to add your own Known Sites, so you can start PyTopo
+by passing it names of sites near you. There are two ways to do that.
+You can right-click on any position on the map and choose "Pin this
+location", then "Save pin location" and give it a site name.
+Or if you're not afraid of editing files, you can edit <i>pytopo.sites</i>
+to add your own sites by their latitude or longitude.
+<p>
+The <i>pytopo.sites</i> file is also the place to add new MapCollections,
+and for this you do have to edit the file (see below).
+
+<h3>Mileage and Elevation</h3>
+<p>
+If you need distance between two points, you can shift-click and PyTopo
+will print distance and bearing from there to the previous place you
+clicked. I know that's not an optimal user interface, but not many
+people seem to need that feature and I find it useful enough when I
+need it.
+<p>
+Sorry, PyTopo does not yet do anything useful with elevation or mileage
+on track logs. But in the meantime you may want to check out my
+standalone <a href="ellie/">Ellie</a> script; that's what I use.
+
+<h2>Getting Map Data</h2>
+
+<h3>MapCollections</h3>
+<p>
+There are lots of different types of MapCollection you can use.
+One useful one is to use map tiles from a different tile server.
+Most tile servers other than OpenStreetMap require you to sign up for
+an API key (which is usually free for light usage, but charges you
+for heavier usage). In that case your key will be encoded into the URL
+you set up in the MapCollection.
+<p>
+In the default <i>pytopo.sites</i>, there's an example of how to use
+the <a href="http://thunderforest.com">ThunderForest</a> map server
+with an API key to retrieve OpenCycleMap tiles. It looks like this,
+specifying the name of the collection, the location on your local disk to
+cache the tiles, the size and type of the tiles, the default zoom level
+(your choice), the URL to use for downloading, the maximum zoom level
+(this is a function of the tile server), and an attribution string.
+<pre wrap>
+OSMMapCollection( "opencyclemap",         # collection name
+                  "~/Maps/opencyclemap",  # where to cache
+                  ".png", 256, 256,       # file type and size
+                  13,                     # default zoom level
+                  "https://tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=YOUR_API_KEY_HERE",
+                  maxzoom=22,             # maximum zoom level
+                  reload_if_older=90,     # reload if &gt; 90 days
+                  attribution="Maps © www.thunderforest.com, Data © www.osm.org/copyright"),
+</pre>
+<p>
+You can use the same syntax for many different tile servers to get a
+variety of different background map tile styles.
+ThunderForest has several nice styles besides OpenCycleMap: you'll see
+their list if you sign up for an API key.
+You can set up as many MapCollections as you want, either different
+styles from the same server or from different servers.
+<p>
+I don't currently know of a tile server that can serve satellite images,
+even with an API key.
+MapQuest used to offer this service but no longer does.
+Please tell me if you know of an alternate server.
+Note that the Google Maps terms of service do not allow using their tiles
+with non-Google mapping apps, so Google isn't an option.
+
+<h3>Download Area</h3>
+<p>
+<i>Download Area</i> is intended to make it easy to download a
+collection of tiles at different zoom levels for a specified area,
+so you can have the tiles ready when you travel and will be offline.
+In practice, it doesn't work as well as intended, partly because most
+map tile servers will throttle connections that request too many tiles,
+so it takes forever to download an area. I stopped using it and
+therefore it isn't very well maintained.
+
+<h3>Commercial Map Data</h3>
+<p>
+Aside from OpenStreetMap tile srvers, pytopo can use local map data
+on disk or CD; for instance, from the old
 <i>Topo!</i> local area and specific park map packages
-sold in camping/hiking stores
-(sometimes under the aegis of National Geographic).
+sold in camping/hiking stores,
+sometimes under the aegis of National Geographic.
+<p>
+For <i>Topo!</i> CD datasets, use a Topo1MapCollection for regions
+or a Topo2MapCollection for the park map sets:
+<pre wrap>
+Topo1MapCollection( "deathvalley", "~/Maps/deathvalley", 7.5, 266, 328 ),
+Topo2MapCollection( "kingscanyon", "~/Maps/kingscyn", "topo", 410, 256 ),
+</pre>
+<p>
 <b>Caution: the <i>Topo! Back Roads Explorer</i> and the statewide
 explorer collections are <i>not</i> in this friendly tiled format.</b>
 They use large data files in a proprietary ".tpq" format.
 <a href="http://cholla.mmto.org/computers/topomaps/">Tom Trebisky
 has analyzed the format and has written an extractor</a>,
 and he also has <a href="http://cholla.mmto.org/gtopo/">a C GTK
-viewer</a> for this format. (Eventually I hope to integrate
-direct support for them into pytopo as well.)
+viewer</a> for this format. I have not tried to integrate support
+into PyTopo; there are enough good online sources of maps now that
+I haven't seen the need to buy any more Topo! datasets myself.
 
-<h2>Making Your Own Map Collections</h2>
+<h3>Making Your Own Map Collections</h3>
 <p>
-For some areas, you can download USGS topo maps free. 
+For some areas, you can download USGS topo maps free.
 For instance, for California you can get maps in TIFF format from the
 <a href="http://casil.ucdavis.edu/casil/gis.ca.gov/drg/">California
 Spatial Information Library</a>. You also may need to use specialized
@@ -209,18 +341,15 @@ I can, but I've only tested it on Linux.
 If it doesn't work for you, please let me know.
 
 <h2>Bugs / Wishlist</h2>
-<p>
-<i>(Stuff that would be nifty, but is either difficult,
-or requires additional map data that I'd have to pay for.
-If you want something on this list, bribing me with interesting
-map data would be an excellent approach.)</i>
 <ul>
+<li>More elaborate track editing.
 <li>Draw maps from non-tiled openstreetmap vector data.
 <li>Combine with elevation data to make pretty maps, like the OpenCycleMap
     tiles but usable with any map tiles.
 <li>Better control over projections and datum -- PyTopo isn't smart
     about those at all. It also may have bugs when used in the
     southern hemisphere.
+<li>Easier way to generate custom maps like geologic maps.
 </ul>
 
 <!-- 
@@ -239,7 +368,7 @@ Probably lots of other things I've forgotten.
 
 <dt>1.1, November 16 2011
 <dd>
-Fix a lot of minor bugs and some usability problems with features 
+Fix a lot of minor bugs and some usability problems with features
 introduced in 1.0.
 
 <dt>1.0, May 7 2011
