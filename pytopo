@@ -150,7 +150,7 @@ magic_parser = None
 
 Debug = False
 
-class MapCollection:
+class MapCollection (object):
 
     """A MapCollection is a set of maplet tiles on disk,
 combined with knowledge about the geographic coordinates
@@ -263,10 +263,6 @@ TiledMapCollection classes must implement
 """
 
     def __init__(self, _name, _location, _tile_w, _tile_h):
-        '''
-           reload_if_older: if set, tiles older than this (in days)
-                            will be reloaded.
-        '''
         MapCollection.__init__(self, _name, _location)
         self.img_width = _tile_w
         self.img_height = _tile_h
@@ -378,16 +374,8 @@ TiledMapCollection classes must implement
                 x = cur_x
                 y = cur_y
 
-                # If the pixbuf wasn't available, the collection may return
-                # a URL to be downloaded. Check for that:
-                if type(pixbuf) == types.TupleType:
-                    # XXX Make sure it's not not already queued for download:
-                    self.download_tiles.push(pixbuf[0], pixbuf[1],
-                                             x, y, x_off, y_off,
-                                             mapwin)
-                    pixbuf = None
-
-                w, h = self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
+                w, h = self.draw_tile_at_position(pixbuf, mapwin,
+                                                  x, y, x_off, y_off)
                 # You may ask, why not just do this subtraction before
                 # draw_pixbuf so we don't have to subtract w and h twice?
                 # Alas, we may not have the real w and h until we've done
@@ -414,7 +402,8 @@ TiledMapCollection classes must implement
         # (At this indentation level, we free after drawing the whole map.)
         gc.collect()
 
-        # If we queued any downloads, schedule a function to take care of that:
+        # If we queued any downloads and aren't currently downloading,
+        # schedule a function to take care of that:
         if len(self.download_tiles) > 0 and self.download_func == None:
             gobject.timeout_add(300, self.download_more)
 
@@ -429,8 +418,10 @@ TiledMapCollection classes must implement
         """
         return
 
-    def draw_one_tile(self, pixbuf, mapwin, x, y, x_off, y_off):
-        """Draw a single tile, perhaps after downloading it."""
+    def draw_tile_at_position(self, pixbuf, mapwin, x, y, x_off, y_off):
+        """Draw a single tile, perhaps after downloading it,
+           at a specified location.
+       ."""
         if pixbuf != None:
             w = pixbuf.get_width() - x_off
             h = pixbuf.get_height() - y_off
@@ -479,6 +470,68 @@ TiledMapCollection classes must implement
             mapwin.set_bg_color()
         return w, h
 
+    def draw_single_tile(self, path, mapwin):
+        '''After a new tile is downloaded, fetch its pixbuf and draw it
+           in the right place for our currently displayed map.
+        '''
+        # Calculate x, y, x_offset, y_offset from the tile name.
+        # Make sure it's even still visible.
+        # Tile name is /path/to/zoom/x/y.ext
+        head, tiley = os.path.split(path)
+        tiley = os.path.splitext(tiley)[0]
+        head, tilex = os.path.split(head)
+        head, tilezoom = os.path.split(head)
+        try:
+            tiley = int(tiley)
+            tilex = int(tilex)
+        except ValueError:
+            print "Bad tile filename", path
+            return
+        # Now we need to turn tilex and tiley into x, y, x_off, y_off
+        # for the MapWindow's current position.
+        lat_deg, lon_deg = self.num2deg(tilex, tiley)
+
+        # Where on the map window should this lat and lon appear?
+        min_lon = mapwin.center_lon - mapwin.win_width / self.xscale / 2
+        max_lat = mapwin.center_lat + mapwin.win_height / self.yscale / 2
+        mapx = int((lon_deg - min_lon) * self.xscale)
+        mapy = int((max_lat - lat_deg) * self.yscale)
+
+        if mapx < 0:
+            x_off = -mapx
+            mapx = 0
+        else:
+            x_off = 0
+        if mapy < 0:
+            y_off = -mapy
+            mapy = 0
+        else:
+            y_off = 0
+
+        try:
+            pixbuf = gtk.gdk.pixbuf_new_from_file(path)
+            self.draw_tile_at_position(pixbuf, mapwin, mapx, mapy, x_off, y_off)
+        except glib.GError, e:
+            print "Couldn't draw tile:", e,
+            if not Debug:
+                print "... deleting"
+            else:
+                print ""
+            print ""
+            if os.path.exists(path) and not Debug:
+                os.unlink(path)
+            self.download_failures += 1
+            # Usually this means OSM gave us a text file containing
+            # a string like "Tile Not Available"
+        except Exception, e:
+            print "Error drawing tile:", e
+            self.download_failures += 1
+
+        # Redraw any trackpoints, since they might have been overwritten.
+        # XXX should schedule this after a delay, so we're not constantly
+        # redrawing large sets of trackpoints each time a new tile comes in.
+        mapwin.draw_trackpoints()
+
     def download_finished(self, path):
         """Callback when a tile finishes downloading.
            The path argument is either the local file path just downloaded,
@@ -504,29 +557,8 @@ TiledMapCollection classes must implement
         # Reset the failure counter:
         #self.download_failures += 1
 
-        # Draw it on the map:
-        url, path, x, y, x_off, y_off, mapwin = self.download_tiles.pop()
-        try:
-            pixbuf = gtk.gdk.pixbuf_new_from_file(path)
-            self.draw_one_tile(pixbuf, mapwin, x, y, x_off, y_off)
-        except glib.GError, e:
-            print "Couldn't draw tile:", e,
-            if not Debug:
-                print "... deleting"
-            else:
-                print ""
-            print ""
-            if os.path.exists(path) and not Debug:
-                os.unlink(path)
-            self.download_failures += 1
-            # Usually this means OSM gave us a text file containing
-            # a string like "Tile Not Available"
-        except Exception, e:
-            print "Error drawing tile:", e
-            self.download_failures += 1
-
-        # Redraw any trackpoints, since they might have been overwritten:
-        mapwin.draw_trackpoints()
+        self.download_tiles.pop()   # Throw away url, path popped
+        self.draw_single_tile(path, self.mapwin)
 
         # It's okay to start a new download now:
         self.download_func = None
@@ -553,7 +585,7 @@ TiledMapCollection classes must implement
             self.download_func = None
             return False
 
-        url, path, x, y, x_off, y_off, mapwin = self.download_tiles.peek()
+        url, path = self.download_tiles.peek()
         # Don't actually pop() it until it has downloaded.
         #urllib.urlretrieve(url, path)
         self.download_func = start_job(download_job(url, path,
@@ -569,6 +601,10 @@ class OSMMapCollection(TiledMapCollection):
     A collection of tiles downloaded from the OpenStreetMap project
     or one of its renderers, using the OSM naming scheme.
     See also http://tfischernet.wordpress.com/2009/05/04/drawing-gps-traces-on-map-tiles-from-openstreetmap/
+
+    @ivar: zoomlevel   The current zoom level.
+    @ivar: location    Where on disk the map tiles reside.
+    @ivar: download_url Where to download new tiles.
     """
 
     def __init__(self, _name, _location, _ext,
@@ -594,6 +630,10 @@ class OSMMapCollection(TiledMapCollection):
         self.powzoom = 2.0 ** self.zoomlevel   # to avoid re-re-calculating
         self.download_url = _download_url
         self.maxzoom = maxzoom
+
+        # We need to keep a pointer to the map window for redrawing
+        # when downloaded tiles come in.
+        self.mapwin = None
 
         # If reload_tiles is set, it should be set to a Unix datestamp,
         # e.g. from when the program was started.
@@ -622,6 +662,13 @@ class OSMMapCollection(TiledMapCollection):
         # Call zoom so we set all scales appropriately:
         self.zoom(0)
 
+    def draw_map(self, center_lon, center_lat, mapwin):
+        """Draw maplets at the specified coordinates, to fill the mapwin."""
+        self.mapwin = mapwin
+        # call parent
+        return super(OSMMapCollection, self).draw_map(center_lon, center_lat,
+                                                      mapwin)
+
     def draw_attribution(self, mapwin):
         mapwin.draw_string_scale(-10, 1, self.attribution,
                                  whichfont="attribution")
@@ -630,7 +677,9 @@ class OSMMapCollection(TiledMapCollection):
     # Utilities for mapping tiles to/from degrees.
     # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
     def deg2num(self, lat_deg, lon_deg, zoom=None):
-        """Map coordinates to tile numbers and offsets"""
+        """Map coordinates to tile numbers and offsets.
+           @return:  (xtile, ytile, x_off, y_off)
+        """
         if zoom:
             powzoom = 2.0 ** zoom
         else:
@@ -650,11 +699,13 @@ class OSMMapCollection(TiledMapCollection):
         return(xtile, ytile, x_off, y_off)
 
     def num2deg(self, xtile, ytile):
-        """Map file numbers to coordinates"""
+        """Map OSM tile file numbers to coordinates.
+           @return:  (lat_deg, lon_deg)
+        """
         lon_deg = xtile / self.powzoom * 360.0 - 180.0
         lat_rad = math.atan(math.sinh(math.pi * (1 - 2 * ytile / self.powzoom)))
         lat_deg = math.degrees(lat_rad)
-        return(lat_deg, lon_deg)
+        return (lat_deg, lon_deg)
 
     def zoom_to(self, newzoom, latitude=45):
         """Zoom to a specific zoom level, updating scales accordingly.
@@ -763,27 +814,37 @@ class OSMMapCollection(TiledMapCollection):
 
     def fetch_or_download_maplet(self, path):
         """Return a pixbuf if the file is on disk, else download"""
-        # Do we need to download?
+        # Does the tile already exist on local disk?
+        # Even if it does, do we need to re-download it?
+        # XXX This calls os.access then os.stat. Does that mean
+        # we're statting the file twice? Might be a performance issue.
         try:
-            needs_download = ((self.reload_tiles and
-                               os.stat(path).st_mtime < self.reload_tiles)
-                              or not os.access(path, os.R_OK))
+            on_disk = os.access(path, os.R_OK)
+            needs_download = (not on_disk) or \
+                             (self.reload_tiles and
+                              os.stat(path).st_mtime < self.reload_tiles)
         except OSError:
+            on_disk = False
             needs_download = True
 
         if needs_download:
-            if not self.download_url:
+            if self.download_url:
+                # path is a full path on the local filesystem, OS independent.
+                # We need to turn it into a url (Unix path) with slashes.
+                thedir = os.path.dirname(path)
+                if not os.access(thedir, os.W_OK):
+                    os.makedirs(thedir)
+
+                self.download_tiles.push(self.url_from_path(path), path)
+
+            else:
                 if Debug:
                     print "Downloads not enabled; skipping", path
-                if not self.reload_tiles:
-                    return None
 
-            # path is a full path on the local filesystem, OS independent.
-            # We need to turn it into a url (Unix path) with slashes.
-            thedir = os.path.dirname(path)
-            if not os.access(thedir, os.W_OK):
-                os.makedirs(thedir)
-            return (self.url_from_path(path), path)
+        # We've queued any needed downloads.
+        # Now return the current pixbuf, if any.
+        if not on_disk:
+            return None
 
         try:
             pixbuf = gtk.gdk.pixbuf_new_from_file(path)
@@ -1751,17 +1812,17 @@ class MapUtils:
 
         # Compute spherical distance from spherical coordinates.
 
-        # For two locations in spherical coordinates 
+        # For two locations in spherical coordinates
         # (1, theta, phi) and (1, theta', phi')
-        # cosine( arc length ) = 
+        # cosine( arc length ) =
         #    sin phi sin phi' cos(theta-theta') + cos phi cos phi'
         # distance = rho * arc length
 
-        cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2) + 
+        cos = (math.sin(phi1)*math.sin(phi2)*math.cos(theta1 - theta2) +
                math.cos(phi1)*math.cos(phi2))
         arc = math.acos( cos )
 
-        # Remember to multiply arc by the radius of the earth 
+        # Remember to multiply arc by the radius of the earth
         # in your favorite set of units to get length.
         return arc * 6373
 
@@ -1774,20 +1835,16 @@ class DownloadTileQueue:
     def __len__(self):
         return len(self.queue)
 
-    def push(self, url, path, x, y, x_off, y_off, mapwin):
-        """Push details for a new tile onto the queue if not already there,
-           or replace XY info if already there -- the map must have moved.
+    # XXX we should perhaps use a set, for faster existence checking,
+    # but then we wouldn't retain order.
+    def push(self, url, path):
+        """Push details for a new tile onto the queue if not already there.
         """
         for q in self.queue:
-            if q[1] == path :  # Are paths the same?
-                # Replace XY info
-                q[2] = x
-                q[3] = y
-                q[4] = x_off
-                q[5] = y_off
+            if q[1] == path :  # Are paths the same? Already queued.
                 return
         if path:
-            self.queue.insert(0, [url, path, x, y, x_off, y_off, mapwin])
+            self.queue.insert(0, [url, path])
 
     def pop(self):
         return self.queue.pop()
@@ -1798,14 +1855,15 @@ class DownloadTileQueue:
 class MapWindow():
 
     """The PyTopo UI: the map window.
-This is intended to hold the GTK specific drawing code,
-and to be extensible into other widget libraries.
+This holds the GTK specific drawing code,
+and is intended to be extensible into other widget libraries.
 To that end, it needs to implement the following methods
 that are expected by the MapCollection classes:
    win_width, win_height = get_size(), set_color(),
    draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
    draw_rectangle(fill, x, y, width, height)
    draw_line(x, y, width, height)
+(That list is very incomplete and needs to be updated, sorry.)
 """
 
     def __init__(self, _controller):
@@ -1826,6 +1884,9 @@ that are expected by the MapCollection classes:
         self.show_waypoints = True
         self.selected_track = None
         self.selected_waypoint = None
+
+        self.win_width = 0
+        self.win_height = 0
 
         self.traildialog = None
 
@@ -2166,7 +2227,7 @@ that are expected by the MapCollection classes:
            if None, we'll assume exact center, as if we've already
            set center_lat and center_lon after a mouse click.
 
-           @return (nearest_track,    Starting point of the nearest track
+           @return: (nearest_track,    Starting point of the nearest track
                     nearest_point,    Index of nearest point on that track
                     nearest_waypoint) Nearest waypoint
         """
@@ -3969,6 +4030,7 @@ def download_job(url, localpath, callback):
         global magic_parser
         if Debug:
             print "Downloading", url
+            print "  to", localpath
         try:
             urllib.urlretrieve(url, localpath)
         except IOError, e:
@@ -4010,7 +4072,6 @@ def download_job(url, localpath, callback):
     if Debug:
         print >>sys.stderr, "[downloaded %s]" % (localpath)
     callback(path)
-
 
 if __name__ == "__main__":
     p = PyTopo()
