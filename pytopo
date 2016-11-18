@@ -6,7 +6,7 @@ pytopo: show topographic maps using data files from Topo! CD
 to generate a map at the specified coordinates.
 Home page and more documentation: http://shallowsky.com/software/topo/
 
-Copyright 2005 - 2015 by Akkana Peck, akkana@shallowsky.com
+Copyright 2005 - 2016 by Akkana Peck, akkana@shallowsky.com
 Please feel free to use, distribute or modify this program
 under the terms of the GPL v2 or, at your option, a later GPL version.
 I'd appreciate hearing about it if you make any changes.
@@ -14,7 +14,6 @@ I'd appreciate hearing about it if you make any changes.
 Finding zero-length files:
  find Maps/opencyclemap/13 -size 0
  cd Maps/opencyclemap/13/1429
- #wget http://a.andy.sandbox.cloudmade.com/tiles/cycle/13/1429/3230.png
  wget http://b.tile.opencyclemap.org/cycle/13/1473/3236.png
 
 Downloading your own file collection (faster than doing it interactively):
@@ -26,7 +25,6 @@ cd Maps/opencyclemap
         foreach fil (`find . -size 0`)
           echo $dir/$fil
           rm $fil
-          #wget http://a.andy.sandbox.cloudmade.com/tiles/cycle/$level/$dir/$fil
           wget http://b.tile.opencyclemap.org/cycle/$level/$dir/$fil
         end
     end
@@ -39,7 +37,7 @@ TODO: allow configuration of colors, line thickness etc.
 # We will do all calculations in decimal degrees,
 # but take inputs in deg.decimal_minutes.
 
-Version = "1.2"
+Version = "1.3 pre"
 VersionString = "PyTopo Version %s by Akkana Peck" % Version
 
 import sys, os, glob, math
@@ -834,6 +832,13 @@ class OSMMapCollection(TiledMapCollection):
                 thedir = os.path.dirname(path)
                 if not os.access(thedir, os.W_OK):
                     os.makedirs(thedir)
+
+                if Debug:
+                    print "Need to download", path
+                    if not on_disk:
+                        print "Wasn't on disk"
+                    else:
+                        print os.stat(path).st_mtime, "<", self.reload_tiles
 
                 self.download_tiles.push(self.url_from_path(path), path)
 
@@ -3125,13 +3130,16 @@ that are expected by the MapCollection classes:
             self.center_lat -= \
                 float(self.collection.img_height) / self.collection.yscale
         elif event.keyval == gtk.keysyms.space:
-            self.set_center_to_pin()
+            self.set_center_to_pin(None)
         elif event.keyval == gtk.keysyms.l and \
                  event.state == gtk.gdk.CONTROL_MASK:
             pass    # Just fall through to draw_map()
+        elif event.keyval == gtk.keysyms.q and \
+                 event.state == gtk.gdk.CONTROL_MASK:
+            self.graceful_exit()
         elif event.string == "m":
             if PyTopo.selection_window(p, self):
-                self.set_center_to_pin()
+                self.set_center_to_pin(None)
                 pass
         elif event.string == "s":
             self.save_as()
@@ -3282,17 +3290,20 @@ that are expected by the MapCollection classes:
                 self.draw_map()
                 return True
 
-            # Is this needed for anything?
-            # It breaks passing location to context menus.
-            # cur_long, cur_lat = self.xy2coords(event.x, event.y,
-            #                                    self.win_width, self.win_height)
             if Debug:
                 print "Click:", \
                     MapUtils.dec_deg2deg_min_str(cur_long), \
                     MapUtils.dec_deg2deg_min_str(cur_lat)
 
+            print "Click"
+            # Is this needed for anything?
+            # It breaks passing location to context menus.
+            cur_long, cur_lat = self.xy2coords(event.x, event.y,
+                                               self.win_width, self.win_height)
             # Find angle and distance since last click.
             if Debug or event.state & gtk.gdk.SHIFT_MASK:
+                print "Shift-click, last were",
+                print self.click_last_long, self.click_last_lat
                 if self.click_last_long != 0 and self.click_last_lat != 0:
                     dist = MapUtils.distance_on_unit_sphere(self.click_last_lat,
                                                            self.click_last_long,
@@ -3313,8 +3324,9 @@ that are expected by the MapCollection classes:
                     angle = MapUtils.angle_to_bearing(angle)
                     print "Bearing:", angle, "=", \
                         MapUtils.angle_to_quadrant(angle)
-            # self.click_last_long = cur_long
-            # self.click_last_lat = cur_lat
+
+            self.click_last_long = cur_long
+            self.click_last_lat = cur_lat
 
             # Is the click near a track or waypoint we're displaying?
             near_track, near_point, near_waypoint = \
@@ -3937,7 +3949,7 @@ Collections = [
     # OSMMapCollection( "opencyclemap", "~/Maps/opencyclemap",
     #                   ".png", 256, 256, 13,
     #                   "https://tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=YOUR_API_KEY_HERE",
-    #                   maxzoom=22, reload_if_older=60,  # reload if > 60 days
+    #                   maxzoom=22, reload_if_older=90,  # reload if > 90 days
     #                   attribution="Maps © www.thunderforest.com, Data © www.osm.org/copyright"),
     ]
 
