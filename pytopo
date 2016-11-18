@@ -37,7 +37,7 @@ TODO: allow configuration of colors, line thickness etc.
 # We will do all calculations in decimal degrees,
 # but take inputs in deg.decimal_minutes.
 
-Version = "1.3 pre"
+Version = "1.3pre"
 VersionString = "PyTopo Version %s by Akkana Peck" % Version
 
 import sys, os, glob, math
@@ -3295,15 +3295,12 @@ that are expected by the MapCollection classes:
                     MapUtils.dec_deg2deg_min_str(cur_long), \
                     MapUtils.dec_deg2deg_min_str(cur_lat)
 
-            print "Click"
             # Is this needed for anything?
             # It breaks passing location to context menus.
             cur_long, cur_lat = self.xy2coords(event.x, event.y,
                                                self.win_width, self.win_height)
             # Find angle and distance since last click.
             if Debug or event.state & gtk.gdk.SHIFT_MASK:
-                print "Shift-click, last were",
-                print self.click_last_long, self.click_last_lat
                 if self.click_last_long != 0 and self.click_last_lat != 0:
                     dist = MapUtils.distance_on_unit_sphere(self.click_last_lat,
                                                            self.click_last_long,
