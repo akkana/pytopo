@@ -861,6 +861,10 @@ class OSMMapCollection(TiledMapCollection):
         if not pixbuf or pixbuf.get_width() <= 0 or pixbuf.get_height() <= 0:
             print "Couldn't open pixbuf from", path
             os.rename(path, path + ".bad")
+            pixbuf = None
+        # XXX Sometimes despite that check, we mysteriously get
+        # GtkWarning: gdk_drawable_real_draw_pixbuf: assertion 'width >= 0 && height >= 0' failed
+        # Not clear what we can do about that since we're already checking.
 
         return pixbuf
 
@@ -3008,6 +3012,18 @@ that are expected by the MapCollection classes:
     def draw_pixbuf(self, pixbuf, x_off, y_off, x, y, w, h):
         """Draw the pixbuf at the given position and size,
         starting at the specified offset."""
+        # Sometimes the next line prints:
+        # GtkWarning: gdk_drawable_real_draw_pixbuf: assertion 'width >= 0 && height >= 0' failed
+        # but checking width and height doesn't seem to guard against that.
+        # What does?
+        # And the message eventually went away and I can't reproduce now
+        # (maybe it finally downloaded a new tile).
+        # print "Drawing pixbuf that is %d x %d!" \
+        #     % (pixbuf.get_width(), pixbuf.get_height())
+        # if (pixbuf.get_width() <= 0 or pixbuf.get_height() <= 0):
+        #     print "Bad pixbuf size!"
+        #     raise RuntimeError("pixbuf is size %d x %d!" \
+        #                        % (pixbuf.get_width(), pixbuf.get_height()))
         self.drawing_area.window.draw_pixbuf(self.xgc, pixbuf, x_off, y_off,
                                               x, y, w, h)
     def draw_rectangle(self, fill, x, y, w, h):
