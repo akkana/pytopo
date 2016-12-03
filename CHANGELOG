@@ -1,0 +1,120 @@
+
+2016-11-28  Akkana Peck <akkana@shallowsky.com>
+	* Try to guard against bad maplet files that result in bad pixmaps. Unfortunately, sometimes we still get the GTK warning despite trying to test for it.
+
+2016-11-18  Akkana Peck <akkana@shallowsky.com>
+	1.3pre:
+	* Fix shift-click for distance and bearing.
+	* Fix the center-to-pin keybindings m and space.
+	* Add Ctrl-Q as an alternate exit binding.
+	* Show existing tiles even if downloading a replacement due to the existing tile being outdated.
+
+2016-11-06  Akkana Peck <akkana@shallowsky.com>
+	* New option on OSMMapCollection: download_if_older
+
+2016-10-31  Akkana Peck <akkana@shallowsky.com>
+	* Handle URLs with {z}{y}{x}, with ThunderForest as an example, replacing the old OpenCycleMap URL.
+	* Show attribution more prominently and make it an init argument for OSM collections.
+	* Don't require elevation from GPX.
+	* Remove mapquest/satellite tiles (which no longer work) from default config.
+
+2016-10-29  Akkana Peck <akkana@shallowsky.com>
+	* Allow splitting a track and saving as GPX.
+	* Retain elevation and timestamps from GPX files, and save them properly when saving as GPX.
+
+2016-09-27  Akkana Peck <akkana@shallowsky.com>
+	* Give collections a way to show tile attribution. This is now required for many tile collections, and is the courteous thing to do even when it's not required.
+	* Update the documentation.
+
+2016-09-23  Akkana Peck <akkana@shallowsky.com>
+	* Allow resizing below the original size.
+
+2016-08-19  Akkana Peck <akkana@shallowsky.com>
+	* Handle GeoJSON trackpoint files.
+          (No waypoints yet, because I don't have an example of one.)
+	* If there are attributes from GeoJSON, show them in a dialog when clicking on a trail.
+	* Rename CamelCase functions to under_scores for PEP and consistency.
+
+2016-06-21  Akkana Peck <akkana@shallowsky.com>
+	* Show track/trail names inside KML files, including weird USFS schema.
+	* Add a -r flag to force re-downloading of tiles.
+
+2016-06-09  Akkana Peck <akkana@shallowsky.com>
+	* Better error handling when passing in files that aren't track logs.
+
+2016-05-01  Akkana Peck <akkana@shallowsky.com>
+	1.2:
+	* Move by dragging, zoom with the mousewheel.
+	* Switch between different background maps.
+	* Much better track log and waypoint handling, with multiple colors for different tracks, and selection by clicking on a track.
+	* Accept KML and KMZ as well as GPX track logs.
+	* Pin and remember specific locations.
+	* Probably lots of other things I've forgotten.
+
+2011-11-16  Akkana Peck <akkana@shallowsky.com>
+	1.1:
+	* Fix a lot of minor bugs and some usability problems with features introduced in 1.0.
+
+2011-05-07  Akkana Peck <akkana@shallowsky.com>
+	1.0:
+	* Lots of UI additions to make pytopo work well on MeeGo and other tablets. Now there's a "pin", you can save sites, go to saved track logs and lots of other goodies, including some great contributions from Ville JyrkkÃ¤.
+
+2010-05-07  Akkana Peck <akkana@shallowsky.com>
+	0.9:
+	* New format! OSMMapCollection handles OpenStreetMap tiles, including (optionally) downloading them for you.
+	* Figure out trackpoint files from context -- no need to use -t any more. So now you can run pytopo *.gpx site
+	* If there's no config file initially, create a default one using tiles from the default OSM website and a few major cities.
+	* More flexible handling of initial window width.
+
+2009-06-20  Akkana Peck <akkana@shallowsky.com>
+	0.8:
+	* Support track/waypoint files;
+	* support worldwide coordinates by using negative longitudes when west of the prime meridian;
+	* complete codebase refactor -- cleaner, more generalizable, more OO code;
+	* base class for implementing new tiled map collections;
+	* some associated MapCollection file format changes;
+	* accept config file in .config/pytopo as well as ~/.pytopo;
+	* introduce new (still buggy and undocumented) OSMMapCollection.
+
+2008-09-10  Akkana Peck <akkana@shallowsky.com>
+	0.7:
+	* Add -c to find the center of a collection;
+	* fix a bug when latitude or longitude is less than 10°.
+
+2007-10-12  Akkana Peck <akkana@shallowsky.com>
+	0.6:
+	* Fix bad memory leak (will run much better on small-memory machines now).
+	* Integrate Tom Trebisky's Topo2 format.
+
+2006-08-21  Akkana Peck <akkana@shallowsky.com>
+	0.5:
+	* Fix a bug when specifying long/lat on the command line.
+
+2006-06-02  Akkana Peck <akkana@shallowsky.com>
+	0.5b2:
+	* Fix "save as".
+	* Fix latitude reported when clicking.
+
+2006-04-16  Akkana Peck <akkana@shallowsky.com>
+	0.5b1:
+	* Read more general map formats.
+	* Display to arbitrarily sized windows.
+	* Bug fixes. Code refactoring.
+
+2005-04-17  Akkana Peck <akkana@shallowsky.com>
+	0.4:
+	* Calculate distance and bearing between clicks; assorted bug fixes.
+
+2005-04-13  Akkana Peck <akkana@shallowsky.com>
+	0.3:
+	* Add 's' binding to save current map to a file (using montage from ImageMagick).
+    Better fix for expose handling.
+
+2005-04-08  Akkana Peck <akkana@shallowsky.com>
+	0.2:
+	* Temporary fix for spurious expose problem (excessive CPU usage).
+
+2005-04-04  Akkana Peck <akkana@shallowsky.com>
+	0.1:
+	* Coordinate handling routines mostly working.
+	* Store coordinates of center, not edge, so zoom works.
