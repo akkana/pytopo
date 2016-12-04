@@ -5,8 +5,8 @@
 from distutils.core import setup
 
 setup(name='pytopo',
-      version='1.1',
-      description='Online and Offline Maps',
+      version='1.3',
+      description='Map and track file viewer, using cached offline map tiles',
       author='Akkana Peck',
       author_email='akkana@shallowsky.com',
       url='http://shallowsky.com/software/topo/',
