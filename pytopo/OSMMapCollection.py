@@ -1,3 +1,11 @@
+# Copyright (C) 2009-2016 by Akkana Peck.
+# You are free to use, share or modify this program under
+# the terms of the GPLv2 or, at your option, any later GPL.
+
+'''OSMMapCollection: tiles downloaded from the OpenStreetMap project,
+   one of its renderers, or any other source that uses a similar
+   tile naming and zoom scheme.
+'''
 
 from TiledMapCollection import TiledMapCollection
 from MapWindow import MapWindow

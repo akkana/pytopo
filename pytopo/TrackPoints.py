@@ -1,6 +1,9 @@
-"""Parsing and handling of GPS track files.
-   See the TrackPoints class for more details.
-"""
+# Copyright (C) 2009-2016 by Akkana Peck.
+# You are free to use, share or modify this program under
+# the terms of the GPLv2 or, at your option, any later GPL.
+
+'''Parsing and handling of GPS track files in pytopo.
+'''
 
 import os
 import xml.dom.minidom

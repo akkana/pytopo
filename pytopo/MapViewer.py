@@ -1,9 +1,16 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from MapWindow import MapWindow
-from MapUtils import MapUtils
-from TrackPoints import TrackPoints
+# Copyright (C) 2009-2016 by Akkana Peck.
+# You are free to use, share or modify this program under
+# the terms of the GPLv2 or, at your option, any later GPL.
+
+'''MapViewer, the main pytopo application, which controls the MapWindow.
+'''
+
+from pytopo.MapWindow import MapWindow
+from pytopo.MapUtils import MapUtils
+from pytopo.TrackPoints import TrackPoints
 
 import sys
 import os

@@ -1,3 +1,11 @@
+# Copyright (C) 2009-2016 by Akkana Peck.
+# You are free to use, share or modify this program under
+# the terms of the GPLv2 or, at your option, any later GPL.
+
+'''GenericMapCollection: a tiled map collection that can use
+   any naming scheme, suitable for home-built tiled maps
+   or maps adapted from other data sources.
+'''
 
 import os
 from MapUtils import MapUtils

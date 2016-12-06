@@ -1,3 +1,11 @@
+# Copyright (C) 2009-2016 by Akkana Peck.
+# You are free to use, share or modify this program under
+# the terms of the GPLv2 or, at your option, any later GPL.
+
+'''TiledMapCollection: a pytopo map collection that can download tiles.
+   A base class for more specific downloaders.
+'''
+
 from MapCollection import MapCollection
 from MapWindow import MapWindow
 from MapUtils import MapUtils

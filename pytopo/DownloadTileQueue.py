@@ -1,3 +1,9 @@
+# Copyright (C) 2009-2016 by Akkana Peck.
+# You are free to use, share or modify this program under
+# the terms of the GPLv2 or, at your option, any later GPL.
+
+'''DownloadTileQueue: maintain a list of tiles being downloaded.
+'''
 
 import sys
 import urllib
