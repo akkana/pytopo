@@ -1,11 +1,11 @@
 
 from TiledMapCollection import TiledMapCollection
+from MapWindow import MapWindow
 
 import os
 import time
 import math
-import gtk
-import gobject   # XXX should be factored out, in all non-gtk classes
+import gobject
 
 
 class OSMMapCollection(TiledMapCollection):
@@ -263,8 +263,8 @@ class OSMMapCollection(TiledMapCollection):
             return None
 
         try:
-            pixbuf = gtk.gdk.pixbuf_new_from_file(path)
-        except gobject.GError:
+            pixbuf = MapWindow.load_image_from_file(path)
+        except:
             pixbuf = None
             # return None
 

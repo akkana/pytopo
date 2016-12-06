@@ -1,9 +1,9 @@
 from MapCollection import MapCollection
+from MapWindow import MapWindow
 from MapUtils import MapUtils
 from DownloadTileQueue import DownloadTileQueue
 
 import os
-import gtk
 import glib
 import gobject
 import gc
@@ -281,7 +281,7 @@ TiledMapCollection classes must implement
             y_off = 0
 
         try:
-            pixbuf = gtk.gdk.pixbuf_new_from_file(path)
+            pixbuf = MapWindow.load_image_from_file(path)
             self.draw_tile_at_position(pixbuf, mapwin, mapx, mapy,
                                        x_off, y_off)
         except glib.GError, e:

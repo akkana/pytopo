@@ -1,7 +1,7 @@
 
 import os
-import gtk
 from MapUtils import MapUtils
+from MapWindow import MapWindow
 from TiledMapCollection import TiledMapCollection
 
 
@@ -60,7 +60,7 @@ class GenericMapCollection(TiledMapCollection):
             # print "Can't open", filename, "for", longitude, latitude
             return None, 0, 0, filename
         # print "Opened", filename, "for", longitude, latitude
-        pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
+        pixbuf = MapWindow.load_image_from_file(filename)
 
         # Offsets aren't implemented yet:
         x_off = 0
@@ -96,7 +96,7 @@ class GenericMapCollection(TiledMapCollection):
         newpath = os.path.join(self.location, newname + ext)
         if filename is None or not os.access(filename, os.R_OK):
             return None, newpath
-        pixbuf = gtk.gdk.pixbuf_new_from_file(newpath)
+        pixbuf = MapWindow.load_image_from_file(newpath)
         return pixbuf, newpath
 
     def coords_to_filename(self, longitude, latitude):

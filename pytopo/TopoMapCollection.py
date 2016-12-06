@@ -1,9 +1,9 @@
 
 from TiledMapCollection import TiledMapCollection
 from MapUtils import MapUtils
+from MapWindow import MapWindow
 
 import os
-import gtk
 
 
 class TopoMapCollection(TiledMapCollection):
@@ -101,7 +101,7 @@ class TopoMapCollection(TiledMapCollection):
 
         if not os.access(filename, os.R_OK):
             return None, x_off, y_off, filename
-        pixbuf = gtk.gdk.pixbuf_new_from_file(filename)
+        pixbuf = MapWindow.load_image_from_file(filename)
 
         return pixbuf, x_off, y_off, filename
 
@@ -182,7 +182,7 @@ class TopoMapCollection(TiledMapCollection):
                 print "  Can't open", newpath
             return None, newpath
 
-        pixbuf = gtk.gdk.pixbuf_new_from_file(newpath)
+        pixbuf = MapWindow.load_image_from_file(newpath)
         return pixbuf, newpath
 
     #

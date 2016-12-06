@@ -1256,6 +1256,10 @@ that are expected by the MapCollection classes:
         self.drawing_area.window.draw_arc(self.xgc, fill, xc - r, yc - 4,
                                           r * 2, r * 2, 0, 23040)  # 64 * 360
 
+    @staticmethod
+    def load_image_from_file(filename):
+        return gtk.gdk.pixbuf_new_from_file(filename)
+
     def draw_string_scale(self, x, y, s, whichfont=None):
         """Draw a string at the specified location.
            If x or y is negative, we'll draw from the right or bottom edge.
