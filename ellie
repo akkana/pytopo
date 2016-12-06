@@ -4,9 +4,13 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-VERSION = 0.4
+VERSION = 0.5
 
-import sys, os, math, datetime, xml.dom.minidom
+import sys
+import os
+
+from pytopo import TrackPoints
+import pytopo.trackstats
 
 try:
     import pylab
@@ -15,154 +19,13 @@ except ImportError:
     have_pylab = False
     print "pylab isn't installed; will print stats only, no plotting"
 
-#import matplotlib.pyplot as plt
-#from matplotlib.dates import YearLocator, MonthLocator, DateFormatter
-
-# Climb threshold: any short climb that doesn't gain more than
-# this number of feet won't be counted toward total climb.
-# GPS units (at least my Vista CX) have a lot of 1-2'
-# fluctuations that vastly overestimate the climb total;
-# just swinging the bag around, or unhooking it from your belt
-# to check your current position, can do that.
-CLIMB_THRESHOLD = 8
-
-# How fast do we have to be moving to count toward the moving average speed?
-# This is in miles/hour.
-SPEED_THRESHOLD = .5
-
-# The variables we're going to plot:
-times = [ ]
-eles = [ ]
-distances = [ ]
-
-# Some evil globals because python doesn't have static variables:
-lastlat = 0
-lastlon = 0
-lastele = -1
-total_dist = 0
-total_climb = 0
-this_climb = 0
-this_climb_start = 0
-
-lasttime = None
-moving_time = datetime.timedelta(0)
-stopped_time = datetime.timedelta(0)
-
-def getVal(parent, name):
-    nodeList = parent.getElementsByTagName(name)
-    if len(nodeList) < 1:
-        return "No " + name + " element"
-    children = nodeList[0].childNodes
-    if len(children) < 1:
-        return "No " + name + " children"
-    node = children[0]
-    if node.nodeType != node.TEXT_NODE:
-        return name + " isn't a text node"
-    return node.data
-
-def tot_climb(arr):
-    tot = 0
-    lastel = -1
-    this_climb = 0
-    this_climb_start = 0
-    for el in arr:
-        if lastel > 0:
-            if el > lastel:
-                if this_climb == 0:
-                    this_climb_start = lastel
-                this_climb += el - lastel
-            elif el < lastel:
-                if this_climb > CLIMB_THRESHOLD:
-                    tot += this_climb
-                    this_climb = 0
-                elif el <= this_climb_start:
-                    this_climb = 0
-
-        lastel = el
-
-    return tot
-
-def accumulate_climb(ele):
-    global lastele, total_climb, this_climb, this_climb_start
-    if lastele >= 0:             # Not the first call
-        if ele > lastele:        # Climbed since last step
-            if this_climb == 0:
-                this_climb_start = lastele
-            this_climb = this_climb + ele - lastele
-        else:
-            if this_climb > CLIMB_THRESHOLD:
-                total_climb = total_climb + this_climb
-                this_climb = 0
-            elif ele <= this_climb_start:
-                # We got a little hump but it isn't big enough to count;
-                # probably an artifact like taking the GPS out of its case
-                # or getting off the bike or something. So reset.
-                this_climb = 0
-    lastele = ele
-
-def handleTrackPoint(point):
-    global lastlat, lastlon, lasttime, total_dist, moving_time, stopped_time
-    time = datetime.datetime.strptime(getVal(point, "time"),
-                                      '%Y-%m-%dT%H:%M:%SZ')
-    lat =  float(point.getAttribute("lat"))
-    lon = float(point.getAttribute("lon"))
-    ele = float(getVal(point, "ele"))
-    ele = round(ele * 3.2808399, 2)      # convert from meters to feet
-
-    if lastlat != 0 and lastlon != 0:
-        dist = math.sqrt((lat - lastlat)**2 + (lon - lastlon)**2) * 69.046767
-            # 69.046767 converts nautical miles (arcminutes) to miles
-        total_dist += dist
-
-        delta_t = time - lasttime   # This is a datetime.timedelta object
-        speed = dist / delta_t.seconds * 60 * 60    # miles/hour
-        if speed > SPEED_THRESHOLD:
-            moving_time += delta_t
-            #print "moving\t",
-        else:
-            stopped_time += delta_t
-            #print "stopped\t",
-
-    lasttime = time
-
-    accumulate_climb(ele)
-
-    lastlat = lat
-    lastlon = lon
-
-    #print total_dist, ele, "\t", time, lat, lon, "\t", total_climb
-    #print total_dist, ele, "\t", time, total_climb
-
-    distances.append(total_dist)
-    eles.append(ele)
-
-def handleTrackFile(dom):
-    points = dom.getElementsByTagName("trkpt")
-    for i in range (0, len(points), 1):
-        handleTrackPoint(points[i])
-    accumulate_climb(0)
-
-def smooth(x, halfwin, beta):
-    """ Kaiser window smoothing.
-        Unfortunately, this only smooths by a tiny bit,
-        and changing beta doesn't affect that much.
-    """
-    window_len = 2 * halfwin + 1
-    # extending the data at beginning and at the end
-    # to apply the window at the borders
-    s = numpy.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
-    w = numpy.kaiser(window_len,beta)
-    y = numpy.convolve(w/w.sum(),s,mode='valid')
-    return y[halfwin:len(y)-halfwin]
-
-import numpy
-
 def main(args):
     if len(args) < 2:
         print "Ellie version", VERSION
         print "Usage:", os.path.basename(args[0]), \
             "[-b beta] [-w halfwidth] file.gpx"
-        print "  beta and halfwidth are parameters for Kaiser window smoothing"
+        print """  beta (default 2) and halfwidth (default 15)
+  are parameters for Kaiser window smoothing"""
         return 1
 
     # Default values that can be changed by commandline arguments:
@@ -183,40 +46,38 @@ def main(args):
         print "Don't understand flag", args[0]
 
     #
-    # Parse the file:
+    # Read the trackpoints file:
     #
+    trackpoints = TrackPoints()
     try:
-        dom = xml.dom.minidom.parse(args[0])
+        trackpoints.read_track_file(args[0])
     except IOError, e:
         print e
         #print dir(e)
         return e.errno
 
-    handleTrackFile(dom)
+    out = pytopo.trackstats.statistics(trackpoints, halfwin, beta)
 
     #
-    # Plot the results:
+    # Print and plot the results:
     #
-    smoothed_eles = smooth(eles, halfwin, beta)
-
-    print "%.1f miles. Raw total climb: %d'" % (total_dist, int(total_climb))
-    smoothed_climb = tot_climb(smoothed_eles)
-    print "Raw climb:    %d'" % tot_climb(eles)
-    print "Smoothed climb: %d'" % smoothed_climb
-    print "  (beta = %02f, half-window size = %d)" % (beta, halfwin)
-    print "%d minutes moving, %d stopped" % (int(moving_time.seconds / 60),
-                                             int(stopped_time.seconds / 60))
-    print "Average speed moving: %.1f mph" % (total_dist *60*60
-                                              / moving_time.seconds)
+    print "%.1f miles. Raw total climb: %d'" % (out['Total distance'],
+                                                int(out['Raw total climb']))
+    print "Smoothed climb: %d'" % out['Smoothed total climb']
+    print "%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
+                                             int(out['Stopped time'] / 60))
+    print "Average speed moving: %.1f mph" % out['Average moving speed']
     if not have_pylab:
         return 0
 
-    pylab.plot(distances, eles, label="GPS elevation data", color="gray")
-    pylab.plot(distances, smoothed_eles, color="red",
-               label="smoothed (b=%.1f, hw=%d)" % (beta, halfwin))
+    pylab.plot(out['Distances'], out['Elevations'],
+               label="GPS elevation data", color="gray")
+    pylab.plot(out['Distances'], out['Smoothed elevations'],
+               color="red", label="smoothed (b=%.1f, hw=%d)" % (beta, halfwin))
 
-    title_string = "Elevation profile (" + str(round(distances[-1], 1)) \
-                  + " miles, " + str(int(smoothed_climb)) + "' climb)"
+    title_string = "Elevation profile (" + str(round(out['Distances'][-1], 1)) \
+                   + " miles, " + str(int(out['Smoothed total climb'])) \
+                   + "' climb)"
     pylab.title(title_string)
 
     # Set the window titlebar to something other than "Figure 1"

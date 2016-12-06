@@ -53,15 +53,15 @@ class TrackPoints(object):
         import pytopo
         return pytopo.__version__
 
-    def get_bounds(self):
-        '''Get bounds encompassing all contained tracks and waypoints.'''
-        return self.minlon, self.minlat, self.maxlon, self.maxlat
-
     def is_start(self, point):
         '''Is this the start of a new track segment?
            If so, it's a string (or unicode), the name of the track section.
         '''
         return isinstance(point, str) or isinstance(point, unicode)
+
+    def get_bounds(self):
+        '''Get bounds encompassing all contained tracks and waypoints.'''
+        return self.minlon, self.minlat, self.maxlon, self.maxlat
 
     def is_attributes(self, point):
         '''Is this point actually a set of attributes?'''
