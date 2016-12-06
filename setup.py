@@ -11,9 +11,9 @@ setup(name='pytopo',
       author_email='akkana@shallowsky.com',
       url='http://shallowsky.com/software/topo/',
       scripts=['pytopo'],
-      data_files=[ ('/usr/share/applications', ["pytopo.desktop"]),
-                   ('/usr/share/pixmaps', ["pytopo.png"]),
-                   ('/usr/share/pytopo', ["pytopo-pin.png"])
+      data_files=[ ('/usr/share/applications', ["resources/pytopo.desktop"]),
+                   ('/usr/share/pixmaps', ["resources/pytopo.png"]),
+                   ('/usr/share/pytopo', ["resources/pytopo-pin.png"])
                  ]
      )
 
