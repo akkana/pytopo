@@ -9,7 +9,7 @@
    I'd appreciate hearing about it if you make any changes.
 '''
 
-__version__ = "1.3"
+__version__ = "1.4"
 __author__ = "Akkana Peck <akkana@shallowsky.com>"
 __license__ = "GPL v2+"
 __all__ = ['Mapping', 'Cartography']

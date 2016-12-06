@@ -1,17 +1,23 @@
-This is PyTopo, an application for exploring tiled maps using local data.
-See the project home page at http://shallowsky.com/software/topo
-for more information.
+This is PyTopo, an application for exploring tiled maps cached locally.
 
-It can download data from OpenStreetMap (default), or you can use
-tiles from programs like the commercial Topo! or tiles you've
-generated yourself.
+See the project home page at http://shallowsky.com/software/topo
+for more information, examples, screenshots, hints on creating
+custom maps, and more.
+
+It can download data from OpenStreetMap or other map servers,
+which may or may not require API keys; or you can use tiles from
+commercial programs like the Topo! or tiles you've generated yourself.
 
 It can also display GPX, KML or KMZ track logs, and can measure
 distances and angles between points or give you the coordinates of
 a point.
 
-Installing: all you really need is the script itself, pytopo
-but if you want to see pin images, create a directory
+It uses PyGTK for its user interface, so you will need PyGTK installed.
+
+You can install it with pip install pytopo.
+Or run it from the project directory by running pytopo/MapViewer.py
+if you have the pytopo directory in your PYTHONPATH.
+But if you want to see pin images, create a directory
 /usr/share/pytopo and copy pytopo-pin.png into it.
 Or just have pytopo-pin.png in the current directory when you run pytopo.
 
@@ -19,16 +25,12 @@ The first time you run it, pytopo will create a ~/.config/pytopo
 directory for its configuration files, and a Maps directory for
 map data.
 
-pytopo -h gives usage.
+pytopo -h gives usage examples.
 
-If you need custom maps., edit ~/.config/pytopo/pytopo.sites to add
-new map Collections.
+If you need custom maps., edit ~/.config/pytopo/pytopo.sites to add new
+map Collections (see examples in that file or on the project home page).
 
-See http://shallowsky.com/software/topo for more information on
-things you can do and some hints how to create more map data if you
-need custom tiles beyond what you can get from OpenStreetMap.
-
-Contributions appreciated!
+Code contributions appreciated!
 
 Also in this project: ellie, a little script for reporting and plotting
 statistics (distance and elevation change) read from a GPX track log.

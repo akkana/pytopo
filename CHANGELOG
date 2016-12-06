@@ -1,3 +1,8 @@
+2016-12-06  Akkana Peck <akkana@shallowsky.com>
+	* Factor ellie stats code into new trackstats module.
+
+2016-12-05  Akkana Peck <akkana@shallowsky.com>
+	* Factor the huge pytopo script into multiple package/classes.
 
 2016-11-28  Akkana Peck <akkana@shallowsky.com>
 	* Try to guard against bad maplet files that result in bad pixmaps. Unfortunately, sometimes we still get the GTK warning despite trying to test for it.
