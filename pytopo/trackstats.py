@@ -160,3 +160,92 @@ def smooth(x, halfwin, beta):
     w = numpy.kaiser(window_len,beta)
     y = numpy.convolve(w/w.sum(),s,mode='valid')
     return y[halfwin:len(y)-halfwin]
+
+#
+# main() to gather stats from a file passed in on the commandline
+# and graph them if possible, else just print them.
+#
+def main():
+    import sys
+    import os
+    import pytopo.TrackPoints
+
+    try:
+        import pylab
+        have_pylab = True
+    except ImportError:
+        have_pylab = False
+        print "pylab isn't installed; will print stats only, no plotting"
+
+    if len(sys.argv) < 2:
+        cmdname = os.path.basename(sys.argv[0])
+        print "%s version %s" % (cmdname, pytopo.__version__)
+        print "Usage: %s [-b beta] [-w halfwidth] file.gpx" % cmdname
+        print """  beta (default 2) and halfwidth (default 15)
+  are parameters for Kaiser window smoothing"""
+        return 1
+
+    # Default values that can be changed by commandline arguments:
+    beta = 2
+    halfwin = 15
+
+    # Look for flags:
+    args = sys.argv[1:]
+    while args[0][0] == '-':
+        if args[0] == '-b' and len(args) > 2:
+            beta = float(args[1])
+            args = args[2:]
+            continue
+        if args[0] == '-w' and len(args) > 2:
+            halfwin = int(args[1])
+            args = args[2:]
+            continue
+        print "Don't understand flag", args[0]
+
+    #
+    # Read the trackpoints file:
+    #
+    trackpoints = pytopo.TrackPoints()
+    try:
+        trackpoints.read_track_file(args[0])
+    except IOError, e:
+        print e
+        #print dir(e)
+        return e.errno
+
+    out = statistics(trackpoints, halfwin, beta)
+
+    #
+    # Print and plot the results:
+    #
+    print "%.1f miles. Raw total climb: %d'" % (out['Total distance'],
+                                                int(out['Raw total climb']))
+    print "Smoothed climb: %d'" % out['Smoothed total climb']
+    print "%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
+                                             int(out['Stopped time'] / 60))
+    print "Average speed moving: %.1f mph" % out['Average moving speed']
+    if not have_pylab:
+        return 0
+
+    pylab.plot(out['Distances'], out['Elevations'],
+               label="GPS elevation data", color="gray")
+    pylab.plot(out['Distances'], out['Smoothed elevations'],
+               color="red", label="smoothed (b=%.1f, hw=%d)" % (beta, halfwin))
+
+    title_string = "Elevation profile (" + str(round(out['Distances'][-1], 1)) \
+                   + " miles, " + str(int(out['Smoothed total climb'])) \
+                   + "' climb)"
+    pylab.title(title_string)
+
+    # Set the window titlebar to something other than "Figure 1"
+    pylab.gcf().canvas.set_window_title("Ellie: " + args[0])
+
+    pylab.xlabel("miles")
+#    pylab.get_current_fig_manager().window.set_title(os.path.basename(args[0] + ": " + title_string))
+    pylab.ylabel("feet")
+    pylab.grid(True)
+    pylab.legend()
+    pylab.show()
+
+if __name__ == '__main__':
+    main()

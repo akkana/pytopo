@@ -21,6 +21,7 @@ setup(name='pytopo',
           # mentions gui_scripts at all.
           'console_scripts': [
               'pytopo=pytopo.MapViewer:main'
+              'ellie=pytopo.trackstats:main'
           ]
       },
       download_url='https://github.com/akkana/pytopo/tarball/1.4',
