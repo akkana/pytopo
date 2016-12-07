@@ -5,7 +5,7 @@
 '''MapWindow: pytopo's GTK-based window for showing tiled maps.
 '''
 
-from MapUtils import MapUtils
+from pytopo.MapUtils import MapUtils
 
 import os
 import re

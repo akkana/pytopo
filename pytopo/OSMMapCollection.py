@@ -7,8 +7,8 @@
    tile naming and zoom scheme.
 '''
 
-from TiledMapCollection import TiledMapCollection
-from MapWindow import MapWindow
+from pytopo.TiledMapCollection import TiledMapCollection
+from pytopo.MapWindow import MapWindow
 
 import os
 import time

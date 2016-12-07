@@ -6,9 +6,9 @@
    commercial map datasets.
 '''
 
-from TiledMapCollection import TiledMapCollection
-from MapUtils import MapUtils
-from MapWindow import MapWindow
+from pytopo.TiledMapCollection import TiledMapCollection
+from pytopo.MapUtils import MapUtils
+from pytopo.MapWindow import MapWindow
 
 import os
 

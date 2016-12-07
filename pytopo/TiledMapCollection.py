@@ -6,10 +6,10 @@
    A base class for more specific downloaders.
 '''
 
-from MapCollection import MapCollection
-from MapWindow import MapWindow
-from MapUtils import MapUtils
-from DownloadTileQueue import DownloadTileQueue
+from pytopo.MapCollection import MapCollection
+from pytopo.MapWindow import MapWindow
+from pytopo.MapUtils import MapUtils
+from pytopo.DownloadTileQueue import DownloadTileQueue
 
 import os
 import glib

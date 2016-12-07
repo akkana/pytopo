@@ -8,9 +8,9 @@
 '''
 
 import os
-from MapUtils import MapUtils
-from MapWindow import MapWindow
-from TiledMapCollection import TiledMapCollection
+from pytopo.MapUtils import MapUtils
+from pytopo.MapWindow import MapWindow
+from pytopo.TiledMapCollection import TiledMapCollection
 
 
 class GenericMapCollection(TiledMapCollection):
