@@ -9,7 +9,7 @@ VERSION = 0.5
 import sys
 import os
 
-from pytopo import TrackPoints
+import pytopo.TrackPoints
 import pytopo.trackstats
 
 try:
@@ -48,7 +48,7 @@ def main(args):
     #
     # Read the trackpoints file:
     #
-    trackpoints = TrackPoints()
+    trackpoints = pytopo.TrackPoints()
     try:
         trackpoints.read_track_file(args[0])
     except IOError, e:
