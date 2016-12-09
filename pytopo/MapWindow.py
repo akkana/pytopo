@@ -11,6 +11,7 @@ import os
 import re
 import urllib
 import math
+import collections
 
 import gtk
 import gobject
@@ -19,7 +20,7 @@ import gc
 import pango
 
 
-class MapWindow():
+class MapWindow(object):
 
     """The pytopo UI: the map window.
 This holds the GTK specific drawing code,
@@ -179,7 +180,7 @@ that are expected by the MapCollection classes:
         self.win_width, self.win_height = self.drawing_area.window.get_size()
 
         # XXX Collection.draw_map wants center, but we only have lower right.
-        if (self.Debug):
+        if self.Debug:
             print ">>>>>>>>>>>>>>>>"
             print "window draw_map centered at",
             print MapUtils.dec_deg2deg_min_str(self.center_lon),
@@ -289,6 +290,7 @@ that are expected by the MapCollection classes:
                 cur_y = None
 
     def select_track(self, trackindex):
+        '''Mark a track as active.'''
         if self.Debug:
             # Test against None specifically, else we won't be able
             # to select the first track starting at index 0.
@@ -311,6 +313,7 @@ that are expected by the MapCollection classes:
         self.show_traildialog(attrstr)
 
     def show_traildialog(self, attrstr):
+        '''Show a dialog giving information about a selected track.'''
         trailname = self.trackpoints.points[self.selected_track]
         if not self.traildialog:
             self.traildialog = gtk.Dialog(trailname,
@@ -355,11 +358,11 @@ that are expected by the MapCollection classes:
             cur_x = None
             cur_y = None
 
-            next = 0
+            nextpt = 0
             while True:
                 self.track_color = self.contrasting_color(self.track_color)
-                next = self.draw_trackpoint_segment(next, self.track_color)
-                if not next:
+                nextpt = self.draw_trackpoint_segment(nextpt, self.track_color)
+                if not nextpt:
                     break
 
         if self.selected_track is not None:  # None vs. trackpoint 0
@@ -854,11 +857,11 @@ that are expected by the MapCollection classes:
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
             selection = treeview.get_selection()
-            model, iter = selection.get_selected()
-            if iter:
-                # locname = store.get_value(iter, 0)
-                # collname = store.get_value(iter, 1)
-                site = store.get_value(iter, 2)
+            model, it = selection.get_selected()
+            if it:
+                # locname = store.get_value(it, 0)
+                # collname = store.get_value(it, 1)
+                site = store.get_value(it, 2)
                 self.controller.use_site(site, self)
                 dialog.destroy()
                 return True
@@ -875,10 +878,10 @@ that are expected by the MapCollection classes:
                                                 gtk.STOCK_SAVE,
                                                 gtk.RESPONSE_OK))
         dialog.set_current_folder(self.controller.config_dir)
-        filter = gtk.FileFilter()
-        filter.set_name("GPX Files")
-        filter.add_pattern("*.gpx")
-        dialog.add_filter(filter)
+        filt = gtk.FileFilter()
+        filt.set_name("GPX Files")
+        filt.add_pattern("*.gpx")
+        dialog.add_filter(filt)
 
         while True:
             response = dialog.run()

@@ -10,6 +10,8 @@ import xml.dom.minidom
 import zipfile
 import simplejson
 
+from pytopo import __version__
+
 
 class TrackPoints(object):
 
@@ -53,8 +55,7 @@ class TrackPoints(object):
         #   ValueError: Attempted relative import in non-package
         # The only solution I've found is to import the whole module,
         # then get the version from it.
-        import pytopo
-        return pytopo.__version__
+        return __version__
 
     def is_start(self, point):
         '''Is this the start of a new track segment?
@@ -224,7 +225,7 @@ class TrackPoints(object):
         with open(filename, "w") as outfp:
             print >>outfp, '''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <gpx version="1.1" creator="PyTopo %s~" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-''' % get_version()
+''' % __version__
             if self.points:
                 print >>outfp, "  <trk>"
                 started = False
@@ -270,12 +271,11 @@ class TrackPoints(object):
             print "No features in geojson file", filename
             return
         for feature in gj["features"]:
-            type = feature["geometry"]["type"]
-            if type != "LineString" and type != "MultiLineString":
+            featuretype = feature["geometry"]["type"]
+            if featuretype != "LineString" and featuretype != "MultiLineString":
                 continue
             # It's a track. Add it.
             name = None
-            propstring = ""
             if "properties" in feature:
                 props = feature["properties"]
                 for key in props:
@@ -287,14 +287,14 @@ class TrackPoints(object):
             if not name:
                 name = "unnamed"
 
-            if type == "LineString":
+            if featuretype == "LineString":
                 self.points.append(name)
                 if "properties" in feature:
                     self.points.append(feature["properties"])
                 for coords in feature["geometry"]["coordinates"]:
                     lon, lat, ele = coords
                     self.handle_track_point(lat, lon, ele, None)
-            elif type == "MultiLineString":
+            elif featuretype == "MultiLineString":
                 for linestring in feature["geometry"]["coordinates"]:
                     self.points.append(name)
                     if "properties" in feature:
@@ -319,13 +319,13 @@ class TrackPoints(object):
         # Handle kmz compressed files, which are much more common in practice
         # than actual KML files:
         if filename.lower().endswith(".kmz") and zipfile.is_zipfile(filename):
-            zip = zipfile.ZipFile(filename)
-            namelist = zip.namelist()
+            zipf = zipfile.ZipFile(filename)
+            namelist = zipf.namelist()
             if "doc.kml" not in namelist:
                 raise ValueError("No doc.kml in %s" % filename)
             if len(namelist) > 1:
                 print "Warning: ignoring files other than doc.kml in", filename
-            kmlfp = zip.open("doc.kml")
+            kmlfp = zipf.open("doc.kml")
             doc_kml = kmlfp.read()
             kmlfp.close()
             dom = xml.dom.minidom.parseString(doc_kml)

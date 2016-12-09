@@ -41,8 +41,8 @@ class MapUtils:
         else:
             sgn = 1
         deg = cls.int_trunc(coord)
-        min = abs(coord - deg) * .6
-        return sgn * (deg + min)
+        minutes = abs(coord - deg) * .6
+        return sgn * (deg + minutes)
 
     @classmethod
     def dec_deg2deg_min_str(cls, coord):
@@ -53,9 +53,9 @@ class MapUtils:
         else:
             sgnstr = ''
         deg = cls.int_trunc(coord)
-        min = abs(coord - deg) * 60.
-        min = cls.truncate2frac(min, .01)
-        return sgnstr + str(deg) + "^" + str(min) + "'"
+        minutes = abs(coord - deg) * 60.
+        minutes = cls.truncate2frac(minutes, .01)
+        return sgnstr + str(deg) + "^" + str(minutes) + "'"
 
     @classmethod
     def angle_to_bearing(cls, angle):

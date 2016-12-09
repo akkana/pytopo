@@ -58,7 +58,7 @@ class MapViewer(object):
 
     @classmethod
     def Usage(cls):
-        print "pytopo", get_version()
+        print "pytopo", MapViewer.get_version()
         print """
 Usage: pytopo
        pytopo trackfile
@@ -90,7 +90,7 @@ Shift-click in the map to print the coordinates of the clicked location.
         print "==============="
         print errstr
         print "===============\n"
-        self.Usage()
+        MapViewer.Usage()
 
     def append_known_site(self, site):
         self.KnownSites.append(site)
@@ -180,9 +180,9 @@ Shift-click in the map to print the coordinates of the clicked location.
         response = dialog.run()
         if response == gtk.RESPONSE_OK:
             selection = treeview.get_selection()
-            model, iter = selection.get_selected()
-            if iter:
-                trackfile = store.get_value(iter, 1)
+            model, it = selection.get_selected()
+            if it:
+                trackfile = store.get_value(it, 1)
                 mapwin.trackpoints = TrackPoints()
                 mapwin.trackpoints.read_track_file(trackfile)
                 # XXX Might want to handle IOError in case file doesn't exist
@@ -230,18 +230,18 @@ Shift-click in the map to print the coordinates of the clicked location.
         response = dialog.run()
         while response == gtk.RESPONSE_APPLY:
             selection = treeview.get_selection()
-            model, iter = selection.get_selected()
-            if iter:
-                site = store.get_value(iter, 2)
+            model, it = selection.get_selected()
+            if it:
+                site = store.get_value(it, 2)
                 self.KnownSites.remove(site)
-                store.remove(iter)
+                store.remove(it)
             response = dialog.run()
 
         if response == gtk.RESPONSE_OK:
             selection = treeview.get_selection()
-            model, iter = selection.get_selected()
-            if iter:
-                site = store.get_value(iter, 2)
+            model, it = selection.get_selected()
+            if it:
+                site = store.get_value(it, 2)
                 self.use_site(site, mapwin)
                 dialog.destroy()
                 return True
@@ -274,10 +274,6 @@ Shift-click in the map to print the coordinates of the clicked location.
     def parse_args(self, mapwin, args):
         """Parse runtime arguments."""
 
-        # Variables we expect from .pytopo:
-        do_collection = False
-
-        arg0 = args[0]
         args = args[1:]
 
         while len(args) > 0:
@@ -391,7 +387,7 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
                 print "Can't make sense of argument:", args[0]
                 self.Usage()
 
-            except ValueError, e:
+            except ValueError:
                 print "Couldn't parse coordinates"
                 self.Usage()
 
@@ -539,10 +535,10 @@ from pytopo import GenericMapCollection
         trackdir = os.path.expanduser('~/Tracks')
 
         if os.path.isdir(trackdir):
-            for file in glob.glob(os.path.join(trackdir, '*.gpx')):
-                head, gpx = os.path.split(file)
+            for f in glob.glob(os.path.join(trackdir, '*.gpx')):
+                head, gpx = os.path.split(f)
                 filename = gpx.partition('.')[0]
-                self.KnownTracks.append([filename, file])
+                self.KnownTracks.append([filename, f])
 
     def create_initial_config(self):
         """Make an initial configuration file.

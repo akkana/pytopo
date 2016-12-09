@@ -34,7 +34,6 @@ def statistics(trackpoints, halfwin, beta):
     global total_climb, this_climb, this_climb_start, lastele
 
     # The variables we're going to plot:
-    times = [ ]
     eles = [ ]
     distances = [ ]
 
