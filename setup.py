@@ -1,13 +1,23 @@
 #!/usr/bin/env python
 
 # from distutils.core import setup
-from setuptools import setup
+from setuptools import setup, Command
 import os
 
 # Utility function to read the README file.
 # Used for the long_description.
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
+
+class CleanCommand(Command):
+    """Custom clean command to tidy up the project root."""
+    user_options = []
+    def initialize_options(self):
+        pass
+    def finalize_options(self):
+        pass
+    def run(self):
+        os.system('rm -vrf ./build ./dist ./*.pyc ./*.tgz ./*.egg-info')
 
 setup(name='pytopo',
       packages=['pytopo'],
@@ -49,6 +59,10 @@ setup(name='pytopo',
           'Topic :: Multimedia :: Graphics',
           'Topic :: Multimedia :: Graphics :: Viewers',
           'Topic :: Utilities'
-        ]
+        ],
+
+      cmdclass={
+          'clean': CleanCommand,
+      }
      )
 
