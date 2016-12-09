@@ -1,26 +1,37 @@
 #!/usr/bin/env python
 
+# from distutils.core import setup
 from setuptools import setup
+import os
+
+# Utility function to read the README file.
+# Used for the long_description.
+def read(fname):
+    return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
 setup(name='pytopo',
+      packages=['pytopo'],
       version='1.4',
-      description='Map and track file viewer, using cached offline map tiles',
+      description='Map viewer, using cached offline map tiles and track files',
       long_description=read('README'),
       author='Akkana Peck',
       author_email='akkana@shallowsky.com',
       license="GPLv2+",
       url='http://shallowsky.com/software/topo/',
-      scripts=['ellie'],
-      data_files=[ ('/usr/share/applications', ["resources/pytopo.desktop"]),
-                   ('/usr/share/pixmaps', ["resources/pytopo.png"]),
-                   ('/usr/share/pytopo', ["resources/pytopo-pin.png"])
-                 ]
+      # include_package_data=True,
+      data_files=[('/usr/share/pixmaps',      ["resources/pytopo.png"]),
+                  # Next line builds bdist fine, but on install, gives:
+                  # error: can't copy 'resources/pytopo.desktop': doesn't exist or not a regular file
+                  ('/usr/share/applications', ["resources/pytopo.desktop"]),
+                  ('/usr/share/pytopo',       ["resources/sample.pytopo"]),
+                  ('/usr/share/pytopo',       ["resources/pytopo-pin.png"])
+                 ],
       entry_points={
           # This probably should be gui_scripts according to some
           # pages I've found, but none of the official documentation
           # mentions gui_scripts at all.
           'console_scripts': [
-              'pytopo=pytopo.MapViewer:main'
+              'pytopo=pytopo.MapViewer:main',
               'ellie=pytopo.trackstats:main'
           ]
       },
