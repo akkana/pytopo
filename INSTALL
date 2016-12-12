@@ -1,0 +1,19 @@
+Install pytopo on your local machine with
+python setup.py install
+
+Or get it from PyPI:
+pip install pytopo
+
+Either way, the executables will be called pytopo and ellie.
+On its first run it will create the configuration file it needs.
+
+Developers: you can run pytopo from the development directory by running
+pytopo/MapViewer.py, as long as your PYTHONPATH points to somewhere
+where Python can import the pytopo module.
+
+Run ellie from pytopo/trackstats.py -- though right now ellie is
+untested because there's a fatal matplotlib bug getting in the way.
+
+Build the API documentation with:
+  cd docs/sphinxdoc/
+  make html
