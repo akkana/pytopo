@@ -3,10 +3,14 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-========================================================
+================================================================
 PyTopo:
+================================================================
 A viewer for tiled maps, plus track and waypoint files.
-========================================================
+================================================================
+
+.. toctree::
+   :maxdepth: 2
 
 *PyTopo* is an open source tiled map viewer,
 written in Python and GRK. It can download and cache tiles from
@@ -20,9 +24,8 @@ can save favorite places, and has some rudimentary track editing ability.
 Installing
 ==========
 
-PyTopo is available on PyPI:
+PyTopo is available on PyPI::
 
-::
   pip install pytopo
 
 It requires PyGTK.
@@ -297,6 +300,8 @@ cut from a larger geologic map.
 
 .. inheritance-diagram:: pytopo.MapCollection pytopo.OSMMapCollection pytopo.Topo1MapCollection pytopo.Topo2MapCollection pytopo.GenericMapCollection
    :parts: 1
+
+**API Documentation:**
 
 * :ref:`genindex`
 * :ref:`modindex`
