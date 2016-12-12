@@ -124,7 +124,15 @@ todo_include_todos = False
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-# html_theme = 'classic'
+# Sphinx 1.2 has no theme support at all, and setting html_theme
+# causes a fatal error:
+# Theme error:
+# no theme named 'default' found (missing theme.conf?)
+# So only set it if version >= 1.3.
+from sphinx import version_info
+vers = version_info
+if vers[0] >= 0 and vers[1] >= 3:
+    html_theme = 'classic'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
