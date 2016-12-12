@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Copyright (C) 2009-2016 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
@@ -225,6 +227,11 @@ def main():
     print "Average speed moving: %.1f mph" % out['Average moving speed']
     if not have_pylab:
         return 0
+
+    print "======= Distances", type(out['Distances'])
+    # print out['Distances']
+    print "\n\n======= Elevations", type(out['Elevations'])
+    # print out['Elevations']
 
     pylab.plot(out['Distances'], out['Elevations'],
                label="GPS elevation data", color="gray")
