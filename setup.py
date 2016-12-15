@@ -9,6 +9,16 @@ import os
 def read(fname):
     return open(os.path.join(os.path.dirname(__file__), fname)).read()
 
+def get_version():
+    '''Read the pytopo module versions from pytopo/__init__.py'''
+    with open("pytopo/__init__.py") as fp:
+        for line in fp:
+            line = line.strip()
+            if line.startswith("__version__"):
+                parts = line.split("=")
+                if len(parts) > 1:
+                    return parts[1].strip()
+
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
     user_options = []
@@ -21,7 +31,7 @@ class CleanCommand(Command):
 
 setup(name='pytopo',
       packages=['pytopo'],
-      version='1.4',
+      version=get_version(),
       description='Map viewer, using cached offline map tiles and track files',
       long_description=read('README'),
       author='Akkana Peck',
