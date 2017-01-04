@@ -385,7 +385,8 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
                     args = args[2:]
                     continue
                 print "Can't make sense of argument:", args[0]
-                self.Usage()
+                args = args[1:]
+                continue
 
             except ValueError:
                 print "Couldn't parse coordinates"
