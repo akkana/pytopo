@@ -228,9 +228,9 @@ def main():
     if not have_pylab:
         return 0
 
-    print "======= Distances", type(out['Distances'])
+    # print "======= Distances", type(out['Distances'])
     # print out['Distances']
-    print "\n\n======= Elevations", type(out['Elevations'])
+    # print "\n\n======= Elevations", type(out['Elevations'])
     # print out['Elevations']
 
     pylab.plot(out['Distances'], out['Elevations'],
