@@ -16,7 +16,6 @@ import collections
 import gtk
 import gobject
 import glib
-import gc
 import pango
 
 
