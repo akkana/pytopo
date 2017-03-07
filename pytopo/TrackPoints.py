@@ -151,6 +151,7 @@ class TrackPoints(object):
         if self.Debug:
             print "Reading track file", filename
         dom = xml.dom.minidom.parse(filename)
+        first_segment_name = None
 
         # Handle track(s).
         segs = dom.getElementsByTagName("trkseg")
@@ -172,16 +173,17 @@ class TrackPoints(object):
                     self.points.append(trkname[0].firstChild.wholeText)
                 else:
                     self.points.append(os.path.basename(filename))
+                if not first_segment_name:
+                    first_segment_name = self.points[-1]
 
                 for pt in trkpts:
-                    # self.handle_track_pointGPX(pt, False)
                     lat, lon, ele, ts = self.GPX_point_coords(pt)
                     self.handle_track_point(lat, lon, ele, None, timestamp=ts)
 
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
         if waypts:
-            self.waypoints.append(os.path.basename(filename))
+            self.waypoints.append(first_segment_name)
             for pt in waypts:
                 lat, lon, ele, time = self.GPX_point_coords(pt)
                 name = "WP"

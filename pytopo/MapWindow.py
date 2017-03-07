@@ -103,8 +103,11 @@ that are expected by the MapCollection classes:
         self.red_color = gtk.gdk.color_parse("red")
         self.bg_scale_color = gtk.gdk.color_parse("white")
         self.first_track_color = gtk.gdk.color_parse("magenta")
-        self.waypoint_color = gtk.gdk.color_parse("blue2")
         self.grid_color = gtk.gdk.color_parse("grey45")
+
+        # waypoint_color is the color for waypoint *labels*.
+        # We'll try to give the actual waypoints the color of their track file.
+        self.waypoint_color = gtk.gdk.color_parse("blue2")
 
         self.font_desc = pango.FontDescription("Sans 9")
         self.wpt_font_desc = pango.FontDescription("Sans Italic 10")
@@ -232,7 +235,7 @@ that are expected by the MapCollection classes:
             return self.first_track_color
 
         # Hue is a floating point between 0 and 1. How much should we jump?
-        jump = .37
+        jump = .13
 
         return gtk.gdk.color_from_hsv(color.hue + jump,
                                       color.saturation, color.value)
@@ -352,6 +355,10 @@ that are expected by the MapCollection classes:
         # self.trackpoints may be trackpoints or waypoints
         self.track_color = None
 
+        # Store the colors we use for each named track segment,
+        # so we can try to use that color for the matching waypoints.
+        track_colors = {}
+
         # win_width, win_height = self.drawing_area.window.get_size()
         if len(self.trackpoints.points) > 0:
             cur_x = None
@@ -360,6 +367,7 @@ that are expected by the MapCollection classes:
             nextpt = 0
             while True:
                 self.track_color = self.contrasting_color(self.track_color)
+                track_colors[self.trackpoints.points[nextpt]] = self.track_color
                 nextpt = self.draw_trackpoint_segment(nextpt, self.track_color)
                 if not nextpt:
                     break
@@ -369,12 +377,14 @@ that are expected by the MapCollection classes:
                                          self.red_color, linewidth=6)
 
         if self.show_waypoints and len(self.trackpoints.waypoints) > 0:
+            ii = 7    # Waypoints will be an X with arms ii*2 long
             self.set_color(self.waypoint_color)
             self.xgc.line_style = gtk.gdk.LINE_SOLID
             self.xgc.line_width = 2
             for pt in self.trackpoints.waypoints:
                 if self.trackpoints.is_start(pt) or \
                    self.trackpoints.is_attributes(pt):
+                    wpcolor = track_colors[pt]
                     continue
                 x = int((pt[0] - self.center_lon) * self.collection.xscale
                         + self.win_width / 2)
@@ -387,11 +397,15 @@ that are expected by the MapCollection classes:
                     layout.set_font_description(self.wpt_font_desc)
                     # tw = layout.get_size()[0] / pango.SCALE
                     th = layout.get_size()[1] / pango.SCALE
+                    self.set_color(self.waypoint_color)
                     self.drawing_area.window.draw_layout(self.xgc,
                                                          x + th / 3,
                                                          y - th / 2,
                                                          layout)
-                    self.draw_rectangle(True, x - 3, y - 3, 6, 6)
+                    self.set_color(wpcolor)
+                    # self.draw_rectangle(True, x - 3, y - 3, 7, 7)
+                    self.draw_line(x - ii, y - ii, x + ii, y + ii)
+                    self.draw_line(x - ii, y + ii, x + ii, y - ii)
 
     def find_nearest_trackpoint(self, x, y):
         """Find the nearet track, the nearest point on that track,
