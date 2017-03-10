@@ -332,7 +332,8 @@ TiledMapCollection classes must implement
                 # Not clear if this is the right thing to do or not.
                 self.download_tiles = DownloadTileQueue()
                 self.download_failures = 0
-                return
+            # We can't draw this tile, so return.
+            return
 
         # Otherwise, we got a path for a successful tile download.
         # Reset the failure counter:
