@@ -183,6 +183,8 @@ class TrackPoints(object):
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
         if waypts:
+            if not first_segment_name:
+                first_segment_name = os.path.basename(filename)
             self.waypoints.append(first_segment_name)
             for pt in waypts:
                 lat, lon, ele, time = self.GPX_point_coords(pt)

@@ -384,7 +384,10 @@ that are expected by the MapCollection classes:
             for pt in self.trackpoints.waypoints:
                 if self.trackpoints.is_start(pt) or \
                    self.trackpoints.is_attributes(pt):
-                    wpcolor = track_colors[pt]
+                    if pt in track_colors:
+                        wpcolor = track_colors[pt]
+                    else:
+                        wpcolor = self.first_track_color
                     continue
                 x = int((pt[0] - self.center_lon) * self.collection.xscale
                         + self.win_width / 2)
@@ -1254,8 +1257,6 @@ that are expected by the MapCollection classes:
         # GtkWarning: gdk_drawable_real_draw_pixbuf: assertion 'width >= 0 && height >= 0' failed
         # but checking width and height doesn't seem to guard against that.
         # What does?
-        # And the message eventually went away and I can't reproduce now
-        # (maybe it finally downloaded a new tile).
         # print "Drawing pixbuf that is %d x %d!" \
         #     % (pixbuf.get_width(), pixbuf.get_height())
         # if (pixbuf.get_width() <= 0 or pixbuf.get_height() <= 0):
