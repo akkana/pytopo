@@ -6,6 +6,7 @@
 '''
 
 from pytopo.MapUtils import MapUtils
+from pytopo.TrackPoints import TrackPoints
 
 import os
 import re
@@ -55,6 +56,7 @@ that are expected by the MapCollection classes:
         self.win_width = 0
         self.win_height = 0
 
+        self.prompt_dialog = None
         self.traildialog = None
 
         self.Debug = False
@@ -381,13 +383,12 @@ that are expected by the MapCollection classes:
             self.set_color(self.waypoint_color)
             self.xgc.line_style = gtk.gdk.LINE_SOLID
             self.xgc.line_width = 2
+            wpcolor = self.first_track_color
             for pt in self.trackpoints.waypoints:
                 if self.trackpoints.is_start(pt) or \
                    self.trackpoints.is_attributes(pt):
                     if pt in track_colors:
                         wpcolor = track_colors[pt]
-                    else:
-                        wpcolor = self.first_track_color
                     continue
                 x = int((pt[0] - self.center_lon) * self.collection.xscale
                         + self.win_width / 2)
@@ -754,6 +755,7 @@ that are expected by the MapCollection classes:
              self.print_location),
             ("Zoom here...", self.zoom),
             ("Go to pin...", self.set_center_to_pin),
+            ("Add waypoint...", self.add_waypoint_by_mouse),
             ("Pin this location", self.set_pin_by_mouse),
             ("Save pin location...", self.save_location),
             ("Split track here", self.split_track_by_mouse),
@@ -957,6 +959,26 @@ that are expected by the MapCollection classes:
 
         self.draw_map()
 
+    def add_waypoint_by_mouse(self, widget):
+        """Set the pin at the current mouse location"""
+        self.pin_lon, self.pin_lat = self.cur_lon, self.cur_lat
+
+        # Prompt for a name for the waypoint
+        wpname = self.prompt("Save location", default="WP")
+        if wpname == None:
+            return
+        if wpname:
+            wpname = wpname.strip()
+        else:
+            wpname = "WP"
+
+        if not self.trackpoints:
+            self.trackpoints = TrackPoints()
+
+        self.trackpoints.handle_track_point(self.cur_lat, self.cur_lon,
+                                            waypoint_name=wpname)
+        self.draw_map()
+
     def set_pin_by_mouse(self, widget):
         """Set the pin at the current mouse location"""
         self.pin_lon, self.pin_lat = self.cur_lon, self.cur_lat
@@ -967,45 +989,68 @@ that are expected by the MapCollection classes:
         self.center_lon, self.center_lat = self.pin_lon, self.pin_lat
         self.draw_map()
 
+    def prompt(self, prompt, comment="", default=""):
+        """Prompt the user for a string, returning the string.
+           Returns None if the user presses CANCEL instead.
+        """
+        if not self.prompt_dialog:
+            self.prompt_dialog = gtk.Dialog("PyTopo", None, 0,
+                                            (gtk.STOCK_CANCEL,
+                                               gtk.RESPONSE_NONE,
+                                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+            self.prompt_dialog.set_size_request(200, 150)
+            self.prompt_dialog.vbox.set_spacing(10)
+
+            self.prompt_dialog_prompt = gtk.Label(prompt)
+            self.prompt_dialog.vbox.pack_start(self.prompt_dialog_prompt,
+                                               expand=False)
+            self.prompt_dialog_text = gtk.Entry()
+            self.prompt_dialog_text.set_activates_default(True)
+            self.prompt_dialog.vbox.pack_start(self.prompt_dialog_text,
+                                               expand=True)
+            self.prompt_dialog_comment = gtk.Label("")
+            self.prompt_dialog.vbox.pack_start(self.prompt_dialog_comment,
+                                               expand=False)
+
+            self.prompt_dialog.show_all()
+
+        else:
+            self.prompt_dialog_comment.set_text(comment)
+            self.prompt_dialog_prompt.set_text(prompt)
+
+        self.prompt_dialog.set_default_response(gtk.RESPONSE_OK)
+        self.prompt_dialog_text.set_text(default)
+        if default:
+            self.prompt_dialog_text.select_region(0, len(default))
+        self.prompt_dialog_text.grab_focus()
+        self.prompt_dialog.show()
+
+        response = self.prompt_dialog.run()
+        if response == gtk.RESPONSE_OK:
+            self.prompt_dialog.hide()
+            return self.prompt_dialog_text.get_text()
+        else:
+            self.prompt_dialog.hide()
+            return None
+
     def save_location(self, widget):
         """Save the pinned location.
         XXX should save zoom level too, if different from collection default.
         """
-        dialog = gtk.Dialog("Save location", None, 0,
-                            (gtk.STOCK_CANCEL, gtk.RESPONSE_NONE,
-                             gtk.STOCK_OK, gtk.RESPONSE_OK))
-        dialog.set_size_request(200, 150)
-        dialog.vbox.set_spacing(10)
-
-        prompt = gtk.Label("Please specify a name:")
-        dialog.vbox.pack_start(prompt, expand=False)
-        nametext = gtk.Entry()
-        dialog.vbox.pack_start(nametext, expand=True)
-        comment = gtk.Label("")
-        dialog.vbox.pack_start(comment, expand=False)
-
-        dialog.show_all()
-
+        comment = ""
         while True:
-            response = dialog.run()
-            if response == gtk.RESPONSE_OK:
-                name = nametext.get_text().strip()
-                if not name:
-                    comment.set_text("Name can't be empty")
-                    continue
+            name = self.prompt("Save location", comment).strip()
+            if name == None:
+                return
+            if not name:
+                comment = "Name can't be empty"
 
-                # Add to KnownSites
-                self.controller.append_known_site([name,
-                    MapUtils.dec_deg2deg_min(self.pin_lon),
-                    MapUtils.dec_deg2deg_min(self.pin_lat),
-                    self.collection.name,
-                    self.collection.zoomlevel])
-
-                dialog.destroy()
-                return True
-            else:
-                dialog.destroy()
-                return True
+        # Add to KnownSites
+        self.controller.append_known_site([name,
+                            MapUtils.dec_deg2deg_min(self.pin_lon),
+                            MapUtils.dec_deg2deg_min(self.pin_lat),
+                            self.collection.name,
+                            self.collection.zoomlevel])
 
     def mytracks(self, widget):
         self.controller.track_select(self)
