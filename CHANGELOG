@@ -1,3 +1,11 @@
+2017-04-02  Akkana Peck <akkana@shallowsky.com>
+	* Add an option to enter waypoints.
+
+2017-03-07  Akkana Peck <akkana@shallowsky.com>
+	* Show waypoints in the color of their associated trackpoint.
+	  Waypoint labels remain blue, since they're hard to read
+	  in many of the colors used for tracks.
+
 2016-12-06  Akkana Peck <akkana@shallowsky.com>
 	* Factor ellie stats code into new trackstats module.
 
