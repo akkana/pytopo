@@ -708,9 +708,16 @@ that are expected by the MapCollection classes:
         return 0
 
     def print_location(self, widget=None):
-        print MapUtils.coord2str_dd(self.cur_lon, self.cur_lat)
-        print "%-15s %-15s" % (MapUtils.dec_deg2deg_min_str(self.cur_lon),
-                               MapUtils.dec_deg2deg_min_str(self.cur_lat))
+        print "%30s     (decimal degrees)" % \
+            MapUtils.coord2str_dd(self.cur_lon, self.cur_lat)
+
+        print"%-15s   %-15s (DD.MMSS, suitable for pytopo.sites)" % \
+            (MapUtils.dec_deg2deg_min(self.cur_lon),
+             MapUtils.dec_deg2deg_min(self.cur_lat))
+
+        print "%-15s   %-15s (D M S)" % \
+            (MapUtils.dec_deg2deg_min_str(self.cur_lon),
+             MapUtils.dec_deg2deg_min_str(self.cur_lat))
 
     def zoom(self, widget=None):
         self.center_lon = self.cur_lon

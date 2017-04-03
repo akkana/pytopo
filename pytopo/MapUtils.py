@@ -45,8 +45,18 @@ class MapUtils:
         return sgn * (deg + minutes)
 
     @classmethod
+    def decdeg2dms(cls, dd):
+        """Convert decimal degrees to (degrees, minutes, seconds)"""
+        is_positive = dd >= 0
+        dd = abs(dd)
+        minutes, seconds = divmod(dd*3600,60)
+        degrees, minutes = divmod(minutes,60)
+        degrees = degrees if is_positive else -degrees
+        return (int(degrees), int(minutes), seconds)
+
+    @classmethod
     def dec_deg2deg_min_str(cls, coord):
-        """Convert decimal degrees to a nice degrees/minutes string"""
+        """Convert decimal degrees to a human-readable degrees/minutes string"""
         if coord < 0:
             sgnstr = '-'
             coord = -coord
