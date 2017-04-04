@@ -99,7 +99,7 @@ class DownloadTileQueue:
             if magic_parser:
                 mimetype = magic_parser.file(localpath)
                 if not mimetype.startswith("image/"):
-                    print "Problem downloading", localpath
+                    print "Problem downloading'%s' to '%s'" % (url, localpath)
                     print "Type:", mimetype
                     # Opencyclemap, at least, sometimes serves text files
                     # that say "tile not available". Other servers may serve

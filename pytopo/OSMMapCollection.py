@@ -52,6 +52,8 @@ class OSMMapCollection(TiledMapCollection):
         self.download_url = _download_url
         self.maxzoom = maxzoom
 
+        self.Debug = False
+
         # If reload_tiles is set, it should be set to a Unix datestamp,
         # e.g. from when the program was started.
         # Any file older than that will be re-downloaded.

@@ -42,6 +42,7 @@ class MapViewer(object):
         self.config_dir = os.path.expanduser("~/.config/pytopo",)
         self.savefilename = os.path.join(self.config_dir, "saved.sites")
         self.reload_tiles = False
+
         self.Debug = False
 
     @staticmethod
@@ -312,6 +313,7 @@ Shift-click in the map to print the coordinates of the clicked location.
 
                 elif args[0] == "-d":
                     self.Debug = True
+                    print "Debugging on"
                 elif args[0] == "-r":
                     self.reload_tiles = time.time()
                 elif args[0] == "-t" and len(args) > 1:
@@ -401,6 +403,8 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
         # If we didn't get a collection, use the default, if any:
         if not mapwin.collection and self.default_collection:
             mapwin.collection = self.find_collection(self.default_collection)
+
+        mapwin.collection.Debug = self.Debug
 
         # If we have a collection and a track but no center point,
         # center it on the trackpoints, and set scale appropriately:
@@ -571,7 +575,15 @@ Collections = [
                       ".png", 256, 256, 10,
                       "http://a.tile.openstreetmap.org" ),
 
-    # You will need an API key to get the excellent OpenCycleMap tiles
+    # The USGS National Map provides various kinds of tiles.
+    # Here's their basic Topo tile:
+    OSMMapCollection( "USGS", "~/Maps/USGS",
+                      ".jpg", 256, 256, 13,
+                       "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/WMTS?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=USGSTopo&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image%2Fjpeg",
+                      maxzoom=19,
+                      attribution="USGS National Map"),
+
+    # You will need an API key to get the OpenCycleMap tiles
     # from http://thunderforest.com.
     # OSMMapCollection( "opencyclemap", "~/Maps/opencyclemap",
     #                   ".png", 256, 256, 13,

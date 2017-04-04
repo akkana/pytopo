@@ -59,8 +59,6 @@ that are expected by the MapCollection classes:
         self.prompt_dialog = None
         self.traildialog = None
 
-        self.Debug = False
-
         try:
             self.pin = \
                 gtk.gdk.pixbuf_new_from_file("/usr/share/pytopo/pytopo-pin.png")
@@ -184,7 +182,7 @@ that are expected by the MapCollection classes:
         self.win_width, self.win_height = self.drawing_area.window.get_size()
 
         # XXX Collection.draw_map wants center, but we only have lower right.
-        if self.Debug:
+        if self.controller.Debug:
             print ">>>>>>>>>>>>>>>>"
             print "window draw_map centered at",
             print MapUtils.dec_deg2deg_min_str(self.center_lon),
@@ -295,7 +293,7 @@ that are expected by the MapCollection classes:
 
     def select_track(self, trackindex):
         '''Mark a track as active.'''
-        if self.Debug:
+        if self.controller.Debug:
             # Test against None specifically, else we won't be able
             # to select the first track starting at index 0.
             if trackindex is not None:
@@ -742,6 +740,8 @@ that are expected by the MapCollection classes:
                                                   self.win_height)
 
         self.collection.zoom(direc)
+        if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
+            print "zoomed to", self.collection.zoomlevel
 
         # What are the coordinates for the current mouse pos after zoom?
         newmouselon, newmouselat = self.xy2coords(event.x, event.y,
@@ -823,6 +823,7 @@ that are expected by the MapCollection classes:
         if newcoll:
             newcoll.zoom_to(self.collection.zoomlevel, self.cur_lat)
             self.collection = newcoll
+            self.collection.Debug = self.controller.Debug
             self.draw_map()
         else:
             print "Couldn't find a collection named '%s'" % name
@@ -941,7 +942,7 @@ that are expected by the MapCollection classes:
         # or we've confirmed overwriting.
         # Now save all our tracks and waypoints as a GPX file in outfile.
         dialog.destroy()
-        if self.Debug:
+        if self.controller.Debug:
             print "Saving GPX to", outfile
         self.trackpoints.save_GPX(outfile)
 
@@ -1209,7 +1210,7 @@ that are expected by the MapCollection classes:
                 err_label.set_text("Sorry, can't parse one of the values")
                 continue
 
-        if self.Debug:
+        if self.controller.Debug:
             print "Downloading from %f - %f, %f - %f, zoom %d - %d" \
                 % (minlon, maxlon, minlat, maxlat, minzoom, maxzoom)
         for zoom in range(minzoom, maxzoom + 1):
@@ -1221,7 +1222,7 @@ that are expected by the MapCollection classes:
             flush_events()
             gtk.gdk.flush()
 
-            if self.Debug:
+            if self.controller.Debug:
                 print "==== Zoom level", zoom
 
             # Find the start and end tiles
@@ -1229,14 +1230,14 @@ that are expected by the MapCollection classes:
                 self.collection.deg2num(maxlat, minlon, zoom)
             (maxxtile, maxytile, x_off, y_off) = \
                 self.collection.deg2num(minlat, maxlon, zoom)
-            if self.Debug:
+            if self.controller.Debug:
                 print "X tiles from", minxtile, "to", maxxtile
                 print "Y tiles from", minytile, "to", maxytile
 
             pathlist = []
             for ytile in range(minytile, maxytile + 1):
                 for xtile in range(minxtile, maxxtile + 1):
-                    if self.Debug:
+                    if self.controller.Debug:
                         print "Tile", xtile, ytile,
                     filename = os.path.join(self.collection.location,
                                             str(zoom),
@@ -1244,11 +1245,11 @@ that are expected by the MapCollection classes:
                                             str(ytile)) \
                         + self.collection.ext
                     if os.access(filename, os.R_OK):
-                        if self.Debug:
+                        if self.controller.Debug:
                             print filename, "is already there"
                         continue
                     pathlist.append(filename)
-                    if self.Debug:
+                    if self.controller.Debug:
                         print "appended as", filename
 
             numtiles = len(pathlist)
@@ -1264,7 +1265,7 @@ that are expected by the MapCollection classes:
                 url = self.collection.url_from_path(filename, zoom)
 
                 # XXX Parallelize this!
-                if self.Debug:
+                if self.controller.Debug:
                     print "Downloading", url, "to", filename
                 thedir = os.path.dirname(filename)
                 if not os.access(thedir, os.W_OK):
@@ -1272,7 +1273,7 @@ that are expected by the MapCollection classes:
                 # err_label.set_text("%d %%: %d of %d" % \
                 #                   (int(num_downloaded*100 / numtiles),
                 #                    num_downloaded, numtiles))
-                if self.Debug:
+                if self.controller.Debug:
                     print "%d %%: %d of %d" % \
                         (int(num_downloaded * 100 / numtiles),
                          num_downloaded, numtiles)
@@ -1427,8 +1428,12 @@ that are expected by the MapCollection classes:
             return True
         elif event.string == "+" or event.string == "=":
             self.collection.zoom(1)
+            if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
+                print "zoomed in to", self.collection.zoomlevel
         elif event.string == "-":
             self.collection.zoom(-1)
+            if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
+                print "zoomed out to", self.collection.zoomlevel
         elif event.keyval == gtk.keysyms.Left:
             self.center_lon -= \
                 float(self.collection.img_width) / self.collection.xscale
@@ -1564,6 +1569,8 @@ that are expected by the MapCollection classes:
                                                           self.win_height)
 
         self.collection.zoom(1)
+        if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
+            print "doubleclick: zoomed in to", self.collection.zoomlevel
         self.draw_map()
         return True
 
@@ -1598,6 +1605,9 @@ that are expected by the MapCollection classes:
             zoom = self.was_click_in_zoom(event.x, event.y)
             if zoom:
                 self.collection.zoom(zoom)
+                if self.controller.Debug and hasattr(self.collection,
+                                                     'zoomlevel'):
+                    print "zoomed to", self.collection.zoomlevel
                 self.draw_map()
                 return True
 
@@ -1606,13 +1616,13 @@ that are expected by the MapCollection classes:
             cur_long, cur_lat = self.xy2coords(event.x, event.y,
                                                self.win_width, self.win_height)
 
-            if self.Debug:
+            if self.controller.Debug:
                 print "Click:", \
                     MapUtils.dec_deg2deg_min_str(cur_long), \
                     MapUtils.dec_deg2deg_min_str(cur_lat)
 
             # Find angle and distance since last click.
-            if self.Debug or event.state & gtk.gdk.SHIFT_MASK:
+            if self.controller.Debug or event.state & gtk.gdk.SHIFT_MASK:
                 if self.click_last_long != 0 and self.click_last_lat != 0:
                     dist = MapUtils.distance_on_unit_sphere(self.click_last_lat,
                                                            self.click_last_long,
