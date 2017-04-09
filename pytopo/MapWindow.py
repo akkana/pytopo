@@ -19,6 +19,8 @@ import gobject
 import glib
 import pango
 
+# import traceback
+
 
 class MapWindow(object):
 
@@ -50,6 +52,7 @@ that are expected by the MapCollection classes:
         self.cur_lat = 0
         self.trackpoints = None
         self.show_waypoints = True
+        self.drawing_track = False
         self.selected_track = None
         self.selected_waypoint = None
 
@@ -754,6 +757,18 @@ that are expected by the MapCollection classes:
         self.draw_map()
         return True
 
+    def toggle_track_drawing(self, mode):
+        if self.drawing_track:
+            self.draw_map()
+
+        else:
+            if not self.trackpoints:
+                self.trackpoints = TrackPoints()
+
+            self.trackpoints.points.append("New track")
+
+        self.drawing_track = not self.drawing_track
+
     def context_menu(self, event):
         '''Create a context menu. This is called anew on every right-click.'''
 
@@ -763,6 +778,7 @@ that are expected by the MapCollection classes:
             ("Zoom here...", self.zoom),
             ("Go to pin...", self.set_center_to_pin),
             ("Add waypoint...", self.add_waypoint_by_mouse),
+            ("Draw a track", self.toggle_track_drawing),
             ("Pin this location", self.set_pin_by_mouse),
             ("Save pin location...", self.save_location),
             ("Split track here", self.split_track_by_mouse),
@@ -783,6 +799,12 @@ that are expected by the MapCollection classes:
             if contextmenu[itemname] == self.toggle_show_waypoints:
                 if self.show_waypoints:
                     item.set_label("Hide waypoints...")
+                item.connect("activate", contextmenu[itemname])
+
+            # Likewise for Toggle track drawing
+            if contextmenu[itemname] == self.toggle_track_drawing:
+                if self.drawing_track:
+                    item.set_label("Finish drawing track")
                 item.connect("activate", contextmenu[itemname])
 
             # Change background map gives a submenu of available collections.
@@ -1537,6 +1559,24 @@ that are expected by the MapCollection classes:
             self.x_start_drag = x
             self.y_start_drag = y
 
+    def click_draw(self, widget, event):
+        """Handle mouse button presses if we're in drawing mode"""
+        if event.button != 1:
+            print "We only handle button 1 so far when drawing tracks."
+            return False
+
+        lon, lat = self.xy2coords(event.x, event.y,
+                                  self.win_width, self.win_height)
+
+        self.trackpoints.handle_track_point(lat, lon, waypoint_name=None)
+
+        # XXX Preferably, just draw the line ourselves,
+        # and figure it'll get drawn nicely later when the map needs to redraw.
+        # This way there's some annoying flicker.
+        self.draw_map()
+
+        return True
+
     def mousepress(self, widget, event):
         """Handle mouse button presses"""
 
@@ -1556,7 +1596,7 @@ that are expected by the MapCollection classes:
                                                         self.win_width,
                                                         self.win_height)
             self.context_menu(event)
-            return
+            return True
 
         # If it wasn't a double click, set a timeout for LongPress
         if event.type != gtk.gdk._2BUTTON_PRESS:
@@ -1602,6 +1642,11 @@ that are expected by the MapCollection classes:
             return True
 
         if event.button == 1:
+            # If we're drawing a track, everything is different.
+            self.drawing_track = True
+            if self.drawing_track:
+                return self.click_draw(widget, event)
+
             zoom = self.was_click_in_zoom(event.x, event.y)
             if zoom:
                 self.collection.zoom(zoom)

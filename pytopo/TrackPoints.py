@@ -126,7 +126,7 @@ class TrackPoints(object):
         """Does the point have a dict with a time element? If so, return it.
         """
         dic = point[-1]
-        if isinstance(dic, dict):
+        if not hasattr(dic, "keys"):
             return None
         if "time" not in dic:
             return None
