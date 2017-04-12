@@ -421,8 +421,8 @@ that are expected by the MapCollection classes:
            set center_lat and center_lon after a mouse click.
 
            @return: (nearest_track,    Starting point of the nearest track
-                    nearest_point,    Index of nearest point on that track
-                    nearest_waypoint) Nearest waypoint
+                     nearest_point,    Index of nearest point on that track
+                     nearest_waypoint) Nearest waypoint
         """
         nearest_track = None
         nearest_point = None
@@ -782,6 +782,7 @@ that are expected by the MapCollection classes:
             ("Pin this location", self.set_pin_by_mouse),
             ("Save pin location...", self.save_location),
             ("Split track here", self.split_track_by_mouse),
+            ("Remove this point", self.remove_trackpoint),
             ("My Locations...", self.mylocations),
             ("My Tracks...", self.mytracks),
             ("Download Area...", self.download_area),
@@ -987,6 +988,23 @@ that are expected by the MapCollection classes:
             # Split the track there
             self.trackpoints.points.insert(near_point, trackname)
 
+        self.draw_map()
+
+    def remove_trackpoint(self, widget):
+        """Remove the point nearest the mouse from its track."""
+
+        # self.draw_map()
+        near_track, near_point, near_waypoint = \
+            self.find_nearest_trackpoint(self.context_x, self.context_y)
+
+        if near_point is None:
+            print "There's no point near the mouse"
+            return
+
+        # Nuttiness: even if you know the index, apparently the only
+        # way to remove something from a list is to search through the
+        # list for an exact item match.
+        self.trackpoints.points.remove(self.trackpoints.points[near_point])
         self.draw_map()
 
     def add_waypoint_by_mouse(self, widget):
