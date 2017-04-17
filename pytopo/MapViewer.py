@@ -576,11 +576,20 @@ Collections = [
                       "http://a.tile.openstreetmap.org" ),
 
     # The USGS National Map provides various kinds of tiles.
-    # Here's their basic Topo tile:
+    # Here's their basic Topo tile.
+    # Their documentation says they support zooms to 19,
+    # but in practice they give an error after zoom level 15.
     OSMMapCollection( "USGS", "~/Maps/USGS",
                       ".jpg", 256, 256, 13,
                        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/WMTS?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=USGSTopo&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image%2Fjpeg",
-                      maxzoom=19,
+                      maxzoom=15,
+                      attribution="USGS National Map"),
+
+    # USGS also offers satellite tiles:
+    OSMMapCollection( "USGS Imagery", "~/Maps/USGS-imagery",
+                      ".jpg", 256, 256, 13,
+                       "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/WMTS?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=USGSImageryOnly&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image%2Fjpeg",
+                      maxzoom=15,
                       attribution="USGS National Map"),
 
     # You will need an API key to get the OpenCycleMap tiles
