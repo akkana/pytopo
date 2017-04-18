@@ -1349,7 +1349,7 @@ that are expected by the MapCollection classes:
         # Sometimes the next line prints:
         # GtkWarning: gdk_drawable_real_draw_pixbuf: assertion 'width >= 0 && height >= 0' failed
         # but checking width and height doesn't seem to guard against that.
-        # What does?
+        # What does? This doesn't:
         # print "Drawing pixbuf that is %d x %d!" \
         #     % (pixbuf.get_width(), pixbuf.get_height())
         # if (pixbuf.get_width() <= 0 or pixbuf.get_height() <= 0):

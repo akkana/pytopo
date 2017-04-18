@@ -6,6 +6,7 @@
 '''
 
 import sys
+import os
 import urllib
 import gobject
 
@@ -87,6 +88,12 @@ class DownloadTileQueue:
             except IOError, e:
                 print "Couldn't download", url, ":"
                 print e
+                return None
+
+            # Sometimes there's no error but we still didn't download anything.
+            # Don't try to MIME parse that: magic gets confused by empty files.
+            if not os.path.exists(localpath):
+                print "Failed to download", url, "to", localpath
                 return None
 
             if magic_parser is None:
