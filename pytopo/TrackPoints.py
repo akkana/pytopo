@@ -22,8 +22,27 @@ class GeoPoint(object):
         self.lon = lon
         self.ele = ele
         self.name = name
-        self.timestamp = None
+        self.timestamp = timestamp
         self.attrs = attrs
+
+    def __repr__(self):
+        if self.ele:
+            s ="(%f, %f, %s)" % (self.lat, self.lon, self.ele)
+        else:
+            s ="(%f, %f)" % (self.lat, self.lon)
+        if self.name:
+            s += " '%s'" % self.name
+        if self.timestamp:
+            s += " [%s]" % self.timestamp
+        if self.attrs:
+            s += "{ "
+            for k in self.attrs.keys():
+                s += "%s: %s, " % (k, self.attrs[k])
+            # Remove the final comma
+            s = s[:-2]
+            s += " }"
+
+        return s
 
 
 class TrackPoints(object):
@@ -117,26 +136,6 @@ class TrackPoints(object):
         else:
             self.points.append(point)
 
-    # def get_ele(self, point):
-    #     """Get the saved elevation of a point, if any.
-    #     """
-    #     if len(point) < 3:
-    #         return None
-    #     ele = point[2]
-    #     if isinstance(ele, str) or isinstance(ele, unicode):
-    #         return ele
-    #     return None
-
-    # def get_timestamp(self, point):
-    #     """Does the point have a dict with a time element? If so, return it.
-    #     """
-    #     dic = point[-1]
-    #     if not hasattr(dic, "keys"):
-    #         return None
-    #     if "time" not in dic:
-    #         return None
-    #     return dic["time"]
-
     def read_track_file(self, filename):
         """Read a track file. Throw IOError if the file doesn't exist."""
         # XXX Should read magic number rather than depending on extension
@@ -183,8 +182,9 @@ class TrackPoints(object):
 
                 for pt in trkpts:
                     lat, lon, ele, ts, attrs = self.GPX_point_coords(pt)
-                    self.handle_track_point(lat, lon, ele, timestamp=ts,
-                                            waypoint_name=None, attrs=attrs)
+                    "GPX_point_coords returned", lat, lon, ele, ts, attrs
+                    self.handle_track_point(lat, lon, ele=ele, timestamp=ts,
+                                            attrs=attrs)
 
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
@@ -196,8 +196,8 @@ class TrackPoints(object):
                 lat, lon, ele, time, attrs = self.GPX_point_coords(pt)
                 name = "WP"
                 name = self.get_DOM_text(pt, "name")
-                self.handle_track_point(lat, lon, ele, name, timestamp=time,
-                                        attrs=attrs)
+                self.handle_track_point(lat, lon, ele=ele, timestamp=time,
+                                        waypoint_name=name, attrs=attrs)
 
         # GPX also allows for routing, rtept, but I don't think we need those.
 
@@ -220,12 +220,15 @@ class TrackPoints(object):
             return n[0].data
         return None
 
-    def GPX_point_coords(self, point):
-        '''Add a new trackpoint or waypoint from a GPX node'''
-        lat = float(point.getAttribute("lat"))
-        lon = float(point.getAttribute("lon"))
-        ele = self.get_DOM_text(point, "ele")
-        time = self.get_DOM_text(point, "time")
+    def GPX_point_coords(self, pointnode):
+        '''Parse a new trackpoint or waypoint from a GPX node.
+           Returns lat (float), lon (float), ele (string or NOne),
+           time (string or None), attrs (dict or None).
+        '''
+        lat = float(pointnode.getAttribute("lat"))
+        lon = float(pointnode.getAttribute("lon"))
+        ele = self.get_DOM_text(pointnode, "ele")
+        time = self.get_DOM_text(pointnode, "time")
 
         # Python dom and minidom have no easy way to combine sub-nodes
         # into a dictionary, or to serialize them.
@@ -233,10 +236,10 @@ class TrackPoints(object):
         # You can loop over point.childNodes and look at .nodeName, .nodeValue
         # but for now, let's only look at a few types of points.
         attrs = {}
-        hdop = self.get_DOM_text(point, "hdop")
+        hdop = self.get_DOM_text(pointnode, "hdop")
         if hdop:
             attrs['hdop'] = hdop
-        speed = self.get_DOM_text(point, "speed")
+        speed = self.get_DOM_text(pointnode, "speed")
         if speed:
             attrs['speed'] = speed
 
@@ -269,23 +272,22 @@ class TrackPoints(object):
 
                     print >>outfp, \
                         '      <trkpt lat="%f" lon="%f">' % (pt.lat, pt.lon)
-                    if hasattr(pt, 'ele'):
+                    if pt.ele:
                         print >>outfp, '        <ele>%s</ele>' % pt.ele
-                    if hasattr(pt, 'time'):
-                        print >>outfp, '        <time>%s</time>' % pt.time
+                    if pt.timestamp:
+                        print >>outfp, '        <time>%s</time>' % pt.timestamp
 
                     # Extra attributes
-                    if hasattr(pt, 'attrs'):
-                        attrs = pt.attrs
-                        if 'hdop' in attrs:
+                    if pt.attrs:
+                        if 'hdop' in pt.attrs:
                             print >>outfp, \
-                                '        <hdop>%s</hdop>' % attrs['hdop']
-                        if 'speed' in attrs:
+                                '        <hdop>%s</hdop>' % pt.attrs['hdop']
+                        if 'speed' in pt.attrs:
                             # Speed is an extension.
                             print >>outfp, \
                                 '''        <extensions>
           <speed>%s</speed>
-        </extensions>''' % attrs['speed']
+        </extensions>''' % pt.attrs['speed']
 
                     # Done with this trackpoint.
                     print >>outfp, '      </trkpt>'
@@ -298,7 +300,7 @@ class TrackPoints(object):
                 print >>outfp, '''  <wpt lat="%f" lon="%f">
     <time>2015-12-02T16:50:34Z</time>
     <name>%s</name>
-  </wpt>''' % (pt[1], pt[0], pt[2])
+  </wpt>''' % (pt.lat, pt.lon, pt.name)
 
             print >>outfp, "</gpx>"
 
@@ -336,7 +338,7 @@ class TrackPoints(object):
                     self.points.append(feature["properties"])
                 for coords in feature["geometry"]["coordinates"]:
                     lon, lat, ele = coords
-                    self.handle_track_point(lat, lon, ele, None)
+                    self.handle_track_point(lat, lon, ele=ele)
             elif featuretype == "MultiLineString":
                 for linestring in feature["geometry"]["coordinates"]:
                     self.points.append(name)
@@ -344,7 +346,7 @@ class TrackPoints(object):
                         self.points.append(feature["properties"])
                     for coords in linestring:
                         lon, lat, ele = coords
-                        self.handle_track_point(lat, lon, ele, None)
+                        self.handle_track_point(lat, lon, ele=ele)
 
     def read_track_file_KML(self, filename):
         """Read a KML or KMZ track file.
@@ -412,8 +414,8 @@ class TrackPoints(object):
                     continue
                 self.points.append(name)
                 for triple in coord_triples:
-                    self.handle_track_point(triple[1], triple[0], triple[2],
-                                            None)
+                    self.handle_track_point(triple[1], triple[0],
+                                            ele=triple[2])
 
             # Handle waypoints:
             if not name:
@@ -424,10 +426,11 @@ class TrackPoints(object):
                 for triple in coord_triples:
                     if len(triple) == 3:
                         self.handle_track_point(triple[1], triple[0],
-                                                triple[2], name)
+                                                ele=triple[2],
+                                                waypoint_name=name)
                     elif len(triple) == 2:
                         self.handle_track_point(triple[1], triple[0],
-                                                None, name)
+                                                waypoint_name=name)
 
     def get_KML_coordinates(self, el):
         '''Get the contents of the first <coordinates> triple

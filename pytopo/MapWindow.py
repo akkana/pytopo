@@ -289,7 +289,7 @@ that are expected by the MapCollection classes:
                 cur_y = y
             else:
                 # It's off the screen. Skip it.
-                # print "Skipping", pt[0], pt[1], \
+                # print "Skipping", pt.lon, pt.lat, \
                 #    ": would be", x, ",", y
                 cur_x = None
                 cur_y = None
@@ -391,14 +391,14 @@ that are expected by the MapCollection classes:
                     if pt in track_colors:
                         wpcolor = track_colors[pt]
                     continue
-                x = int((pt[0] - self.center_lon) * self.collection.xscale
+                x = int((pt.lon - self.center_lon) * self.collection.xscale
                         + self.win_width / 2)
-                y = int((self.center_lat - pt[1]) * self.collection.yscale
+                y = int((self.center_lat - pt.lat) * self.collection.yscale
                         + self.win_height / 2)
 
                 if x >= 0 and x < self.win_width and \
                    y >= 0 and y < self.win_height:
-                    layout = self.drawing_area.create_pango_layout(pt[2])
+                    layout = self.drawing_area.create_pango_layout(pt.name)
                     layout.set_font_description(self.wpt_font_desc)
                     # tw = layout.get_size()[0] / pango.SCALE
                     th = layout.get_size()[1] / pango.SCALE
@@ -443,12 +443,12 @@ that are expected by the MapCollection classes:
             """Return distance from pt to x, y --
                but only if it's smaller than sm_dist.
             """
-            # tx = int((pt[0] - self.center_lon) * self.collection.xscale
+            # tx = int((pt.lon - self.center_lon) * self.collection.xscale
             #          + halfwidth)
-            # ty = int((self.center_lat - pt[1]) * self.collection.yscale
+            # ty = int((self.center_lat - pt.lat) * self.collection.yscale
             #          + halfheight)
 
-            tx, ty = self.coords2xy(pt[0], pt[1],
+            tx, ty = self.coords2xy(pt.lon, pt.lat,
                                     self.win_width, self.win_height)
 
             if abs(x - tx) > CLOSE or abs(y - ty) > CLOSE:
