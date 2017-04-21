@@ -271,9 +271,9 @@ that are expected by the MapCollection classes:
             if self.trackpoints.is_attributes(pt):
                 continue
 
-            x = int((pt[0] - self.center_lon) * self.collection.xscale
+            x = int((pt.lon - self.center_lon) * self.collection.xscale
                     + self.win_width / 2)
-            y = int((self.center_lat - pt[1]) * self.collection.yscale
+            y = int((self.center_lat - pt.lat) * self.collection.yscale
                     + self.win_height / 2)
 
             if ((x >= 0 and x < self.win_width and

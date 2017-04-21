@@ -13,6 +13,19 @@ import simplejson
 from pytopo import __version__
 
 
+class GeoPoint(object):
+    """A single track point or waypoint."""
+    # Note: GPX files imported from KML may have no timestamps.
+    def __init__(self, lat, lon, ele=None,
+                 name=False, timestamp=None, attrs=None):
+        self.lat = lat
+        self.lon = lon
+        self.ele = ele
+        self.name = name
+        self.timestamp = None
+        self.attrs = attrs
+
+
 class TrackPoints(object):
 
     """Parsing and handling of GPS track files.
@@ -80,11 +93,12 @@ class TrackPoints(object):
             return self.points[trackindex + 1]
         return None
 
-    def handle_track_point(self, lat, lon,
-                           ele=None, waypoint_name=False, timestamp=None):
+    def handle_track_point(self, lat, lon, ele=None,
+                           timestamp=None, waypoint_name=False, attrs=None):
         '''Add a new trackpoint or waypoint after some basic sanity checks.
            If waypoint_name, we assume this is a waypoint,
            otherwise assume it's a track point.
+           attrs is an optional dict of other attributes, like hdop or speed.
         '''
         if lon < self.minlon:
             self.minlon = lon
@@ -95,42 +109,33 @@ class TrackPoints(object):
         if lat > self.maxlat:
             self.maxlat = lat
 
-        point = [lon, lat]
-
-        if waypoint_name:
-            point.append(waypoint_name)
-
-        if ele:
-            point.append(ele)
-
-        if timestamp:
-            point.append({"time": timestamp})
-        # Note: GPX files imported from KML may have no timestamps.
+        point = GeoPoint(lat, lon, ele=ele, timestamp=timestamp,
+                         name=waypoint_name, attrs=attrs)
 
         if waypoint_name:
             self.waypoints.append(point)
         else:
             self.points.append(point)
 
-    def get_ele(self, point):
-        """Get the saved elevation of a point, if any.
-        """
-        if len(point) < 3:
-            return None
-        ele = point[2]
-        if isinstance(ele, str) or isinstance(ele, unicode):
-            return ele
-        return None
+    # def get_ele(self, point):
+    #     """Get the saved elevation of a point, if any.
+    #     """
+    #     if len(point) < 3:
+    #         return None
+    #     ele = point[2]
+    #     if isinstance(ele, str) or isinstance(ele, unicode):
+    #         return ele
+    #     return None
 
-    def get_timestamp(self, point):
-        """Does the point have a dict with a time element? If so, return it.
-        """
-        dic = point[-1]
-        if not hasattr(dic, "keys"):
-            return None
-        if "time" not in dic:
-            return None
-        return dic["time"]
+    # def get_timestamp(self, point):
+    #     """Does the point have a dict with a time element? If so, return it.
+    #     """
+    #     dic = point[-1]
+    #     if not hasattr(dic, "keys"):
+    #         return None
+    #     if "time" not in dic:
+    #         return None
+    #     return dic["time"]
 
     def read_track_file(self, filename):
         """Read a track file. Throw IOError if the file doesn't exist."""
@@ -177,8 +182,9 @@ class TrackPoints(object):
                     first_segment_name = self.points[-1]
 
                 for pt in trkpts:
-                    lat, lon, ele, ts = self.GPX_point_coords(pt)
-                    self.handle_track_point(lat, lon, ele, None, timestamp=ts)
+                    lat, lon, ele, ts, attrs = self.GPX_point_coords(pt)
+                    self.handle_track_point(lat, lon, ele, timestamp=ts,
+                                            waypoint_name=None, attrs=attrs)
 
         # Handle waypoints
         waypts = dom.getElementsByTagName("wpt")
@@ -187,10 +193,11 @@ class TrackPoints(object):
                 first_segment_name = os.path.basename(filename)
             self.waypoints.append(first_segment_name)
             for pt in waypts:
-                lat, lon, ele, time = self.GPX_point_coords(pt)
+                lat, lon, ele, time, attrs = self.GPX_point_coords(pt)
                 name = "WP"
                 name = self.get_DOM_text(pt, "name")
-                self.handle_track_point(lat, lon, ele, name, timestamp=time)
+                self.handle_track_point(lat, lon, ele, name, timestamp=time,
+                                        attrs=attrs)
 
         # GPX also allows for routing, rtept, but I don't think we need those.
 
@@ -219,8 +226,26 @@ class TrackPoints(object):
         lon = float(point.getAttribute("lon"))
         ele = self.get_DOM_text(point, "ele")
         time = self.get_DOM_text(point, "time")
+
+        # Python dom and minidom have no easy way to combine sub-nodes
+        # into a dictionary, or to serialize them.
+        # Also nodes are mostly undocumented.
+        # You can loop over point.childNodes and look at .nodeName, .nodeValue
+        # but for now, let's only look at a few types of points.
+        attrs = {}
+        hdop = self.get_DOM_text(point, "hdop")
+        if hdop:
+            attrs['hdop'] = hdop
+        speed = self.get_DOM_text(point, "speed")
+        if speed:
+            attrs['speed'] = speed
+
+        # If we had no extra attributes, pass None, not an empty dict.
+        if not attrs:
+            attrs = None
+
         # For now, keep elevation and time as unchanged strings.
-        return lat, lon, ele, time
+        return lat, lon, ele, time, attrs
 
     def save_GPX(self, filename):
         '''Save all known tracks and waypoints as a GPX file.
@@ -240,16 +265,30 @@ class TrackPoints(object):
                         else:
                             started = True
                         print >>outfp, "    <trkseg>"
-                    else:
-                        print >>outfp, \
-                            '      <trkpt lat="%f" lon="%f">' % (pt[1], pt[0])
-                        ele = self.get_ele(pt)
-                        if ele:
-                            print >>outfp, '        <ele>%s</ele>' % ele
-                        ts = self.get_timestamp(pt)
-                        if ts:
-                            print >>outfp, '        <time>%s</time>' % ts
-                        print >>outfp, '      </trkpt>'
+                        continue
+
+                    print >>outfp, \
+                        '      <trkpt lat="%f" lon="%f">' % (pt.lat, pt.lon)
+                    if hasattr(pt, 'ele'):
+                        print >>outfp, '        <ele>%s</ele>' % pt.ele
+                    if hasattr(pt, 'time'):
+                        print >>outfp, '        <time>%s</time>' % pt.time
+
+                    # Extra attributes
+                    if hasattr(pt, 'attrs'):
+                        attrs = pt.attrs
+                        if 'hdop' in attrs:
+                            print >>outfp, \
+                                '        <hdop>%s</hdop>' % attrs['hdop']
+                        if 'speed' in attrs:
+                            # Speed is an extension.
+                            print >>outfp, \
+                                '''        <extensions>
+          <speed>%s</speed>
+        </extensions>''' % attrs['speed']
+
+                    # Done with this trackpoint.
+                    print >>outfp, '      </trkpt>'
                 print >>outfp, "    </trkseg>"
                 print >>outfp, "  </trk>"
 
