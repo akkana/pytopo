@@ -1661,7 +1661,6 @@ that are expected by the MapCollection classes:
 
         if event.button == 1:
             # If we're drawing a track, everything is different.
-            self.drawing_track = True
             if self.drawing_track:
                 return self.click_draw(widget, event)
 
