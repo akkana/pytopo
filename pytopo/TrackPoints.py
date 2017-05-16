@@ -146,6 +146,19 @@ class TrackPoints(object):
             return self.read_track_file_GeoJSON(filename)
         return self.read_track_file_GPX(filename)
 
+    def get_segment_name(self, seg):
+        """See if this trkseg or trk has a <name> child.
+           If so, return the text out of it, else None.
+        """
+        trkname = seg.getElementsByTagName("name")
+        if trkname and \
+           trkname[0].parentNode == seg and \
+           trkname[0].hasChildNodes() and \
+           trkname[0].firstChild.nodeName == '#text' and \
+           trkname[0].firstChild.wholeText:
+            return trkname[0].firstChild.wholeText
+        return None
+
     def read_track_file_GPX(self, filename):
         """Read a GPX track file. Throw IOError if the file doesn't exist."""
 
@@ -165,16 +178,19 @@ class TrackPoints(object):
             # need to keep different track files and segments separate: don't
             # draw lines from the end of a track to the beginning of the next.
             if trkpts:
+                # See if the segment itself has a name
+                segname = self.get_segment_name(seg)
                 # See if the parent track has a name.
                 trk = seg
                 while trk.nodeName != "trk":
                     trk = trk.parentNode
-                trkname = trk.getElementsByTagName("name")
-                if trkname and \
-                   trkname[0].hasChildNodes() and \
-                   trkname[0].firstChild.nodeName == '#text' and \
-                   trkname[0].firstChild.wholeText:
-                    self.points.append(trkname[0].firstChild.wholeText)
+                trkname = self.get_segment_name(trk)
+                if trkname and segname:
+                    self.points.append(trkname + ':' + segname)
+                elif segname:
+                    self.points.append(segname)
+                elif trkname:
+                    self.points.append(trkname)
                 else:
                     self.points.append(os.path.basename(filename))
                 if not first_segment_name:
