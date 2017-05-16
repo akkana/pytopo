@@ -192,9 +192,8 @@ that are expected by the MapCollection classes:
             print MapUtils.dec_deg2deg_min_str(self.center_lat)
         self.collection.draw_map(self.center_lon, self.center_lat, self)
 
-        self.draw_trackpoints()
-
         if not self.is_dragging:
+            self.draw_trackpoints()
             self.draw_zoom_control()
 
         # Is there a selected track?
@@ -1657,6 +1656,7 @@ that are expected by the MapCollection classes:
             x, y, state = event.window.get_pointer()
             self.move_to(x, y, widget)
             self.draw_zoom_control()
+            self.draw_trackpoints()
             return True
 
         if event.button == 1:
