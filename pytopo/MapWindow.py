@@ -433,7 +433,7 @@ that are expected by the MapCollection classes:
             x = halfwidth
         if y is None:
             y = halfheight
-        CLOSE = 6    # pixels
+        CLOSE = 12    # pixels
 
         if not self.trackpoints:
             return None, None, None
