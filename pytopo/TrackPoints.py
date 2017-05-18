@@ -159,6 +159,13 @@ class TrackPoints(object):
             return trkname[0].firstChild.wholeText
         return None
 
+    def inside_box(self, pt, bb):
+        '''Is the point inside the given bounding box?
+           Bounding box is (min_lon, min_lat, max_lon, max_lat).
+        '''
+        return (pt.lon >= bb[0] and pt.lon <= bb[2] and
+                pt.lat >= bb[1] and pt.lat <= bb[3])
+
     def read_track_file_GPX(self, filename):
         """Read a GPX track file. Throw IOError if the file doesn't exist."""
 
@@ -266,59 +273,94 @@ class TrackPoints(object):
         # For now, keep elevation and time as unchanged strings.
         return lat, lon, ele, time, attrs
 
-    def save_GPX(self, filename):
+    def save_GPX_in_region(self, start_lon, start_lat, end_lon, end_lat,
+                           filename):
+        # print "Save GPX in", filename, start_lon, start_lat, end_lon, end_lat
+        self.save_GPX(filename, (start_lon, start_lat, end_lon, end_lat))
+
+    def save_GPX(self, filename, boundingbox=None):
         '''Save all known tracks and waypoints as a GPX file.
            XXX We don't have valid <time> saved for these points.
         '''
+        if boundingbox:
+            # Make sure it's ordered right
+            boundingbox = (min(boundingbox[0], boundingbox[2]),
+                           min(boundingbox[1], boundingbox[3]),
+                           max(boundingbox[0], boundingbox[2]),
+                           max(boundingbox[1], boundingbox[3]))
+
         with open(filename, "w") as outfp:
-            print >>outfp, '''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
+            outfp.write('''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <gpx version="1.1" creator="PyTopo %s~" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-''' % __version__
+''' % __version__)
             if self.points:
-                print >>outfp, "  <trk>"
-                started = False
+                outfp.write("  <trk>\n")
+                segstr = ''
+                skipping = False
                 for pt in self.points:
                     if self.is_start(pt):
-                        if started:
-                            print >>outfp, "    </trkseg>"
-                        else:
-                            started = True
-                        print >>outfp, "    <trkseg>"
+                        if segstr:
+                            segstr += "    </trkseg>\n"
+                            outfp.write(segstr)
+                        segstr = "    <trkseg>\n"
+                        if pt:
+                            segstr += "      <name>%s</name>\n" % pt
+                        skipping = False
                         continue
 
-                    print >>outfp, \
-                        '      <trkpt lat="%f" lon="%f">' % (pt.lat, pt.lon)
+                    # If it doesn't have lat, lon then it's not a GeoPoint
+                    # and can't be added to the track.
+                    # It might be a dict of attributes from a GeoJSON.
+                    if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
+                        continue
+
+                    # Skipping this trkseg?
+                    if skipping:
+                        continue
+
+                    if boundingbox:
+                        if not self.inside_box(pt, boundingbox):
+                            segstr = ''
+                            skipping = True
+                            continue
+
+                    segstr += '      <trkpt lat="%f" lon="%f">\n' % (pt.lat,
+                                                                     pt.lon)
                     if pt.ele:
-                        print >>outfp, '        <ele>%s</ele>' % pt.ele
+                        segstr += '        <ele>%s</ele>\n' % pt.ele
                     if pt.timestamp:
-                        print >>outfp, '        <time>%s</time>' % pt.timestamp
+                        segstr += '        <time>%s</time>\n' % pt.timestamp
 
                     # Extra attributes
                     if pt.attrs:
                         if 'hdop' in pt.attrs:
-                            print >>outfp, \
-                                '        <hdop>%s</hdop>' % pt.attrs['hdop']
+                            segstr += '        <hdop>%s</hdop>\n' \
+                                      % pt.attrs['hdop']
                         if 'speed' in pt.attrs:
                             # Speed is an extension.
-                            print >>outfp, \
-                                '''        <extensions>
+                            segstr += '''        <extensions>
           <speed>%s</speed>
-        </extensions>''' % pt.attrs['speed']
+        </extensions>\n''' % pt.attrs['speed']
 
                     # Done with this trackpoint.
-                    print >>outfp, '      </trkpt>'
-                print >>outfp, "    </trkseg>"
-                print >>outfp, "  </trk>"
+                    segstr += '      </trkpt>\n'
+                if segstr:
+                    segstr += "    </trkseg>\n"
+                segstr += "  </trk>\n"
+                outfp.write(segstr)
 
             for pt in self.waypoints:
-                if self.is_start(pt):
+                # If it doesn't have lat, lon then it's not a GeoPoint
+                # and can't be added to the track.
+                if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
                     continue
-                print >>outfp, '''  <wpt lat="%f" lon="%f">
+                if not boundingbox or self.inside_box(pt, boundingbox):
+                    outfp.write('''  <wpt lat="%f" lon="%f">
     <time>2015-12-02T16:50:34Z</time>
     <name>%s</name>
-  </wpt>''' % (pt.lat, pt.lon, pt.name)
+  </wpt>\n''' % (pt.lat, pt.lon, pt.name))
 
-            print >>outfp, "</gpx>"
+            outfp.write("</gpx>")
 
     def read_track_file_GeoJSON(self, filename):
         """Read a GeoJSON track file.

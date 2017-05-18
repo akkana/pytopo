@@ -19,7 +19,7 @@ import gobject
 import glib
 import pango
 
-# import traceback
+import traceback
 
 
 class MapWindow(object):
@@ -95,7 +95,19 @@ that are expected by the MapCollection classes:
         self.context_x = None
         self.context_y = None
 
+        # Flags that affect how we handle mouse events:
+        # Are we in the middle of dragging the map?
         self.is_dragging = False
+
+        # Are we making a rubber-band selection?
+        # If so, is_rubberbanding may be set to a list or tuple:
+        # (function to call, arguments ...)
+        # indicating what to do when the rubberbanding is finished,
+        # e.g. (save_GPX, outfile)
+        self.is_rubberbanding = False
+        # These are used to draw the rubberbanding box:
+        self.x_last_drag = None
+        self.y_last_drag = None
 
         # The timeout for long press events
         self.press_timeout = None
@@ -103,8 +115,9 @@ that are expected by the MapCollection classes:
         # Colors and fonts should of course be configurable:
         # self.bg_color = gtk.gdk.color_parse("black")
         self.black_color = gtk.gdk.color_parse("black")
+        self.white_color = gtk.gdk.color_parse("white")
         self.red_color = gtk.gdk.color_parse("red")
-        self.bg_scale_color = gtk.gdk.color_parse("white")
+        self.bg_scale_color = self.white_color
         self.first_track_color = gtk.gdk.color_parse("magenta")
         self.grid_color = gtk.gdk.color_parse("grey45")
 
@@ -199,21 +212,14 @@ that are expected by the MapCollection classes:
         # Is there a selected track?
         def draw_selected_label(name, labelstring, x, y):
             tracklabel = labelstring + name
-
-            layout = self.drawing_area.create_pango_layout(tracklabel)
-            layout.set_font_description(self.select_font_desc)
-            label_width, label_height = layout.get_pixel_size()
-            self.xgc.set_rgb_fg_color(self.red_color)
-            self.drawing_area.window.draw_layout(self.xgc,
-                                                 self.win_width-label_width-x,
-                                                 y,
-                                                 layout)
+            self.draw_label(tracklabel, x, y)
 
         if self.selected_track is not None:
             draw_selected_label(self.trackpoints.points[self.selected_track],
-                                "Track: ", 15, 15)
+                                "Track: ", -15, 15)
         if self.selected_waypoint is not None:
-            draw_selected_label(self.trackpoints.waypoints[self.selected_waypoint][2], "Waypoint: ", 15, 40)
+            draw_selected_label(self.trackpoints.waypoints[self.selected_waypoint][2],
+                                "Waypoint: ", 15, 40)
 
         # Copyright info or other attribution
         self.set_color(self.grid_color)
@@ -737,18 +743,15 @@ that are expected by the MapCollection classes:
 
         # Save off the coordinates currently under the mouse,
         # so we can arrange for it to be under the mouse again after zoom.
-        curmouselon, curmouselat = self.xy2coords(event.x, event.y,
-                                                  self.win_width,
-                                                  self.win_height)
+        curmouselon, curmouselat = self.xy2coords(event.x, event.y)
 
         self.collection.zoom(direc)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
             print "zoomed to", self.collection.zoomlevel
 
         # What are the coordinates for the current mouse pos after zoom?
-        newmouselon, newmouselat = self.xy2coords(event.x, event.y,
-                                                  self.win_width,
-                                                  self.win_height)
+        newmouselon, newmouselat = self.xy2coords(event.x, event.y)
+
         # Shift the map over so the old point will be under the mouse.
         self.center_lon += (curmouselon - newmouselon)
         self.center_lat += (curmouselat - newmouselat)
@@ -786,7 +789,8 @@ that are expected by the MapCollection classes:
             ("My Tracks...", self.mytracks),
             ("Download Area...", self.download_area),
             ("Show waypoints...", self.toggle_show_waypoints),
-            ("Save GPX...", self.save_tracks_as),
+            ("Save GPX...", self.save_all_tracks_as),
+            ("Save Area as GPX...", self.save_area_tracks_as),
             ("Change background map", self.change_collection),
             ("Quit", self.graceful_exit)
         ])
@@ -917,8 +921,23 @@ that are expected by the MapCollection classes:
             dialog.destroy()
         return False
 
-    def save_tracks_as(self, widget):
+    def save_all_tracks_as(self, widget):
         '''Prompt for a filename to save all tracks and waypoints.'''
+        return self.save_tracks_as(widget, False)
+
+    def save_area_tracks_as(self, widget):
+        '''Prompt for a filename to save all tracks and waypoints,
+           then let the user drag out an area with the mouse
+           and save all tracks that are completely within that area.
+        '''
+        return self.save_tracks_as(widget, True)
+
+    def save_tracks_as(self, widget, select_area=False):
+        '''Prompt for a filename to save all tracks and waypoints.
+           Then either let the user drag out an area with the mouse
+           and save all tracks that are completely within that area,
+           or save all tracks we know about.
+        '''
         dialog = gtk.FileChooserDialog(title="Save GPX",
                                        action=gtk.FILE_CHOOSER_ACTION_SAVE,
                                        buttons=(gtk.STOCK_CANCEL,
@@ -966,6 +985,13 @@ that are expected by the MapCollection classes:
         dialog.destroy()
         if self.controller.Debug:
             print "Saving GPX to", outfile
+
+        if select_area:
+            self.draw_label("Drag out the area you want to save...", 150, 50)
+            self.is_rubberbanding = (self.trackpoints.save_GPX_in_region,
+                                     outfile)
+            return
+
         self.trackpoints.save_GPX(outfile)
 
     def split_track_by_mouse(self, widget):
@@ -1358,6 +1384,17 @@ that are expected by the MapCollection classes:
         self.drawing_area.window.draw_pixbuf(self.xgc, pixbuf, x_off, y_off,
                                              x, y, w, h)
 
+    def draw_rect_between(self, fill, x1, y1, x2, y2):
+        """Draw a rectangle. between two sets of coordinates,
+           which are not necessarily in UL, LR order.
+        """
+        minx = min(x1, x2)
+        miny = min(y1, y2)
+        maxx = max(x1, x2)
+        maxy = max(y1, y2)
+        self.drawing_area.window.draw_rectangle(self.xgc, fill, minx, miny,
+                                                maxx-minx, maxy-miny)
+
     def draw_rectangle(self, fill, x, y, w, h):
         """Draw a rectangle."""
         self.drawing_area.window.draw_rectangle(self.xgc, fill, x, y, w, h)
@@ -1370,6 +1407,18 @@ that are expected by the MapCollection classes:
         """Draw a circle, filled or not, centered at xc, yc with radius r."""
         self.drawing_area.window.draw_arc(self.xgc, fill, xc - r, yc - 4,
                                           r * 2, r * 2, 0, 23040)  # 64 * 360
+
+    def draw_label(self, labelstring, x, y):
+        layout = self.drawing_area.create_pango_layout(labelstring)
+        layout.set_font_description(self.select_font_desc)
+        label_width, label_height = layout.get_pixel_size()
+        if x < 0:
+            x = self.win_width - label_width + x
+        if y < 0:
+            y = self.win_height - label_height + y
+
+        self.xgc.set_rgb_fg_color(self.red_color)
+        self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
 
     @staticmethod
     def load_image_from_file(filename):
@@ -1448,7 +1497,6 @@ that are expected by the MapCollection classes:
 
         if self.xgc == 0:
             self.xgc = self.drawing_area.window.new_gc()
-            # self.xgc.set_foreground(white)
 
         # x, y, w, h = event.area
 
@@ -1507,7 +1555,7 @@ that are expected by the MapCollection classes:
         self.draw_map()
         return True
 
-    def xy2coords(self, x, y, win_width, win_height, xscale=None, yscale=None):
+    def xy2coords(self, x, y, xscale=None, yscale=None):
         """Convert pixels to longitude/latitude."""
         # collection.x_scale is in pixels per degree.
         if not xscale:
@@ -1515,9 +1563,9 @@ that are expected by the MapCollection classes:
         if not yscale:
             yscale = self.collection.yscale
         return (self.center_lon -
-                float(win_width / 2 - x) / xscale,
+                float(self.win_width / 2 - x) / xscale,
                 self.center_lat +
-                float(win_height / 2 - y) / yscale)
+                float(self.win_height / 2 - y) / yscale)
 
     def coords2xy(self, lon, lat, win_width, win_height,
                   xscale=None, yscale=None):
@@ -1557,14 +1605,34 @@ that are expected by the MapCollection classes:
             state = event.state
         if not state & gtk.gdk.BUTTON1_MASK:
             return False
+
         if not self.is_dragging:
             self.x_start_drag = x
             self.y_start_drag = y
             self.is_dragging = True
+
+        if self.is_rubberbanding:
+            # Draw the new box:
+            self.xgc.function = gtk.gdk.XOR
+            self.set_color(self.white_color)
+            if self.x_last_drag and self.y_last_drag:
+                self.draw_rect_between(False,
+                                       self.x_start_drag, self.y_start_drag,
+                                       self.x_last_drag, self.y_last_drag)
+            self.draw_rect_between(False,
+                                   self.x_start_drag, self.y_start_drag,
+                                   x, y)
+            self.x_last_drag = x
+            self.y_last_drag = y
+            return True
+
         self.move_to(x, y, widget)
         return True
 
     def move_to(self, x, y, widget):
+        # traceback.print_stack()
+        # print "======="
+
         if widget.drag_check_threshold(self.x_start_drag, self.y_start_drag,
                                        x, y):
             dx = x - self.x_start_drag
@@ -1582,8 +1650,7 @@ that are expected by the MapCollection classes:
             print "We only handle button 1 so far when drawing tracks."
             return False
 
-        lon, lat = self.xy2coords(event.x, event.y,
-                                  self.win_width, self.win_height)
+        lon, lat = self.xy2coords(event.x, event.y)
 
         self.trackpoints.handle_track_point(lat, lon, waypoint_name=None)
 
@@ -1609,9 +1676,7 @@ that are expected by the MapCollection classes:
             x, y, state = self.drawing_area.window.get_pointer()
             self.context_x = x
             self.context_y = y
-            self.cur_lon, self.cur_lat = self.xy2coords(x, y,
-                                                        self.win_width,
-                                                        self.win_height)
+            self.cur_lon, self.cur_lat = self.xy2coords(x, y)
             self.context_menu(event)
             return True
 
@@ -1621,9 +1686,7 @@ that are expected by the MapCollection classes:
             return False
 
         # Zoom in if we get a double-click.
-        self.center_lon, self.center_lat = self.xy2coords(event.x, event.y,
-                                                          self.win_width,
-                                                          self.win_height)
+        self.center_lon, self.center_lat = self.xy2coords(event.x, event.y)
 
         self.collection.zoom(1)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
@@ -1636,9 +1699,7 @@ that are expected by the MapCollection classes:
             gobject.source_remove(self.press_timeout)
             self.press_timeout = None
         x, y, state = self.drawing_area.window.get_pointer()
-        self.cur_lon, self.cur_lat = self.xy2coords(x, y,
-                                                    self.win_width,
-                                                    self.win_height)
+        self.cur_lon, self.cur_lat = self.xy2coords(x, y)
         self.context_menu(None)
         return True
 
@@ -1650,6 +1711,29 @@ that are expected by the MapCollection classes:
             gobject.source_remove(self.press_timeout)
             self.press_timeout = None
             # return False
+
+        if self.is_rubberbanding:
+            # is_rubberbanding is a list or tuple,
+            # where the first item is the callback function to call.
+            # and everything else is the arguments to pass.
+            # The function will be called with args:
+            # (start_x, start_y, end_x, end_y, other_args...)
+
+            self.xgc.function = gtk.gdk.COPY
+
+            lon1, lat1 = self.xy2coords(self.x_start_drag, self.y_start_drag)
+            lon2, lat2 = self.xy2coords(event.x, event.y)
+
+            self.is_rubberbanding[0](lon1, lat1, lon2, lat2,
+                                     *self.is_rubberbanding[1:])
+            self.is_rubberbanding = False
+            self.is_dragging = False
+            self.x_last_drag = None
+            self.y_last_drag = None
+
+            self.draw_map()
+
+            return True
 
         if self.is_dragging:
             self.is_dragging = False
@@ -1675,8 +1759,7 @@ that are expected by the MapCollection classes:
 
             # Is this needed for anything?
             # It breaks passing location to context menus.
-            cur_long, cur_lat = self.xy2coords(event.x, event.y,
-                                               self.win_width, self.win_height)
+            cur_long, cur_lat = self.xy2coords(event.x, event.y)
 
             if self.controller.Debug:
                 print "Click:", \
