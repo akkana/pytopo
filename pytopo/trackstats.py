@@ -74,10 +74,9 @@ def statistics(trackpoints, halfwin, beta):
             lastele = -1
             continue
 
-        lat, lon, ele, t = pt
-        # We're requiring that trackpoints have a time attached.
-        # Should we try to handle tracks that don't have timestamps?
-        t = datetime.datetime.strptime(t['time'], '%Y-%m-%dT%H:%M:%SZ')
+        lat, lon, ele, t = pt.lat, pt.lon, pt.ele, pt.timestamp
+
+        t = datetime.datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ')
         lat =  float(lat)
         lon = float(lon)
         ele = round(float(ele) * 3.2808399, 2)    # convert meters->feet
