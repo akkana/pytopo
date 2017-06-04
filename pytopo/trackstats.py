@@ -171,11 +171,11 @@ def main():
     import pytopo.TrackPoints
 
     try:
-        import pylab
-        have_pylab = True
+        import pylab as plt
+        have_plt = True
     except ImportError:
-        have_pylab = False
-        print "pylab isn't installed; will print stats only, no plotting"
+        have_plt = False
+        print "plt isn't installed; will print stats only, no plotting"
 
     if len(sys.argv) < 2:
         cmdname = os.path.basename(sys.argv[0])
@@ -224,7 +224,7 @@ def main():
     print "%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
                                              int(out['Stopped time'] / 60))
     print "Average speed moving: %.1f mph" % out['Average moving speed']
-    if not have_pylab:
+    if not have_plt:
         return 0
 
     # print "======= Distances", type(out['Distances'])
@@ -232,25 +232,32 @@ def main():
     # print "\n\n======= Elevations", type(out['Elevations'])
     # print out['Elevations']
 
-    pylab.plot(out['Distances'], out['Elevations'],
+    plt.plot(out['Distances'], out['Elevations'],
                label="GPS elevation data", color="gray")
-    pylab.plot(out['Distances'], out['Smoothed elevations'],
+    plt.plot(out['Distances'], out['Smoothed elevations'],
                color="red", label="smoothed (b=%.1f, hw=%d)" % (beta, halfwin))
 
     title_string = "Elevation profile (" + str(round(out['Distances'][-1], 1)) \
                    + " miles, " + str(int(out['Smoothed total climb'])) \
                    + "' climb)"
-    pylab.title(title_string)
+    plt.title(title_string)
 
     # Set the window titlebar to something other than "Figure 1"
-    pylab.gcf().canvas.set_window_title("Ellie: " + args[0])
+    plt.gcf().canvas.set_window_title("Ellie: " + args[0])
 
-    pylab.xlabel("miles")
-#    pylab.get_current_fig_manager().window.set_title(os.path.basename(args[0] + ": " + title_string))
-    pylab.ylabel("feet")
-    pylab.grid(True)
-    pylab.legend()
-    pylab.show()
+    plt.xlabel("miles")
+#    plt.get_current_fig_manager().window.set_title(os.path.basename(args[0] + ": " + title_string))
+    plt.ylabel("feet")
+    plt.grid(True)
+    plt.legend()
+
+    # Exit on key q
+    plt.figure(1).canvas.mpl_connect('key_press_event',
+                                     lambda e:
+                                         sys.exit(0) if e.key == 'ctrl+q'
+                                         else None)
+
+    plt.show()
 
 if __name__ == '__main__':
     main()
