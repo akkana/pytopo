@@ -218,7 +218,7 @@ that are expected by the MapCollection classes:
             draw_selected_label(self.trackpoints.points[self.selected_track],
                                 "Track: ", -15, 15)
         if self.selected_waypoint is not None:
-            draw_selected_label(self.trackpoints.waypoints[self.selected_waypoint][2],
+            draw_selected_label(self.trackpoints.waypoints[self.selected_waypoint].name,
                                 "Waypoint: ", 15, 40)
 
         # Copyright info or other attribution
