@@ -12,6 +12,15 @@ import math
 import datetime
 import numpy
 
+from MapUtils import MapUtils
+
+
+CLIMB_THRESHOLD = 8
+
+# How fast do we have to be moving to count
+# toward the moving average speed?
+# This is in miles/hour.
+SPEED_THRESHOLD = .2
 
 # Variables that need to be global, because statistics() and
 # accumulate_climb() need to share them, and python 2.7 doesn't
@@ -20,13 +29,6 @@ total_climb = 0
 this_climb = 0
 this_climb_start = 0
 lastele = -1
-
-CLIMB_THRESHOLD = 8
-
-# How fast do we have to be moving to count
-# toward the moving average speed?
-# This is in miles/hour.
-SPEED_THRESHOLD = .5
 
 
 def statistics(trackpoints, halfwin, beta):
@@ -81,27 +83,32 @@ def statistics(trackpoints, halfwin, beta):
         lon = float(lon)
         ele = round(float(ele) * 3.2808399, 2)    # convert meters->feet
 
-        if lastlat != 0 and lastlon != 0:
-            dist = math.sqrt((lat - lastlat)**2 + (lon - lastlon)**2) \
-                   * 69.046767
-            # 69.046767 converts nautical miles (arcminutes) to miles
+        if not lastlat or not lastlon:
+            lastlat = lat
+            lastlon = lon
+            lasttime = t
+            continue
+
+        dist = MapUtils.haversine_distance(lat, lon, lastlat, lastlon)
+
+        delta_t = t - lasttime   # a datetime.timedelta object
+        speed = dist / delta_t.seconds * 60 * 60    # miles/hour
+        if speed > SPEED_THRESHOLD:
             total_dist += dist
+            moving_time += delta_t
+            #print "moving\t",
 
-            delta_t = t - lasttime   # a datetime.timedelta object
-            speed = dist / delta_t.seconds * 60 * 60    # miles/hour
-            if speed > SPEED_THRESHOLD:
-                moving_time += delta_t
-                #print "moving\t",
-            else:
-                stopped_time += delta_t
-                #print "stopped\t",
+            lasttime = t
+            lastlat = lat
+            lastlon = lon
 
-        lasttime = t
+            accumulate_climb(ele)
 
-        accumulate_climb(ele)
-
-        lastlat = lat
-        lastlon = lon
+        else:
+            # If we're considered stopped, don't update lastlat/lastlon.
+            # We'll calculate distance from the first stopped point.
+            stopped_time += delta_t
+            #print "stopped\t",
 
         # print total_dist, ele, "\t", time, lat, lon, "\t", total_climb
         # print total_dist, ele, "\t", time, total_climb
@@ -114,7 +121,8 @@ def statistics(trackpoints, halfwin, beta):
     out = {}
     out['Total distance'] = total_dist
     out['Raw total climb'] = total_climb
-    out['Smoothed total climb'] = tot_climb(smoothed_eles)
+    out['Smoothed total climb'], out['Lowest'], out['Highest'] \
+        = tot_climb(smoothed_eles)
     out['Moving time'] = moving_time.seconds
     out['Stopped time'] = stopped_time.seconds
     out['Average moving speed'] = total_dist * 60 * 60 / moving_time.seconds
@@ -124,15 +132,18 @@ def statistics(trackpoints, halfwin, beta):
 
     return out
 
+
 def tot_climb(arr):
     global this_climb, this_climb_start
 
-    tot = 0
+    tot = 0.
     lastel = -1
-    this_climb = 0
-    this_climb_start = 0
+    this_climb = 0.
+    this_climb_start = 0.
+    lowest = 30000.
+    highest = -30000.
     for el in arr:
-        if lastel > 0:
+        if lastel >= 0:
             if el > lastel:
                 if this_climb == 0:
                     this_climb_start = lastel
@@ -144,14 +155,19 @@ def tot_climb(arr):
                 elif el <= this_climb_start:
                     this_climb = 0
 
+        if el > highest:
+            highest = el
+        if el < lowest:
+            lowest = el
         lastel = el
 
-    return tot
+    if this_climb > 0:
+        tot += this_climb
+
+    return tot, lowest, highest
 
 def smooth(x, halfwin, beta):
     """ Kaiser window smoothing.
-        Unfortunately, this only smooths by a tiny bit,
-        and changing beta doesn't affect that much.
     """
     window_len = 2 * halfwin + 1
     # extending the data at beginning and at the end
@@ -218,9 +234,10 @@ def main():
     #
     # Print and plot the results:
     #
-    print "%.1f miles. Raw total climb: %d'" % (out['Total distance'],
-                                                int(out['Raw total climb']))
+    print "%.1f miles." % (out['Total distance'])
+    print "Raw total climb: %d'" % (int(out['Raw total climb']))
     print "Smoothed climb: %d'" % out['Smoothed total climb']
+    print "  from %d to %d" % (out['Lowest'], out['Highest'])
     print "%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
                                              int(out['Stopped time'] / 60))
     print "Average speed moving: %.1f mph" % out['Average moving speed']

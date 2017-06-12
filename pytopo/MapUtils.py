@@ -118,6 +118,7 @@ class MapUtils:
         Haversine distance between two points, expressed in meters.
         From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
         Implemented from http://www.movable-type.co.uk/scripts/latlong.html
+        Returns distance in miles.
         """
         d_lat = math.radians(latitude_1 - latitude_2)
         d_lon = math.radians(longitude_1 - longitude_2)
