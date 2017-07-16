@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 # Copyright (C) 2009-2016 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
@@ -8,19 +6,11 @@
    such as total distance, average speed, and total climb.
 '''
 
+import argparse
 import math
 import datetime
 import numpy
 
-from MapUtils import MapUtils
-
-
-CLIMB_THRESHOLD = 8
-
-# How fast do we have to be moving to count
-# toward the moving average speed?
-# This is in miles/hour.
-SPEED_THRESHOLD = .2
 
 # Variables that need to be global, because statistics() and
 # accumulate_climb() need to share them, and python 2.7 doesn't
@@ -30,8 +20,15 @@ this_climb = 0
 this_climb_start = 0
 lastele = -1
 
+CLIMB_THRESHOLD = 8
 
-def statistics(trackpoints, halfwin, beta):
+# How fast do we have to be moving to count
+# toward the moving average speed?
+# This is in miles/hour.
+SPEED_THRESHOLD = .5
+
+
+def statistics(trackpoints, halfwin, beta, metric):
     '''Accumulate statistics like mileage and total climb.
        Return a dictionary of stats collected.
     '''
@@ -76,39 +73,42 @@ def statistics(trackpoints, halfwin, beta):
             lastele = -1
             continue
 
-        lat, lon, ele, t = pt.lat, pt.lon, pt.ele, pt.timestamp
-
-        t = datetime.datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ')
+        lat, lon, ele, t = pt
+        # We're requiring that trackpoints have a time attached.
+        # Should we try to handle tracks that don't have timestamps?
+        t = datetime.datetime.strptime(t['time'], '%Y-%m-%dT%H:%M:%SZ')
         lat =  float(lat)
         lon = float(lon)
-        ele = round(float(ele) * 3.2808399, 2)    # convert meters->feet
+        if not metric:
+            ele = round(float(ele) * 3.2808399, 2)    # convert meters->feet
+        else: 
+            ele = round(float(ele),2)
 
-        if not lastlat or not lastlon:
-            lastlat = lat
-            lastlon = lon
-            lasttime = t
-            continue
-
-        dist = MapUtils.haversine_distance(lat, lon, lastlat, lastlon)
-
-        delta_t = t - lasttime   # a datetime.timedelta object
-        speed = dist / delta_t.seconds * 60 * 60    # miles/hour
-        if speed > SPEED_THRESHOLD:
+        if lastlat != 0 and lastlon != 0:
+            if not metric:
+                dist = math.sqrt((lat - lastlat)**2 + (lon - lastlon)**2) \
+                    * 69.046767              # 69.046767 converts nautical miles (arcminutes) to miles
+            else:
+                dist = math.sqrt((lat - lastlat)**2 + (lon - lastlon)**2) \
+                    * 69.046767 * 1.60934
+            
             total_dist += dist
-            moving_time += delta_t
-            #print "moving\t",
 
-            lasttime = t
-            lastlat = lat
-            lastlon = lon
+            delta_t = t - lasttime   # a datetime.timedelta object
+            speed = dist / delta_t.seconds * 60 * 60    # miles/hour
+            if speed > SPEED_THRESHOLD:
+                moving_time += delta_t
+                #print "moving\t",
+            else:
+                stopped_time += delta_t
+                #print "stopped\t",
 
-            accumulate_climb(ele)
+        lasttime = t
 
-        else:
-            # If we're considered stopped, don't update lastlat/lastlon.
-            # We'll calculate distance from the first stopped point.
-            stopped_time += delta_t
-            #print "stopped\t",
+        accumulate_climb(ele)
+
+        lastlat = lat
+        lastlon = lon
 
         # print total_dist, ele, "\t", time, lat, lon, "\t", total_climb
         # print total_dist, ele, "\t", time, total_climb
@@ -121,8 +121,7 @@ def statistics(trackpoints, halfwin, beta):
     out = {}
     out['Total distance'] = total_dist
     out['Raw total climb'] = total_climb
-    out['Smoothed total climb'], out['Lowest'], out['Highest'] \
-        = tot_climb(smoothed_eles)
+    out['Smoothed total climb'] = tot_climb(smoothed_eles)
     out['Moving time'] = moving_time.seconds
     out['Stopped time'] = stopped_time.seconds
     out['Average moving speed'] = total_dist * 60 * 60 / moving_time.seconds
@@ -132,18 +131,15 @@ def statistics(trackpoints, halfwin, beta):
 
     return out
 
-
 def tot_climb(arr):
     global this_climb, this_climb_start
 
-    tot = 0.
+    tot = 0
     lastel = -1
-    this_climb = 0.
-    this_climb_start = 0.
-    lowest = 30000.
-    highest = -30000.
+    this_climb = 0
+    this_climb_start = 0
     for el in arr:
-        if lastel >= 0:
+        if lastel > 0:
             if el > lastel:
                 if this_climb == 0:
                     this_climb_start = lastel
@@ -155,19 +151,14 @@ def tot_climb(arr):
                 elif el <= this_climb_start:
                     this_climb = 0
 
-        if el > highest:
-            highest = el
-        if el < lowest:
-            lowest = el
         lastel = el
 
-    if this_climb > 0:
-        tot += this_climb
-
-    return tot, lowest, highest
+    return tot
 
 def smooth(x, halfwin, beta):
     """ Kaiser window smoothing.
+        Unfortunately, this only smooths by a tiny bit,
+        and changing beta doesn't affect that much.
     """
     window_len = 2 * halfwin + 1
     # extending the data at beginning and at the end
@@ -187,94 +178,86 @@ def main():
     import pytopo.TrackPoints
 
     try:
-        import pylab as plt
-        have_plt = True
+        import pylab
+        have_pylab = True
     except ImportError:
-        have_plt = False
-        print "plt isn't installed; will print stats only, no plotting"
+        have_pylab = False
+        print "pylab isn't installed; will print stats only, no plotting"
 
-    if len(sys.argv) < 2:
-        cmdname = os.path.basename(sys.argv[0])
-        print "%s version %s" % (cmdname, pytopo.__version__)
-        print "Usage: %s [-b beta] [-w halfwidth] file.gpx" % cmdname
-        print """  beta (default 2) and halfwidth (default 15)
-  are parameters for Kaiser window smoothing"""
-        return 1
+    parser = argparse.ArgumentParser(description='This parses track log files, in gpx format, and gives you a graph and a few statistics. ')
+    parser.add_argument('--version', action='version', version=pytopo.__version__)
+    parser.add_argument('-m', action="store_true", default=False, dest="metric", help='Use metric rather than standard units')
+    parser.add_argument('-b', action="store", default=2, dest="beta", type=int, help='Kaiser window smoothing beta parameter (default = 2)')
+    parser.add_argument('-w', action="store", default=15, dest="halfwin", type=int, help='Kaiser window smoothing halfwidth parameter (default = 15)')
+    parser.add_argument('track_file', nargs='+')
 
-    # Default values that can be changed by commandline arguments:
-    beta = 2
-    halfwin = 15
+    results = parser.parse_args()
+    beta = results.beta
+    halfwin = results.halfwin
+    metric = results.metric
+    track_file = results.track_file[0]
 
-    # Look for flags:
-    args = sys.argv[1:]
-    while args[0][0] == '-':
-        if args[0] == '-b' and len(args) > 2:
-            beta = float(args[1])
-            args = args[2:]
-            continue
-        if args[0] == '-w' and len(args) > 2:
-            halfwin = int(args[1])
-            args = args[2:]
-            continue
-        print "Don't understand flag", args[0]
 
     #
     # Read the trackpoints file:
     #
     trackpoints = pytopo.TrackPoints()
     try:
-        trackpoints.read_track_file(args[0])
+        #trackpoints.read_track_file(args[0])
+        trackpoints.read_track_file(results.track_file[0])
     except IOError, e:
         print e
         #print dir(e)
         return e.errno
 
-    out = statistics(trackpoints, halfwin, beta)
+    out = statistics(trackpoints, halfwin, beta, metric)
 
     #
     # Print and plot the results:
     #
-    print "%.1f miles." % (out['Total distance'])
-    print "Raw total climb: %d'" % (int(out['Raw total climb']))
-    print "Smoothed climb: %d'" % out['Smoothed total climb']
-    print "  from %d to %d" % (out['Lowest'], out['Highest'])
+    if not metric:
+        print "%.1f miles. Raw total climb: %d'" % (out['Total distance'],
+                                                    int(out['Raw total climb']))
+        print "Smoothed climb: %d'" % out['Smoothed total climb']
+        print "Average speed moving: %.1f mph" % out['Average moving speed']
+    else:
+        print "%.1f km. Raw total climb: %d m" % (out['Total distance'],
+                                                    int(out['Raw total climb']))
+        print "Smoothed climb: %d m" % out['Smoothed total climb']
+        print "Average speed moving: %.1f kph" % out['Average moving speed']
     print "%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
                                              int(out['Stopped time'] / 60))
-    print "Average speed moving: %.1f mph" % out['Average moving speed']
-    if not have_plt:
+
+    if not have_pylab:
         return 0
 
-    # print "======= Distances", type(out['Distances'])
-    # print out['Distances']
-    # print "\n\n======= Elevations", type(out['Elevations'])
-    # print out['Elevations']
-
-    plt.plot(out['Distances'], out['Elevations'],
+    pylab.plot(out['Distances'], out['Elevations'],
                label="GPS elevation data", color="gray")
-    plt.plot(out['Distances'], out['Smoothed elevations'],
+    pylab.plot(out['Distances'], out['Smoothed elevations'],
                color="red", label="smoothed (b=%.1f, hw=%d)" % (beta, halfwin))
 
-    title_string = "Elevation profile (" + str(round(out['Distances'][-1], 1)) \
-                   + " miles, " + str(int(out['Smoothed total climb'])) \
-                   + "' climb)"
-    plt.title(title_string)
+    if not metric:
+        title_string = "Elevation profile (" + str(round(out['Distances'][-1], 1)) \
+                       + " miles, " + str(int(out['Smoothed total climb'])) \
+                       + "' climb)"
+    else:
+        title_string = "Elevation profile (" + str(round(out['Distances'][-1], 1)) \
+                       + " km, " + str(int(out['Smoothed total climb'])) \
+                       + "' climb)"
+    pylab.title(title_string)
 
     # Set the window titlebar to something other than "Figure 1"
-    plt.gcf().canvas.set_window_title("Ellie: " + args[0])
+    pylab.gcf().canvas.set_window_title("Ellie: " + track_file)
+    if not metric:
+        pylab.xlabel("miles")
+        pylab.ylabel("feet")
+    else:
+        pylab.xlabel("km")
+        pylab.ylabel("m")
 
-    plt.xlabel("miles")
-#    plt.get_current_fig_manager().window.set_title(os.path.basename(args[0] + ": " + title_string))
-    plt.ylabel("feet")
-    plt.grid(True)
-    plt.legend()
-
-    # Exit on key q
-    plt.figure(1).canvas.mpl_connect('key_press_event',
-                                     lambda e:
-                                         sys.exit(0) if e.key == 'ctrl+q'
-                                         else None)
-
-    plt.show()
+    pylab.grid(True)
+    pylab.legend()
+    pylab.show()
 
 if __name__ == '__main__':
     main()
