@@ -38,14 +38,26 @@ setup(name='pytopo',
       author_email='akkana@shallowsky.com',
       license="GPLv2+",
       url='http://shallowsky.com/software/topo/',
+
+      # This is supposed to include everything specified in MANIFEST.in,
+      # but it doesn't.
       # include_package_data=True,
-      data_files=[('/usr/share/pixmaps',      ["resources/pytopo.png"]),
-                  # Next line builds bdist fine, but on install, gives:
-                  # error: can't copy 'resources/pytopo.desktop': doesn't exist or not a regular file
-                  ('/usr/share/applications', ["resources/pytopo.desktop"]),
-                  ('/usr/share/pytopo',       ["resources/sample.pytopo"]),
-                  ('/usr/share/pytopo',       ["resources/pytopo-pin.png"])
-                 ],
+
+      # This also doesn't include the specified files:
+      package_data={
+          '': [ 'resources/pytopo-pin.png', 'resources/sample.pytopo' ],
+          },
+
+      # This gives an error because the absolute paths don't exist
+      # inside the virtualenv:
+      # data_files=[('/usr/share/pixmaps',      ["resources/pytopo.png"]),
+      #             # Next line builds bdist fine, but on install, gives:
+      #             # error: can't copy 'resources/pytopo.desktop': doesn't exist or not a regular file
+      #             ('/usr/share/applications', ["resources/pytopo.desktop"]),
+      #             ('/usr/share/pytopo',       ["resources/sample.pytopo"]),
+      #             ('/usr/share/pytopo',       ["resources/pytopo-pin.png"])
+      #            ],
+
       entry_points={
           # This probably should be gui_scripts according to some
           # pages I've found, but none of the official documentation
