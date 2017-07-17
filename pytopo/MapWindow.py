@@ -19,6 +19,8 @@ import gobject
 import glib
 import pango
 
+from pkg_resources import resource_filename
+
 import traceback
 
 
@@ -62,14 +64,25 @@ that are expected by the MapCollection classes:
         self.prompt_dialog = None
         self.traildialog = None
 
+        # Try to find the pytopo.pin image.
         try:
-            self.pin = \
-                gtk.gdk.pixbuf_new_from_file("/usr/share/pytopo/pytopo-pin.png")
+            # This tends to raise exceptions, so protect it.
+            # It's not clear whether a / path separator here is kosher
+            # for all platforms; some people seem to use it but the
+            # actual documentation is unhelpful on the issue.
+            pinpath = resource_filename(__name__, 'resources/pytopo-pin.png')
         except:
-            try:
-                self.pin = gtk.gdk.pixbuf_new_from_file("pytopo-pin.png")
-            except:
-                self.pin = None
+            pinpath = None
+        if not os.access(pinpath, os.R_OK):
+            pinpath = os.path.join(os.path.dirname(__file__),
+                                   'resources', 'pytopo-pin.png')
+            if not os.access(pinpath, os.R_OK):
+                pinpath = "pytopo-pin.png"
+
+        try:
+            self.pin = gtk.gdk.pixbuf_new_from_file(pinpath)
+        except:
+            self.pin = None
         self.pin_lon = 0
         self.pin_lat = 0
         self.pin_xoff = -4

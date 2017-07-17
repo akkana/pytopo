@@ -11,13 +11,17 @@ def read(fname):
 
 def get_version():
     '''Read the pytopo module versions from pytopo/__init__.py'''
+    return "1.5b2"
     with open("pytopo/__init__.py") as fp:
         for line in fp:
             line = line.strip()
             if line.startswith("__version__"):
-                parts = line.split("=")
-                if len(parts) > 1:
-                    return parts[1].strip()
+                versionpart = line.split("=").strip()
+                if versionpart.startswith('"') or versionpart.startswith("'"):
+                    versionpart = versionpart[1:]
+                if versionpart.endswith('"') or versionpart.endswith("'"):
+                    versionpart = versionpart[:-1]
+                return versionpart
 
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
@@ -38,15 +42,16 @@ setup(name='pytopo',
       author_email='akkana@shallowsky.com',
       license="GPLv2+",
       url='http://shallowsky.com/software/topo/',
+      zip_safe=False,
 
       # This is supposed to include everything specified in MANIFEST.in,
       # but it doesn't.
-      # include_package_data=True,
+      include_package_data=True,
 
       # This also doesn't include the specified files:
-      package_data={
-          '': [ 'resources/pytopo-pin.png', 'resources/sample.pytopo' ],
-          },
+      # package_data={
+      #     '': [ 'resources/pytopo-pin.png', 'resources/sample.pytopo' ],
+      #     },
 
       # This gives an error because the absolute paths don't exist
       # inside the virtualenv:
@@ -62,7 +67,7 @@ setup(name='pytopo',
           # This probably should be gui_scripts according to some
           # pages I've found, but none of the official documentation
           # mentions gui_scripts at all.
-          'console_scripts': [
+          'gui_scripts': [
               'pytopo=pytopo.MapViewer:main',
               'ellie=pytopo.trackstats:main'
           ]
