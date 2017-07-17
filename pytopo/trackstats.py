@@ -11,6 +11,7 @@
 import math
 import datetime
 import numpy
+import argparse
 
 from MapUtils import MapUtils
 
@@ -31,7 +32,7 @@ this_climb_start = 0
 lastele = -1
 
 
-def statistics(trackpoints, halfwin, beta):
+def statistics(trackpoints, halfwin, beta, metric):
     '''Accumulate statistics like mileage and total climb.
        Return a dictionary of stats collected.
     '''
@@ -81,7 +82,10 @@ def statistics(trackpoints, halfwin, beta):
         t = datetime.datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ')
         lat =  float(lat)
         lon = float(lon)
-        ele = round(float(ele) * 3.2808399, 2)    # convert meters->feet
+        if metric:
+            ele = round(float(ele),2)
+        else:
+            ele = round(float(ele) * 3.2808399, 2)    # convert meters->feet
 
         if not lastlat or not lastlon:
             lastlat = lat
@@ -89,7 +93,7 @@ def statistics(trackpoints, halfwin, beta):
             lasttime = t
             continue
 
-        dist = MapUtils.haversine_distance(lat, lon, lastlat, lastlon)
+        dist = MapUtils.haversine_distance(lat, lon, lastlat, lastlon, metric)
 
         delta_t = t - lasttime   # a datetime.timedelta object
         speed = dist / delta_t.seconds * 60 * 60    # miles/hour
@@ -193,54 +197,54 @@ def main():
         have_plt = False
         print "plt isn't installed; will print stats only, no plotting"
 
-    if len(sys.argv) < 2:
-        cmdname = os.path.basename(sys.argv[0])
-        print "%s version %s" % (cmdname, pytopo.__version__)
-        print "Usage: %s [-b beta] [-w halfwidth] file.gpx" % cmdname
-        print """  beta (default 2) and halfwidth (default 15)
-  are parameters for Kaiser window smoothing"""
-        return 1
+    progname = os.path.basename(sys.argv[0])
 
-    # Default values that can be changed by commandline arguments:
-    beta = 2
-    halfwin = 15
+    parser = argparse.ArgumentParser(description='This parses track log files, in gpx format, and gives you a graph and a few statistics. ')
+    parser.add_argument('--version', action='version',
+                        version=pytopo.__version__)
+    parser.add_argument('-m', action="store_true", default=False,
+                        dest="metric",
+                        help='Use metric rather than US units')
+    parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
+                        help='Kaiser window smoothing beta parameter (default: 2)')
+    parser.add_argument('-w', action="store", default=15, dest="halfwin",
+                        type=int, help='Kaiser window smoothing halfwidth parameter (default: 15)')
+    parser.add_argument('track_file', nargs='+')
 
-    # Look for flags:
-    args = sys.argv[1:]
-    while args[0][0] == '-':
-        if args[0] == '-b' and len(args) > 2:
-            beta = float(args[1])
-            args = args[2:]
-            continue
-        if args[0] == '-w' and len(args) > 2:
-            halfwin = int(args[1])
-            args = args[2:]
-            continue
-        print "Don't understand flag", args[0]
+    results = parser.parse_args()
+    print results
+    beta = results.beta
+    halfwin = results.halfwin
+    metric = results.metric
+    track_files = results.track_file
 
     #
     # Read the trackpoints file:
     #
     trackpoints = pytopo.TrackPoints()
     try:
-        trackpoints.read_track_file(args[0])
+        trackpoints.read_track_file(track_files[0])
+        # XXX Read more than one file
     except IOError, e:
         print e
         #print dir(e)
         return e.errno
 
-    out = statistics(trackpoints, halfwin, beta)
+    out = statistics(trackpoints, halfwin, beta, metric)
 
     #
     # Print and plot the results:
     #
-    print "%.1f miles." % (out['Total distance'])
-    print "Raw total climb: %d'" % (int(out['Raw total climb']))
-    print "Smoothed climb: %d'" % out['Smoothed total climb']
+    climb_units = 'm' if metric else "'"
+    dist_units = 'km' if metric else 'mi'
+    print "%.1f %s" % (out['Total distance'], dist_units)
+    print "Raw total climb: %d%s" % (int(out['Raw total climb']), climb_units)
+    print "Smoothed climb: %d%s" % (out['Smoothed total climb'], climb_units)
     print "  from %d to %d" % (out['Lowest'], out['Highest'])
     print "%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
                                              int(out['Stopped time'] / 60))
-    print "Average speed moving: %.1f mph" % out['Average moving speed']
+    print "Average speed moving: %.1f %s/h" % (out['Average moving speed'],
+                                               dist_units)
     if not have_plt:
         return 0
 
@@ -254,13 +258,13 @@ def main():
     plt.plot(out['Distances'], out['Smoothed elevations'],
                color="red", label="smoothed (b=%.1f, hw=%d)" % (beta, halfwin))
 
-    title_string = "Elevation profile (" + str(round(out['Distances'][-1], 1)) \
-                   + " miles, " + str(int(out['Smoothed total climb'])) \
-                   + "' climb)"
+    title_string = "Elevation profile (%.1f %s, %d%s climb)" \
+                   % (out['Distances'][-1], dist_units,
+                      out['Smoothed total climb'], climb_units)
     plt.title(title_string)
 
     # Set the window titlebar to something other than "Figure 1"
-    plt.gcf().canvas.set_window_title("Ellie: " + args[0])
+    plt.gcf().canvas.set_window_title("%s: %s" % (progname, track_files[0]))
 
     plt.xlabel("miles")
 #    plt.get_current_fig_manager().window.set_title(os.path.basename(args[0] + ": " + title_string))

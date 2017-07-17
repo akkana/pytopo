@@ -7,6 +7,8 @@
 
 import math
 
+EARTH_RADIUS_MI = 3959.
+EARTH_RADIUS_KM = 6371.
 
 class MapUtils:
 
@@ -113,7 +115,7 @@ class MapUtils:
 
     @classmethod
     def haversine_distance(cls, latitude_1, longitude_1,
-                           latitude_2, longitude_2):
+                           latitude_2, longitude_2, metric=False):
         """
         Haversine distance between two points, expressed in meters.
         From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
@@ -129,10 +131,11 @@ class MapUtils:
             math.sin(d_lon / 2) * math.sin(d_lon / 2) * \
             math.cos(lat1) * math.cos(lat2)
         c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-        EARTH_RADIUS = 3959.     # miles
-        d = EARTH_RADIUS * c
 
-        return d
+        if metric:
+            return EARTH_RADIUS_KM * c
+        else:
+            return EARTH_RADIUS_MI * c
 
     @classmethod
     def distance_on_unit_sphere(cls, lat1, long1, lat2, long2):
