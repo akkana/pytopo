@@ -219,8 +219,7 @@ that are expected by the MapCollection classes:
         self.collection.draw_map(self.center_lon, self.center_lat, self)
 
         if not self.is_dragging:
-            self.draw_trackpoints()
-            self.draw_zoom_control()
+            self.draw_overlays()
 
         # Is there a selected track?
         def draw_selected_label(name, labelstring, x, y):
@@ -520,19 +519,26 @@ that are expected by the MapCollection classes:
                 """
         return nearest_track, nearest_point, nearest_waypoint
 
+    def draw_overlays(self):
+        self.collection.draw_attribution(self)
+        self.draw_zoom_control()
+        self.draw_map_scale()
+        self.draw_trackpoints()
+
     def draw_map_scale(self):
-        ########################################################################
+        ###################################################################
         #
-        # The draw_map_scale function calculates and draws a map scale at the
-        # bottom of the map window created by the PyTopo mapping application.
-        # Distances are calculated along the surface of the geoid defined by the
-        # earth equitorial radius, Req, and the square of the eccentricity of
-        # the earth, esq.
-        # The map scale is accurate only for the center latitude of the map.
-        # The circumference of the earth at the equator is 24901 miles (an upper
-        # limit on map size).
-        # USGS quadrangles use NAD-27, but WGS-84 is the most recent datum, and
-        # GPS uses WGS-84.
+        # The draw_map_scale function calculates and draws a map scale
+        # at the bottom of the map window created by the PyTopo
+        # mapping application. Distances are calculated along the
+        # surface of the geoid defined by the earth equitorial radius,
+        # Req, and the square of the eccentricity of the earth, esq.
+        #
+        # The map scale is accurate only for the center latitude of
+        # the map. The circumference of the earth at the equator is
+        # 24901 miles (an upper limit on map size). USGS quadrangles
+        # use NAD-27, but WGS-84 is the most recent datum, and GPS
+        # uses WGS-84.
         #
         # References:
         #    http://en.wikipedia.org/wiki/Geodetic_system
@@ -540,7 +546,7 @@ that are expected by the MapCollection classes:
         #
         # Copyright (C) 2013 Spencer A. Buckner
         #
-        ########################################################################
+        ###################################################################
 
         # Define constants
         # Req = 6.3781370e+06   # WGS-84 earth equatorial radius (meters)
@@ -1031,7 +1037,6 @@ that are expected by the MapCollection classes:
     def remove_trackpoint(self, widget):
         """Remove the point nearest the mouse from its track."""
 
-        # self.draw_map()
         near_track, near_point, near_waypoint = \
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
@@ -1752,8 +1757,7 @@ that are expected by the MapCollection classes:
             self.is_dragging = False
             x, y, state = event.window.get_pointer()
             self.move_to(x, y, widget)
-            self.draw_zoom_control()
-            self.draw_trackpoints()
+            self.draw_overlays()
             return True
 
         if event.button == 1:

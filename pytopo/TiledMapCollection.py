@@ -308,10 +308,11 @@ TiledMapCollection classes must implement
             print "Error drawing tile:", e
             self.download_failures += 1
 
-        # Redraw any trackpoints, since they might have been overwritten.
+        # Redraw any trackpoints, zoom controls, and anything else that
+        # has to draw over the tiles, since they might have been overwritten.
         # XXX should schedule this after a delay, so we're not constantly
         # redrawing large sets of trackpoints each time a new tile comes in.
-        mapwin.draw_trackpoints()
+        mapwin.draw_overlays()
 
     def download_finished(self, path):
         """Callback when a tile finishes downloading.

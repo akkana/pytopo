@@ -44,29 +44,16 @@ setup(name='pytopo',
       url='http://shallowsky.com/software/topo/',
       zip_safe=False,
 
-      # This is supposed to include everything specified in MANIFEST.in,
-      # but it doesn't.
+      # This only works if the data files are inside the package directory,
+      # i.e. from here they have to be in pytopo/resources, not just resources.
       include_package_data=True,
-
-      # This also doesn't include the specified files:
-      # package_data={
-      #     '': [ 'resources/pytopo-pin.png', 'resources/sample.pytopo' ],
-      #     },
-
-      # This gives an error because the absolute paths don't exist
-      # inside the virtualenv:
-      # data_files=[('/usr/share/pixmaps',      ["resources/pytopo.png"]),
-      #             # Next line builds bdist fine, but on install, gives:
-      #             # error: can't copy 'resources/pytopo.desktop': doesn't exist or not a regular file
-      #             ('/usr/share/applications', ["resources/pytopo.desktop"]),
-      #             ('/usr/share/pytopo',       ["resources/sample.pytopo"]),
-      #             ('/usr/share/pytopo',       ["resources/pytopo-pin.png"])
-      #            ],
 
       entry_points={
           # This probably should be gui_scripts according to some
-          # pages I've found, but none of the official documentation
-          # mentions gui_scripts at all.
+          # pages I've found, but the official documentation
+          # mostly talks about console_scripts and not gui_scripts.
+          # On Linux they're the same, but on Windows, console_scripts
+          # bring up a terminal, gui_scripts don't.
           'gui_scripts': [
               'pytopo=pytopo.MapViewer:main',
               'ellie=pytopo.trackstats:main'
