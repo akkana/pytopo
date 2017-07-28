@@ -1,3 +1,10 @@
+2017-07-17  Akkana Peck <akkana@shallowsky.com>
+	1.5b2:
+	* Integrate Marco Duiker's argparse and metric changes.
+	* Fix setup.py to handle pin.png properly.
+	  (Still not sure what to do about .desktop file, though;
+          Python setuptools doesn't seem to have any provision for them.)
+
 2017-04-02  Akkana Peck <akkana@shallowsky.com>
 	* Add an option to enter waypoints.
 
