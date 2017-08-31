@@ -18,9 +18,8 @@ from MapUtils import MapUtils
 
 CLIMB_THRESHOLD = 8
 
-# How fast do we have to be moving to count
-# toward the moving average speed?
-# This is in miles/hour.
+# How fast do we have to be moving, in miles/hour,
+# to count toward the total distance and the moving average speed?
 SPEED_THRESHOLD = .2
 
 # Variables that need to be global, because statistics() and
@@ -93,10 +92,26 @@ def statistics(trackpoints, halfwin, beta, metric):
             lasttime = t
             continue
 
-        dist = MapUtils.haversine_distance(lat, lon, lastlat, lastlon, metric)
-
         delta_t = t - lasttime   # a datetime.timedelta object
-        speed = dist / delta_t.seconds * 60 * 60    # miles/hour
+
+        # Our speed and distance calculation isn't accurate.
+        # If there's a GPS speed recorded, use that and the
+        # time interval for distance calculations.
+        if 'speed' in pt.attrs:
+            speed = float(pt.attrs['speed'])    # in m/s
+            dist = speed * delta_t.seconds
+            # This is in meters/s. Convert to mi/hr or km/hr.
+            if metric:
+                dist /= 1000.
+                speed *= 3.6
+            else:
+                dist /= 1609.344
+                speed *= 2.2369363
+
+        else:
+            dist = MapUtils.haversine_distance(lat, lon, lastlat, lastlon, metric)
+            speed = dist / delta_t.seconds * 60 * 60    # miles (or km) / hour
+
         if speed > SPEED_THRESHOLD:
             total_dist += dist
             moving_time += delta_t
@@ -119,6 +134,12 @@ def statistics(trackpoints, halfwin, beta, metric):
 
         distances.append(total_dist)
         eles.append(ele)
+
+    # If halfwin wasn't supplied, try to guess a good value.
+    # XXX TO DO: figure out a way to guess.
+    if not halfwin:
+        print len(eles), "points", ", average distance per step", total_dist / len(eles)
+        halfwin = 15
 
     smoothed_eles = smooth(eles, halfwin, beta)
 
@@ -170,16 +191,16 @@ def tot_climb(arr):
 
     return tot, lowest, highest
 
-def smooth(x, halfwin, beta):
-    """ Kaiser window smoothing.
-    """
+def smooth(vals, halfwin, beta):
+    """ Kaiser window smoothing."""
+
     window_len = 2 * halfwin + 1
     # extending the data at beginning and at the end
     # to apply the window at the borders
-    s = numpy.r_[x[window_len-1:0:-1],x,x[-1:-window_len:-1]]
-    w = numpy.kaiser(window_len,beta)
-    y = numpy.convolve(w/w.sum(),s,mode='valid')
-    return y[halfwin:len(y)-halfwin]
+    s = numpy.r_[vals[window_len-1:0:-1], vals, vals[-1:-window_len:-1]]
+    w = numpy.kaiser(window_len, beta)
+    smoothed = numpy.convolve(w/w.sum(), s, mode='valid')
+    return smoothed[halfwin:len(smoothed) - halfwin]
 
 #
 # main() to gather stats from a file passed in on the commandline
@@ -207,12 +228,11 @@ def main():
                         help='Use metric rather than US units')
     parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
                         help='Kaiser window smoothing beta parameter (default: 2)')
-    parser.add_argument('-w', action="store", default=15, dest="halfwin",
-                        type=int, help='Kaiser window smoothing halfwidth parameter (default: 15)')
+    parser.add_argument('-w', action="store", default=0, dest="halfwin",
+                        type=int, help='Kaiser window smoothing halfwidth parameter (default: will try to guess a reasonable value)')
     parser.add_argument('track_file', nargs='+')
 
     results = parser.parse_args()
-    print results
     beta = results.beta
     halfwin = results.halfwin
     metric = results.metric
