@@ -45,7 +45,7 @@ any other tile server that uses the same naming conventions.
 (But not Google Maps, since Google's terms of service doesn't permit
 other programs to use their tiles.)
 
-<h3>Installing</h3>
+<h2>Installing</h2>
 <p>
 PyTopo is available on PyPI:
 <pre>
@@ -56,13 +56,17 @@ Then run pytopo.
 <p>
 <b><a href="https://github.com/akkana/pytopo">PyTopo's source is
 hosted on Github </a></b> if you want the latest and greatest.
+
+<h3>Requirements</h3>
 <p>
-You'll need PyGTK installed.
-On Linux, you can get it through your distro<br>
-on Windows, with <code>pip install pygtk</code><br>
-Mac is tricky since it has dependencies: the easiest way to get PyGTK
-may be to install <a href="http://gimp.org">GIMP</a>,
-which comes with PyGTK.
+You'll need PyGTK2 installed.
+On Linux, you can get it through your distro: for instance, on Debian
+or Ubuntu, <code>sudo apt-get install python-gtk2</code>
+or search for python-gtk2 in your package manager.
+<br>
+On Windows, with <code>pip install pygtk</code><br>
+Mac is tricky since it has dependencies: the easiest way to get PyGTK2
+may be to install <a href="http://gimp.org">GIMP</a>.
 
 <!-- 
 <p>
@@ -211,7 +215,7 @@ need it.
 <p>
 Sorry, PyTopo does not yet do anything useful with elevation or mileage
 on track logs. But in the meantime you may want to check out my
-standalone <a href="ellie/">Ellie</a> script; that's what I use.
+standalone <a href="../ellie/">Ellie</a> script; that's what I use.
 
 <h2>Getting Map Data</h2>
 
