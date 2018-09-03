@@ -7,6 +7,7 @@
 
 from pytopo.MapUtils import MapUtils
 from pytopo.TrackPoints import TrackPoints
+import trackstats
 
 import os
 import re
@@ -129,6 +130,7 @@ that are expected by the MapCollection classes:
         # self.bg_color = gtk.gdk.color_parse("black")
         self.black_color = gtk.gdk.color_parse("black")
         self.white_color = gtk.gdk.color_parse("white")
+        self.yellow_color = gtk.gdk.color_parse("yellow")
         self.red_color = gtk.gdk.color_parse("red")
         self.bg_scale_color = self.white_color
         self.first_track_color = gtk.gdk.color_parse("magenta")
@@ -227,8 +229,22 @@ that are expected by the MapCollection classes:
             self.draw_label(tracklabel, x, y)
 
         if self.selected_track is not None:
-            draw_selected_label(self.trackpoints.points[self.selected_track],
-                                "Track: ", -15, 15)
+            halfwin = 0
+            beta = 2
+            metric = False
+            stats = trackstats.statistics(self.trackpoints,
+                                          halfwin, beta, metric,
+                                          startpt=self.selected_track,
+                                          onetrack=True)
+
+            climb_units = 'm' if metric else "'"
+            dist_units = 'km' if metric else 'mi'
+            label = "Track: " + self.trackpoints.points[self.selected_track]
+            label += "\n%.1f %s" % (stats['Total distance'], dist_units)
+            label += "\nClimb: %d%s" % (stats['Smoothed total climb'],
+                                        climb_units)
+            self.draw_label(label, -15, 15, self.yellow_color)
+
         if self.selected_waypoint is not None:
             draw_selected_label(self.trackpoints.waypoints[self.selected_waypoint].name,
                                 "Waypoint: ", 15, 40)
@@ -1426,7 +1442,7 @@ that are expected by the MapCollection classes:
         self.drawing_area.window.draw_arc(self.xgc, fill, xc - r, yc - 4,
                                           r * 2, r * 2, 0, 23040)  # 64 * 360
 
-    def draw_label(self, labelstring, x, y):
+    def draw_label(self, labelstring, x, y, color=None, dropshadow=True):
         layout = self.drawing_area.create_pango_layout(labelstring)
         layout.set_font_description(self.select_font_desc)
         label_width, label_height = layout.get_pixel_size()
@@ -1435,7 +1451,16 @@ that are expected by the MapCollection classes:
         if y < 0:
             y = self.win_height - label_height + y
 
-        self.xgc.set_rgb_fg_color(self.red_color)
+        if not color:
+            color = self.yellow_color
+
+        if dropshadow:
+            self.xgc.set_rgb_fg_color(self.black_color)
+            self.drawing_area.window.draw_layout(self.xgc, x, y-2, layout)
+            self.drawing_area.window.draw_layout(self.xgc, x-2, y+2, layout)
+            self.drawing_area.window.draw_layout(self.xgc, x+2, y+2, layout)
+
+        self.xgc.set_rgb_fg_color(color)
         self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
 
     @staticmethod

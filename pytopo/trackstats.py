@@ -31,9 +31,11 @@ this_climb_start = 0
 lastele = -1
 
 
-def statistics(trackpoints, halfwin, beta, metric):
+def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     '''Accumulate statistics like mileage and total climb.
        Return a dictionary of stats collected.
+       If startpt is provided, start from a sub-track.
+       If onetrack is True, only analyze one track segment.
     '''
     global total_climb, this_climb, this_climb_start, lastele
 
@@ -69,12 +71,15 @@ def statistics(trackpoints, halfwin, beta, metric):
                     this_climb = 0
         lastele = ele
 
-    for pt in trackpoints.points:
+    for pt in trackpoints.points[startpt:]:
         if trackpoints.is_start(pt):
             lastlat = 0
             lastlon = 0
             lastele = -1
-            continue
+            if onetrack and total_dist:
+                break
+            else:
+                continue
 
         lat, lon, ele, t = pt.lat, pt.lon, pt.ele, pt.timestamp
 
@@ -97,7 +102,7 @@ def statistics(trackpoints, halfwin, beta, metric):
         # Our speed and distance calculation isn't accurate.
         # If there's a GPS speed recorded, use that and the
         # time interval for distance calculations.
-        if 'speed' in pt.attrs:
+        if pt.attrs and 'speed' in pt.attrs:
             speed = float(pt.attrs['speed'])    # in m/s
             dist = speed * delta_t.seconds
             # This is in meters/s. Convert to mi/hr or km/hr.
@@ -138,7 +143,7 @@ def statistics(trackpoints, halfwin, beta, metric):
     # If halfwin wasn't supplied, try to guess a good value.
     # XXX TO DO: figure out a way to guess.
     if not halfwin:
-        print len(eles), "points", ", average distance per step", total_dist / len(eles)
+        # print len(eles), "points", ", average distance per step", total_dist / len(eles)
         halfwin = 15
 
     smoothed_eles = smooth(eles, halfwin, beta)
