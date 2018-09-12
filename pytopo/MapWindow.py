@@ -138,7 +138,8 @@ that are expected by the MapCollection classes:
 
         # waypoint_color is the color for waypoint *labels*.
         # We'll try to give the actual waypoints the color of their track file.
-        self.waypoint_color = gtk.gdk.color_parse("blue2")
+        self.waypoint_color = gtk.gdk.color_parse("yellow")
+        self.waypoint_color_bg = gtk.gdk.color_parse("black")
 
         self.font_desc = pango.FontDescription("Sans 9")
         self.wpt_font_desc = pango.FontDescription("Sans Italic 10")
@@ -413,11 +414,6 @@ that are expected by the MapCollection classes:
                                          self.red_color, linewidth=6)
 
         if self.show_waypoints and len(self.trackpoints.waypoints) > 0:
-            ii = 7    # Waypoints will be an X with arms ii*2 long
-            self.set_color(self.waypoint_color)
-            self.xgc.line_style = gtk.gdk.LINE_SOLID
-            self.xgc.line_width = 2
-            wpcolor = self.first_track_color
             for pt in self.trackpoints.waypoints:
                 if self.trackpoints.is_start(pt) or \
                    self.trackpoints.is_attributes(pt):
@@ -435,15 +431,20 @@ that are expected by the MapCollection classes:
                     layout.set_font_description(self.wpt_font_desc)
                     # tw = layout.get_size()[0] / pango.SCALE
                     th = layout.get_size()[1] / pango.SCALE
+                    self.set_color(self.waypoint_color_bg)
+                    self.drawing_area.window.draw_layout(self.xgc,
+                                                         x + th / 3 + 1,
+                                                         y - th / 2 + 1,
+                                                         layout)
                     self.set_color(self.waypoint_color)
                     self.drawing_area.window.draw_layout(self.xgc,
                                                          x + th / 3,
                                                          y - th / 2,
                                                          layout)
-                    self.set_color(wpcolor)
-                    # self.draw_rectangle(True, x - 3, y - 3, 7, 7)
-                    self.draw_line(x - ii, y - ii, x + ii, y + ii)
-                    self.draw_line(x - ii, y + ii, x + ii, y - ii)
+                    self.draw_pixbuf(self.pin, 0, 0,
+                                     x + self.pin_xoff,
+                                     y + self.pin_yoff, -1, -1)
+
 
     def find_nearest_trackpoint(self, x, y):
         """Find the nearet track, the nearest point on that track,
