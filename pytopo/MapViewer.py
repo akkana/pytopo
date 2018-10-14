@@ -65,7 +65,7 @@ Usage: pytopo
        pytopo trackfile
        pytopo known_site
        pytopo [-t trackfile] [-c collection] [-r] [site_name]
-       pytopo [-t trackfile] start_lat start_long collection
+       pytopo [-t trackfile] start_lat start_lon [collection]
        pytopo -p :     list known sites and tracks
        pytopo -r :     re-download all map tiles
        pytopo -h :     print this message
@@ -75,7 +75,8 @@ With no arguments, will display a list of known sites.
 Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
 track points and/or waypoints; multiple track files are allowed.
 
-Use degrees.decimal_minutes format for coordinates.
+Use decimal degrees for coordinates.
+
 Set up favorite site names in ~/.config/pytopo.sites,
 favorite track logs in ~/Tracks
 
@@ -381,11 +382,23 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
                 if len(args) >= 2 and \
                    len(args[0]) > 1 and args[0][1].isdigit() and \
                    len(args[1]) > 1 and args[1][1].isdigit():
-                    mapwin.center_lon = MapUtils.deg_min2dec_deg(float(args[0]))
-                    mapwin.center_lat = MapUtils.deg_min2dec_deg(float(args[2]))
-                    mapwin.collection = self.find_collection(args[3])
+                    mapwin.center_lat = float(args[0])
+                    mapwin.center_lon = float(args[1])
+
+                    # Set a pin on the specified point.
+                    mapwin.pin_lat = mapwin.center_lat
+                    mapwin.pin_lon = mapwin.center_lon
+
                     args = args[2:]
+
+                    if args:
+                        mapwin.collection = self.find_collection(args[0])
+                        args = args[1:]
+                    else:
+                        mapwin.collection = \
+                            self.find_collection(self.default_collection)
                     continue
+
                 print "Can't make sense of argument:", args[0]
                 args = args[1:]
                 continue

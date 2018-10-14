@@ -126,7 +126,7 @@ Usage: pytopo
        pytopo trackfile
        pytopo known_site
        pytopo [-t trackfile] [-c collection] [-r] [site_name]
-       pytopo [-t trackfile] start_lat start_long collection
+       pytopo [-t trackfile] start_lat start_lon [collection]
        pytopo -p :     list known sites and tracks
        pytopo -r :     re-download all map tiles
        pytopo -h :     print this message
@@ -136,7 +136,8 @@ With no arguments, will display a list of known sites.
 Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
 track points and/or waypoints; multiple track files are allowed.
 
-Use degrees.decimal_minutes format for coordinates.
+Use decimal degrees for start_lat and start_lon.
+
 Set up favorite site names in ~/.config/pytopo.sites,
 favorite track logs in ~/Tracks
 </pre>
