@@ -9,6 +9,7 @@ import os
 import xml.dom.minidom
 import zipfile
 import simplejson
+import time
 
 from pytopo import __version__
 
@@ -16,6 +17,8 @@ from pytopo import __version__
 class GeoPoint(object):
     """A single track point or waypoint."""
     # Note: GPX files imported from KML may have no timestamps.
+    # lat and lon are floats; the rest are strings.
+    # If you need to add them, see add_bogus_timestamps.
     def __init__(self, lat, lon, ele=None,
                  name=False, timestamp=None, attrs=None):
         self.lat = lat
@@ -272,6 +275,18 @@ class TrackPoints(object):
 
         # For now, keep elevation and time as unchanged strings.
         return lat, lon, ele, time, attrs
+
+    def add_bogus_timestamps(self):
+        '''Add made-up timestamps to every track point.'''
+        # 2007-10-02T09:22:06Z
+        t = time.time()
+        # How many seconds will we advance each time?
+        interval = 15
+        for pt in self.points:
+            if not self.is_start(pt) and not pt.timestamp:
+                pt.timestamp = time.strftime('%Y-%m-%dT%H:%M:%S',
+                                             time.gmtime(t))
+                t += interval
 
     def save_GPX_in_region(self, start_lon, start_lat, end_lon, end_lat,
                            filename):
