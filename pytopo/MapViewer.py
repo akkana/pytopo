@@ -8,6 +8,8 @@
 '''MapViewer, the main pytopo application, which controls the MapWindow.
 '''
 
+from __future__ import print_function
+
 from pytopo.MapWindow import MapWindow
 from pytopo.MapUtils import MapUtils
 from pytopo.TrackPoints import TrackPoints
@@ -59,8 +61,8 @@ class MapViewer(object):
 
     @classmethod
     def Usage(cls):
-        print "pytopo", MapViewer.get_version()
-        print """
+        print("pytopo", MapViewer.get_version())
+        print("""
 Usage: pytopo
        pytopo trackfile
        pytopo known_site
@@ -83,15 +85,15 @@ favorite track logs in ~/Tracks
 Move around by dragging or using arrow keys.  q quits.
 Right-click gives a context menu.
 Shift-click in the map to print the coordinates of the clicked location.
-"""
+""")
         sys.exit(1)
 
     @classmethod
     def error_out(cls, errstr):
         """Print an error and exit cleanly."""
-        print "==============="
-        print errstr
-        print "===============\n"
+        print("===============")
+        print(errstr)
+        print("===============\n")
         MapViewer.Usage()
 
     def append_known_site(self, site):
@@ -108,28 +110,28 @@ Shift-click in the map to print the coordinates of the clicked location.
         try:
             savefile = open(self.savefilename, "w")
         except:
-            print "Couldn't open save file", self.savefilename
+            print("Couldn't open save file", self.savefilename)
             return
 
         for site in self.KnownSites[self.first_saved_site:]:
             # All sites have a string, two floats and another string;
             # some sites may have additional ints after that.
-            print >>savefile, '[ "%s", %f, %f, "%s"' % \
-                (site[0], site[1], site[2], site[3]),
+            print('[ "%s", %f, %f, "%s"' % \
+                (site[0], site[1], site[2], site[3]), end=' ', file=savefile)
             if len(site) > 4:
-                print >>savefile, ', ' + ', '.join(map(str, site[4:])),
-            print >>savefile, "]"
+                print(', ' + ', '.join(map(str, site[4:])), end=' ', file=savefile)
+            print("]", file=savefile)
         savefile.close()
 
     def print_sites(self):
         """Print the list of known sites."""
-        print "Known Sites:"
+        print("Known Sites:")
         for site in self.KnownSites:
-            print " ", site[0], "(", os.path.basename(site[3]), ")"
-        print
-        print "Known Tracks:"
+            print(" ", site[0], "(", os.path.basename(site[3]), ")")
+        print()
+        print("Known Tracks:")
         for track in self.KnownTracks:
-            print " ", track[0]
+            print(" ", track[0])
         sys.exit(0)
 
     def find_collection(self, collname):
@@ -145,7 +147,7 @@ Shift-click in the map to print the coordinates of the clicked location.
                                    " for collection " + collname)
                 collection = coll
                 if (self.Debug):
-                    print "Found the collection", collection.name
+                    print("Found the collection", collection.name)
                 return collection
         return collection
 
@@ -265,9 +267,9 @@ Shift-click in the map to print the coordinates of the clicked location.
         mapwin.pin_lat = mapwin.center_lat
         # print "Center in decimal degrees:", centerLon, centerLat
         if (self.Debug):
-            print site[0] + ":", \
+            print(site[0] + ":", \
                 MapUtils.dec_deg2deg_min_str(mapwin.center_lon), \
-                MapUtils.dec_deg2deg_min_str(mapwin.center_lat)
+                MapUtils.dec_deg2deg_min_str(mapwin.center_lat))
         if len(site) > 4 and collection.zoom_to:
             collection.zoom_to(site[4])
         mapwin.draw_map()
@@ -281,7 +283,7 @@ Shift-click in the map to print the coordinates of the clicked location.
         while len(args) > 0:
             if args[0][0] == '-' and not args[0][1].isdigit():
                 if args[0] == "-v" or args[0] == "--version":
-                    print self.get_version()
+                    print(self.get_version())
                     sys.exit(0)
                 elif args[0] == "-h" or args[0] == "--help":
                     self.Usage()
@@ -294,7 +296,7 @@ Shift-click in the map to print the coordinates of the clicked location.
                 elif args[0] == "-c":
                     # Specify a collection:
                     if len(args) < 2:
-                        print "-c must specify collection"
+                        print("-c must specify collection")
                         self.Usage()
                     mapwin.collection = self.find_collection(args[1])
                     if mapwin.collection is None:
@@ -305,16 +307,16 @@ Shift-click in the map to print the coordinates of the clicked location.
                     mapwin.center_lon, mapwin.center_lat = \
                         mapwin.collection.get_top_left()
                     if (self.Debug):
-                        print "Collection", mapwin.collection.name,
-                        print "Starting at", \
+                        print("Collection", mapwin.collection.name, end=' ')
+                        print("Starting at", \
                             MapUtils.dec_deg2deg_min_str(mapwin.center_lon), \
                             ", ", \
-                            MapUtils.dec_deg2deg_min_str(mapwin.center_lat)
+                            MapUtils.dec_deg2deg_min_str(mapwin.center_lat))
                     args = args[1:]
 
                 elif args[0] == "-d":
                     self.Debug = True
-                    print "Debugging on"
+                    print("Debugging on")
                 elif args[0] == "-r":
                     self.reload_tiles = time.time()
                 elif args[0] == "-t" and len(args) > 1:
@@ -325,14 +327,14 @@ Shift-click in the map to print the coordinates of the clicked location.
                     for tr in self.KnownTracks:
                         if args[1] == tr[0]:
                             if self.Debug:
-                                print "Reading known track", tr[0], tr[1]
+                                print("Reading known track", tr[0], tr[1])
                             args[1] = tr[1]
                             break
 
                     try:
                         mapwin.trackpoints.read_track_file(args[1])
                     except IOError:
-                        print "Can't read track file", args[1]
+                        print("Can't read track file", args[1])
                     args = args[1:]
                 else:
                     self.error_out("Unknown flag " + args[0])
@@ -354,15 +356,15 @@ Shift-click in the map to print the coordinates of the clicked location.
                         trackpoints.read_track_file(args[0])
                         mapwin.trackpoints = trackpoints
                 except IOError:
-                    print "Can't read track file", args[0]
+                    print("Can't read track file", args[0])
                 except xml.parsers.expat.ExpatError:
-                    print "Can't read %s: syntax error." % args[0]
+                    print("Can't read %s: syntax error." % args[0])
                     if args[0].lower().endswith(".kml") or \
                        args[0].lower().endswith(".kmz"):
-                        print """
+                        print("""
 Is this a KML made with ArcGIS?
 It may have an illegal xsi:schemaLocation.
-If so, try changing xsi:schemaLocation to just schemaLocation."""
+If so, try changing xsi:schemaLocation to just schemaLocation.""")
                 args = args[1:]
                 continue
 
@@ -399,17 +401,17 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
                             self.find_collection(self.default_collection)
                     continue
 
-                print "Can't make sense of argument:", args[0]
+                print("Can't make sense of argument:", args[0])
                 args = args[1:]
                 continue
 
             except ValueError:
-                print "Couldn't parse coordinates"
+                print("Couldn't parse coordinates")
                 self.Usage()
 
             # If we get here, we still have an argument but it doesn't
             # match anything we know: flag, collection, site or coordinate.
-            print "Problem parsing arguments. Remaining args:", args
+            print("Problem parsing arguments. Remaining args:", args)
             self.Usage()
 
         # Now we've parsed all the arguments.
@@ -431,7 +433,7 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
         if self.reload_tiles and 'set_reload_tiles' in dir(mapwin.collection):
             mapwin.collection.set_reload_tiles(self.reload_tiles)
         elif self.reload_tiles:
-            print "Collection can't re-download tiles"
+            print("Collection can't re-download tiles")
 
         # By now, we hope we have the mapwin positioned with a collection
         # and starting coordinates:
@@ -467,25 +469,25 @@ If so, try changing xsi:schemaLocation to just schemaLocation."""
         userfile = os.path.join(self.config_dir, "pytopo.sites")
         if not os.access(userfile, os.R_OK):
             if self.Debug:
-                print "Couldn't open", userfile
+                print("Couldn't open", userfile)
             userfile = os.path.expanduser("~/.pytopo")
             if not os.access(userfile, os.R_OK):
                 if self.Debug:
-                    print "Couldn't open", userfile, "either"
+                    print("Couldn't open", userfile, "either")
                 userfile = os.path.join(self.config_dir, "pytopo", ".pytopo")
                 if not os.access(userfile, os.R_OK):
                     if self.Debug:
-                        print "Couldn't open", userfile, "either"
+                        print("Couldn't open", userfile, "either")
                     userfile = self.create_initial_config()
                     if userfile is None:
-                        print "Couldn't create a new pytopo config file"
+                        print("Couldn't create a new pytopo config file")
                         return
                 else:
-                    print "Suggestion: rename", userfile, \
-                          "to ~/.config/pytopo/pytopo.sites"
-                    print userfile, "may eventually be deprecated"
+                    print("Suggestion: rename", userfile, \
+                          "to ~/.config/pytopo/pytopo.sites")
+                    print(userfile, "may eventually be deprecated")
         if self.Debug:
-            print "Found", userfile
+            print("Found", userfile)
 
         # Now we'd better have a userfile
 
@@ -544,7 +546,7 @@ from pytopo import GenericMapCollection
                 if len(matches) == 5 and matches[4] is not None:
                     site.append(int(matches[4]))
                 if self.Debug:
-                    print "Adding", site[0], "to KnownSites"
+                    print("Adding", site[0], "to KnownSites")
                 self.KnownSites.append(site)
 
         savefile.close()
@@ -579,7 +581,7 @@ from pytopo import GenericMapCollection
                 return None
 
         # Now we have fp open. Write a very basic config to it.
-        print >>fp, """# Pytopo site file
+        print("""# Pytopo site file
 
 # Map collections
 
@@ -625,14 +627,14 @@ KnownSites = [
     [ "london", 0.1, 51.266, "openstreetmap" ],
     [ "sydney", 151.0, -33.5, "openstreetmap" ],
     ]
-"""
+""", file=fp)
         fp.close()
 
-        print """Welcome to Pytopo!
+        print("""Welcome to Pytopo!
 Created an initial site file in %s
 You can add new sites and collections there; see the instructions at
    http://shallowsky.com/software/topo/
-""" % (userfile)
+""" % (userfile))
         return userfile
 
     def main(self, pytopo_args):

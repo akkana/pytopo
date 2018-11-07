@@ -5,6 +5,8 @@
 '''Parsing and handling of GPS track files in pytopo.
 '''
 
+from __future__ import print_function
+
 import os
 import xml.dom.minidom
 import zipfile
@@ -39,7 +41,7 @@ class GeoPoint(object):
             s += " [%s]" % self.timestamp
         if self.attrs:
             s += "{ "
-            for k in self.attrs.keys():
+            for k in list(self.attrs.keys()):
                 s += "%s: %s, " % (k, self.attrs[k])
             # Remove the final comma
             s = s[:-2]
@@ -96,7 +98,7 @@ class TrackPoints(object):
         '''Is this the start of a new track segment?
            If so, it's a string (or unicode), the name of the track section.
         '''
-        return isinstance(point, str) or isinstance(point, unicode)
+        return isinstance(point, str) or isinstance(point, str)
 
     def get_bounds(self):
         '''Get bounds encompassing all contained tracks and waypoints.'''
@@ -176,7 +178,7 @@ class TrackPoints(object):
             raise IOError("Can't open track file %s" % filename)
 
         if self.Debug:
-            print "Reading track file", filename
+            print("Reading track file", filename)
         dom = xml.dom.minidom.parse(filename)
         first_segment_name = None
 
@@ -383,10 +385,10 @@ class TrackPoints(object):
         with open(filename) as fp:
             gj = simplejson.loads(fp.read())
         if gj["type"] != "FeatureCollection":
-            print filename, "isn't a FeatureCollection"
+            print(filename, "isn't a FeatureCollection")
             return
         if "features" not in gj:
-            print "No features in geojson file", filename
+            print("No features in geojson file", filename)
             return
         for feature in gj["features"]:
             featuretype = feature["geometry"]["type"]
@@ -432,7 +434,7 @@ class TrackPoints(object):
             raise IOError("Can't open track file %s" % filename)
 
         if self.Debug:
-            print "Reading track file", filename
+            print("Reading track file", filename)
 
         # Handle kmz compressed files, which are much more common in practice
         # than actual KML files:
@@ -442,7 +444,7 @@ class TrackPoints(object):
             if "doc.kml" not in namelist:
                 raise ValueError("No doc.kml in %s" % filename)
             if len(namelist) > 1:
-                print "Warning: ignoring files other than doc.kml in", filename
+                print("Warning: ignoring files other than doc.kml in", filename)
             kmlfp = zipf.open("doc.kml")
             doc_kml = kmlfp.read()
             kmlfp.close()
@@ -520,7 +522,7 @@ class TrackPoints(object):
         ret = []
         for s in coord_triples:
             triple = s.split(',')
-            triple = map(float, triple)
+            triple = list(map(float, triple))
             if len(triple) == 2:
                 triple.append(None)
             ret.append(triple)

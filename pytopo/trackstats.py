@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2009-2016 by Akkana Peck.
+# Copyright (C) 2009-2018 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
 '''Statistics on track logs,
    such as total distance, average speed, and total climb.
 '''
+
+from __future__ import print_function
 
 import math
 import datetime
@@ -221,7 +223,7 @@ def main():
         have_plt = True
     except ImportError:
         have_plt = False
-        print "plt isn't installed; will print stats only, no plotting"
+        print("plt isn't installed; will print stats only, no plotting")
 
     progname = os.path.basename(sys.argv[0])
 
@@ -250,8 +252,8 @@ def main():
     try:
         trackpoints.read_track_file(track_files[0])
         # XXX Read more than one file
-    except IOError, e:
-        print e
+    except IOError as e:
+        print(e)
         #print dir(e)
         return e.errno
 
@@ -262,14 +264,14 @@ def main():
     #
     climb_units = 'm' if metric else "'"
     dist_units = 'km' if metric else 'mi'
-    print "%.1f %s" % (out['Total distance'], dist_units)
-    print "Raw total climb: %d%s" % (int(out['Raw total climb']), climb_units)
-    print "Smoothed climb: %d%s" % (out['Smoothed total climb'], climb_units)
-    print "  from %d to %d" % (out['Lowest'], out['Highest'])
-    print "%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
-                                             int(out['Stopped time'] / 60))
-    print "Average speed moving: %.1f %s/h" % (out['Average moving speed'],
-                                               dist_units)
+    print("%.1f %s" % (out['Total distance'], dist_units))
+    print("Raw total climb: %d%s" % (int(out['Raw total climb']), climb_units))
+    print("Smoothed climb: %d%s" % (out['Smoothed total climb'], climb_units))
+    print("  from %d to %d" % (out['Lowest'], out['Highest']))
+    print("%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
+                                             int(out['Stopped time'] / 60)))
+    print("Average speed moving: %.1f %s/h" % (out['Average moving speed'],
+                                               dist_units))
     if not have_plt:
         return 0
 

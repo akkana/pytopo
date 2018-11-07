@@ -5,6 +5,8 @@
 '''MapCollection: the base class for all pytopo map collections.
 '''
 
+from __future__ import print_function
+
 import os
 import math
 
@@ -105,7 +107,7 @@ map coordinates and need a starting place. Should probably remove it.
 
         # Handle the case of a single point
         if xdist == 0 or ydist == 0:
-            print "Single point! Zooming to maxzoom", self.maxzoom
+            print("Single point! Zooming to maxzoom", self.maxzoom)
             self.zoom_to(self.maxzoom)
             return
 
@@ -118,5 +120,5 @@ map coordinates and need a starting place. Should probably remove it.
                 self.zoom_to(z-1)
                 return
             z += 1
-        print "Couldn't fit bounding box; using maximum zoom"
+        print("Couldn't fit bounding box; using maximum zoom")
         self.zoom_to(self.maxzoom)

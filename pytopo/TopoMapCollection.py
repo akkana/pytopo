@@ -6,6 +6,8 @@
    commercial map datasets.
 '''
 
+from __future__ import print_function
+
 from pytopo.TiledMapCollection import TiledMapCollection
 from pytopo.MapUtils import MapUtils
 from pytopo.MapWindow import MapWindow
@@ -56,15 +58,15 @@ class TopoMapCollection(TiledMapCollection):
         self.xscale = self.img_width * 600.0 / self.series
         self.yscale = self.img_height * 600.0 / self.series
         if (self.Debug):
-            print "set series to", self.series
+            print("set series to", self.series)
         # 600 is minutes/degree * maplets/minute
 
         # The fraction of a degree that each maplet spans:
         self.frac = float(self.img_width) / self.xscale
         if (self.Debug):
             if self.frac != float(self.img_height) / self.yscale:
-                print "x and y fractions not equal!",
-                print self.frac, float(self.img_height) / self.yscale
+                print("x and y fractions not equal!", end=' ')
+                print(self.frac, float(self.img_height) / self.yscale)
 
     def get_maplet(self, longitude, latitude):
         """Get the maplet containing the specified coordinates.
@@ -76,8 +78,8 @@ class TopoMapCollection(TiledMapCollection):
         filename = self.coords_to_filename(longitude - self.lon_correction,
                                            latitude - self.lat_correction)
         if (self.Debug):
-            print "T1MC get_maplet(", MapUtils.dec_deg2deg_min_str(longitude),
-            print ",", MapUtils.dec_deg2deg_min_str(latitude), "):", filename
+            print("T1MC get_maplet(", MapUtils.dec_deg2deg_min_str(longitude), end=' ')
+            print(",", MapUtils.dec_deg2deg_min_str(latitude), "):", filename)
 
         # Calculate offsets.
         # Maplets are self.series minutes wide and tall,
@@ -92,19 +94,19 @@ class TopoMapCollection(TiledMapCollection):
         x_off = int((longitude - MapUtils.truncate2frac(longitude, self.frac)
                      - self.lon_correction) * self.xscale)
         if (self.Debug):
-            print "truncated", MapUtils.dec_deg2deg_min_str(longitude), "to",
-            print MapUtils.dec_deg2deg_min_str(MapUtils.truncate2frac(longitude,
-                                                                     self.frac))
+            print("truncated", MapUtils.dec_deg2deg_min_str(longitude), "to", end=' ')
+            print(MapUtils.dec_deg2deg_min_str(MapUtils.truncate2frac(longitude,
+                                                                     self.frac)))
 
         # Latitude decreases downward:
         y_off = int((MapUtils.truncate2frac(latitude, self.frac) +
                      self.frac - latitude - self.lat_correction) * self.yscale)
 
         if (self.Debug):
-            print "truncated", MapUtils.dec_deg2deg_min_str(latitude), "to",
-            print MapUtils.dec_deg2deg_min_str(MapUtils.truncate2frac(latitude,
-                                                                     self.frac))
-            print "y_off is", y_off
+            print("truncated", MapUtils.dec_deg2deg_min_str(latitude), "to", end=' ')
+            print(MapUtils.dec_deg2deg_min_str(MapUtils.truncate2frac(latitude,
+                                                                     self.frac)))
+            print("y_off is", y_off)
 
         if not os.access(filename, os.R_OK):
             return None, x_off, y_off, filename
@@ -119,7 +121,7 @@ class TopoMapCollection(TiledMapCollection):
         """
 
         if (self.Debug):
-            print "get_next_maplet:", fullpathname, dX, dY
+            print("get_next_maplet:", fullpathname, dX, dY)
         pathname, filename = os.path.split(fullpathname)
         collecdir, mapdir = os.path.split(pathname)
         maplat = int(mapdir[1:3])
@@ -143,8 +145,8 @@ class TopoMapCollection(TiledMapCollection):
             if xdir > 8:
                 xdir = 1
                 if self.Debug:
-                    print mapdir, name, ": wrapping mapdir coordinates -x",
-                    print maplon
+                    print(mapdir, name, ": wrapping mapdir coordinates -x", end=' ')
+                    print(maplon)
                 maplon = str(int(maplon) + 1)
         if x > grid:
             x = 1
@@ -152,8 +154,8 @@ class TopoMapCollection(TiledMapCollection):
             if xdir < 1:
                 xdir = 8
                 if self.Debug:
-                    print mapdir, name, ": wrapping mapdir coordinates +x",
-                    print maplon
+                    print(mapdir, name, ": wrapping mapdir coordinates +x", end=' ')
+                    print(maplon)
                 maplon = str(int(maplon) - 1)
 
         if y > grid:
@@ -162,8 +164,8 @@ class TopoMapCollection(TiledMapCollection):
             if ydir < 0:
                 ydir = 7
                 if self.Debug:
-                    print mapdir, name, ": wrapping mapdir coordinates +y",
-                    print maplat
+                    print(mapdir, name, ": wrapping mapdir coordinates +y", end=' ')
+                    print(maplat)
                 maplat = str(int(maplat) - 1)
 
         if y < 1:
@@ -172,8 +174,8 @@ class TopoMapCollection(TiledMapCollection):
             if ydir > 7:
                 ydir = 0
                 if self.Debug:
-                    print mapdir, name, ": wrapping mapdir coordinates -y",
-                    print maplat
+                    print(mapdir, name, ": wrapping mapdir coordinates -y", end=' ')
+                    print(maplat)
                 maplat = str(int(maplat) + 1)
 
         # We're ready to piece the filename back together!
@@ -185,8 +187,8 @@ class TopoMapCollection(TiledMapCollection):
                                    + MapUtils.ohstring(y, 2) + ext)
         if not os.access(newpath, os.R_OK):
             if self.Debug:
-                print "get_next_maplet(", fullpathname, dX, dY, ")"
-                print "  Can't open", newpath
+                print("get_next_maplet(", fullpathname, dX, dY, ")")
+                print("  Can't open", newpath)
             return None, newpath
 
         pixbuf = MapWindow.load_image_from_file(newpath)

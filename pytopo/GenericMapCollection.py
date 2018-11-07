@@ -7,6 +7,8 @@
    or maps adapted from other data sources.
 '''
 
+from __future__ import print_function
+
 import os
 from pytopo.MapUtils import MapUtils
 from pytopo.MapWindow import MapWindow
@@ -63,7 +65,7 @@ class GenericMapCollection(TiledMapCollection):
         """
         filename = self.coords_to_filename(longitude, latitude)
         if (self.Debug):
-            print "Generic get_maplet", longitude, latitude, "->", filename
+            print("Generic get_maplet", longitude, latitude, "->", filename)
         if filename is None or not os.access(filename, os.R_OK):
             # print "Can't open", filename, "for", longitude, latitude
             return None, 0, 0, filename
@@ -83,7 +85,7 @@ class GenericMapCollection(TiledMapCollection):
         """
         pathname, filename = os.path.split(fullpathname)
         if (self.Debug):
-            print "Generic get_next_maplet", filename, dX, dY
+            print("Generic get_next_maplet", filename, dX, dY)
         name, ext = os.path.splitext(filename)
         # traceback.print_stack()
         mapb = int(name[-self.numdigits:])

@@ -5,9 +5,18 @@
 '''DownloadTileQueue: maintain a list of tiles being downloaded.
 '''
 
+from __future__ import print_function
+
 import sys
 import os
-import urllib
+
+try:
+    # Python 3:
+    from urllib.request import urlretrieve
+except ImportError:
+    # Python 2:
+    from urllib import urlretrieve
+
 import gobject
 
 import threading
@@ -81,19 +90,19 @@ class DownloadTileQueue:
         def download(url, localpath, callback):
             global magic_parser
             if Debug:
-                print "Downloading", url
-                print "  to", localpath
+                print("Downloading", url)
+                print("  to", localpath)
             try:
-                urllib.urlretrieve(url, localpath)
-            except IOError, e:
-                print "Couldn't download", url, ":"
-                print e
+                urlretrieve(url, localpath)
+            except IOError as e:
+                print("Couldn't download", url, ":")
+                print(e)
                 return None
 
             # Sometimes there's no error but we still didn't download anything.
             # Don't try to MIME parse that: magic gets confused by empty files.
             if not os.path.exists(localpath):
-                print "Failed to download", url, "to", localpath
+                print("Failed to download", url, "to", localpath)
                 return None
 
             if magic_parser is None:
@@ -106,8 +115,8 @@ class DownloadTileQueue:
             if magic_parser:
                 mimetype = magic_parser.file(localpath)
                 if not mimetype.startswith("image/"):
-                    print "Problem downloading'%s' to '%s'" % (url, localpath)
-                    print "Type:", mimetype
+                    print("Problem downloading'%s' to '%s'" % (url, localpath))
+                    print("Type:", mimetype)
                     # Opencyclemap, at least, sometimes serves text files
                     # that say "tile not available". Other servers may serve
                     # HTML files.
@@ -118,9 +127,9 @@ class DownloadTileQueue:
                         # Don't show >3 full lines of error message:
                         if len(errstr) > 240:
                             errstr = errstr[0:100]
-                        print 'File contents: "%s"' % errstr.strip()
+                        print('File contents: "%s"' % errstr.strip())
                     else:
-                        print "File type is", mimetype
+                        print("File type is", mimetype)
 
                     # Return no path, so it can be deleted if appropriate.
                     return None
@@ -130,5 +139,5 @@ class DownloadTileQueue:
         path = yield DownloadTileQueue.threaded_task(download, url,
                                                      localpath, callback)
         if Debug:
-            print >>sys.stderr, "[downloaded %s]" % (localpath)
+            print("[downloaded %s]" % (localpath), file=sys.stderr)
         callback(path)

@@ -5,13 +5,20 @@
 '''MapWindow: pytopo's GTK-based window for showing tiled maps.
 '''
 
+from __future__ import print_function
+
 from pytopo.MapUtils import MapUtils
 from pytopo.TrackPoints import TrackPoints
-import trackstats
+from . import trackstats
 
 import os
 import re
-import urllib
+try:
+    # Python 3:
+    import urllib.request, urllib.parse, urllib.error
+except ImportError:
+    # Python 2:
+    import urllib
 import math
 import collections
 
@@ -205,7 +212,7 @@ that are expected by the MapCollection classes:
         """Redraw the map, centered at center_lon, center_lat."""
 
         if self.collection is None:
-            print "No collection!"
+            print("No collection!")
             return
         if not self.drawing_area:
             # Not initialized yet, not ready to draw a map
@@ -215,10 +222,10 @@ that are expected by the MapCollection classes:
 
         # XXX Collection.draw_map wants center, but we only have lower right.
         if self.controller.Debug:
-            print ">>>>>>>>>>>>>>>>"
-            print "window draw_map centered at",
-            print MapUtils.dec_deg2deg_min_str(self.center_lon),
-            print MapUtils.dec_deg2deg_min_str(self.center_lat)
+            print(">>>>>>>>>>>>>>>>")
+            print("window draw_map centered at", end=' ')
+            print(MapUtils.dec_deg2deg_min_str(self.center_lon), end=' ')
+            print(MapUtils.dec_deg2deg_min_str(self.center_lat))
         self.collection.draw_map(self.center_lon, self.center_lat, self)
 
         if not self.is_dragging:
@@ -334,9 +341,9 @@ that are expected by the MapCollection classes:
             # Test against None specifically, else we won't be able
             # to select the first track starting at index 0.
             if trackindex is not None:
-                print "Selecting track starting at", trackindex
+                print("Selecting track starting at", trackindex)
             else:
-                print "De-selecting track"
+                print("De-selecting track")
         self.selected_track = trackindex
 
         if not trackindex:
@@ -750,16 +757,16 @@ that are expected by the MapCollection classes:
         return 0
 
     def print_location(self, widget=None):
-        print "%30s     (decimal degrees)" % \
-            MapUtils.coord2str_dd(self.cur_lon, self.cur_lat)
+        print("%30s     (decimal degrees)" % \
+            MapUtils.coord2str_dd(self.cur_lon, self.cur_lat))
 
-        print"%-15s   %-15s (DD.MMSS, suitable for pytopo.sites)" % \
+        print("%-15s   %-15s (DD.MMSS, suitable for pytopo.sites)" % \
             (MapUtils.dec_deg2deg_min(self.cur_lon),
-             MapUtils.dec_deg2deg_min(self.cur_lat))
+             MapUtils.dec_deg2deg_min(self.cur_lat)))
 
-        print "%-15s   %-15s (D M S)" % \
+        print("%-15s   %-15s (D M S)" % \
             (MapUtils.dec_deg2deg_min_str(self.cur_lon),
-             MapUtils.dec_deg2deg_min_str(self.cur_lat))
+             MapUtils.dec_deg2deg_min_str(self.cur_lat)))
 
     def zoom(self, widget=None):
         self.center_lon = self.cur_lon
@@ -783,7 +790,7 @@ that are expected by the MapCollection classes:
 
         self.collection.zoom(direc)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
-            print "zoomed to", self.collection.zoomlevel
+            print("zoomed to", self.collection.zoomlevel)
 
         # What are the coordinates for the current mouse pos after zoom?
         newmouselon, newmouselat = self.xy2coords(event.x, event.y)
@@ -832,7 +839,7 @@ that are expected by the MapCollection classes:
         ])
 
         menu = gtk.Menu()
-        for itemname in contextmenu.keys():
+        for itemname in list(contextmenu.keys()):
             item = gtk.MenuItem(itemname)
 
             # Show/Hide waypoints changes its name since it's a toggle:
@@ -888,7 +895,7 @@ that are expected by the MapCollection classes:
             self.collection.Debug = self.controller.Debug
             self.draw_map()
         else:
-            print "Couldn't find a collection named '%s'" % name
+            print("Couldn't find a collection named '%s'" % name)
 
     def toggle_show_waypoints(self, widget):
         self.show_waypoints = not self.show_waypoints
@@ -1020,7 +1027,7 @@ that are expected by the MapCollection classes:
         # Now save all our tracks and waypoints as a GPX file in outfile.
         dialog.destroy()
         if self.controller.Debug:
-            print "Saving GPX to", outfile
+            print("Saving GPX to", outfile)
 
         if select_area:
             self.draw_label("Drag out the area you want to save...", 150, 50)
@@ -1058,7 +1065,7 @@ that are expected by the MapCollection classes:
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
         if near_point is None:
-            print "There's no point near the mouse"
+            print("There's no point near the mouse")
             return
 
         # Nuttiness: even if you know the index, apparently the only
@@ -1176,7 +1183,7 @@ that are expected by the MapCollection classes:
 
     def download_area(self, widget):
         if not self.collection.zoomlevel:
-            print "Can't download an area for this collection"
+            print("Can't download an area for this collection")
             return
 
         # Get default values for area and zoom levels:
@@ -1311,8 +1318,8 @@ that are expected by the MapCollection classes:
                 continue
 
         if self.controller.Debug:
-            print "Downloading from %f - %f, %f - %f, zoom %d - %d" \
-                % (minlon, maxlon, minlat, maxlat, minzoom, maxzoom)
+            print("Downloading from %f - %f, %f - %f, zoom %d - %d" \
+                % (minlon, maxlon, minlat, maxlat, minzoom, maxzoom))
         for zoom in range(minzoom, maxzoom + 1):
             err_label.set_text("Downloading zoom level %d" % zoom)
 
@@ -1323,7 +1330,7 @@ that are expected by the MapCollection classes:
             gtk.gdk.flush()
 
             if self.controller.Debug:
-                print "==== Zoom level", zoom
+                print("==== Zoom level", zoom)
 
             # Find the start and end tiles
             (minxtile, minytile, x_off, y_off) = \
@@ -1331,14 +1338,14 @@ that are expected by the MapCollection classes:
             (maxxtile, maxytile, x_off, y_off) = \
                 self.collection.deg2num(minlat, maxlon, zoom)
             if self.controller.Debug:
-                print "X tiles from", minxtile, "to", maxxtile
-                print "Y tiles from", minytile, "to", maxytile
+                print("X tiles from", minxtile, "to", maxxtile)
+                print("Y tiles from", minytile, "to", maxytile)
 
             pathlist = []
             for ytile in range(minytile, maxytile + 1):
                 for xtile in range(minxtile, maxxtile + 1):
                     if self.controller.Debug:
-                        print "Tile", xtile, ytile,
+                        print("Tile", xtile, ytile, end=' ')
                     filename = os.path.join(self.collection.location,
                                             str(zoom),
                                             str(xtile),
@@ -1346,11 +1353,11 @@ that are expected by the MapCollection classes:
                         + self.collection.ext
                     if os.access(filename, os.R_OK):
                         if self.controller.Debug:
-                            print filename, "is already there"
+                            print(filename, "is already there")
                         continue
                     pathlist.append(filename)
                     if self.controller.Debug:
-                        print "appended as", filename
+                        print("appended as", filename)
 
             numtiles = len(pathlist)
             err_label.set_text("Zoom level %d: %d tiles" % (zoom, numtiles))
@@ -1366,7 +1373,7 @@ that are expected by the MapCollection classes:
 
                 # XXX Parallelize this!
                 if self.controller.Debug:
-                    print "Downloading", url, "to", filename
+                    print("Downloading", url, "to", filename)
                 thedir = os.path.dirname(filename)
                 if not os.access(thedir, os.W_OK):
                     os.makedirs(thedir)
@@ -1374,12 +1381,12 @@ that are expected by the MapCollection classes:
                 #                   (int(num_downloaded*100 / numtiles),
                 #                    num_downloaded, numtiles))
                 if self.controller.Debug:
-                    print "%d %%: %d of %d" % \
+                    print("%d %%: %d of %d" % \
                         (int(num_downloaded * 100 / numtiles),
-                         num_downloaded, numtiles)
+                         num_downloaded, numtiles))
                 progress_label.set_text("%d: %s" % (num_downloaded, url))
                 flush_events()
-                urllib.urlretrieve(url, filename)
+                urllib.request.urlretrieve(url, filename)
                 num_downloaded += 1
 
                 # XXX should show progress more graphically.
@@ -1531,7 +1538,7 @@ that are expected by the MapCollection classes:
         os.system(cmdstr)
 
         if (os.access(outfile, os.R_OK)):
-            print "Saved:", outfile
+            print("Saved:", outfile)
 
     def expose_event(self, widget, event):
         """Handle exposes on the canvas."""
@@ -1560,11 +1567,11 @@ that are expected by the MapCollection classes:
         elif event.string == "+" or event.string == "=":
             self.collection.zoom(1)
             if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
-                print "zoomed in to", self.collection.zoomlevel
+                print("zoomed in to", self.collection.zoomlevel)
         elif event.string == "-":
             self.collection.zoom(-1)
             if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
-                print "zoomed out to", self.collection.zoomlevel
+                print("zoomed out to", self.collection.zoomlevel)
         elif event.keyval == gtk.keysyms.Left:
             self.center_lon -= \
                 float(self.collection.img_width) / self.collection.xscale
@@ -1691,7 +1698,7 @@ that are expected by the MapCollection classes:
     def click_draw(self, widget, event):
         """Handle mouse button presses if we're in drawing mode"""
         if event.button != 1:
-            print "We only handle button 1 so far when drawing tracks."
+            print("We only handle button 1 so far when drawing tracks.")
             return False
 
         lon, lat = self.xy2coords(event.x, event.y)
@@ -1734,7 +1741,7 @@ that are expected by the MapCollection classes:
 
         self.collection.zoom(1)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
-            print "doubleclick: zoomed in to", self.collection.zoomlevel
+            print("doubleclick: zoomed in to", self.collection.zoomlevel)
         self.draw_map()
         return True
 
@@ -1796,7 +1803,7 @@ that are expected by the MapCollection classes:
                 self.collection.zoom(zoom)
                 if self.controller.Debug and hasattr(self.collection,
                                                      'zoomlevel'):
-                    print "zoomed to", self.collection.zoomlevel
+                    print("zoomed to", self.collection.zoomlevel)
                 self.draw_map()
                 return True
 
@@ -1805,9 +1812,9 @@ that are expected by the MapCollection classes:
             cur_long, cur_lat = self.xy2coords(event.x, event.y)
 
             if self.controller.Debug:
-                print "Click:", \
+                print("Click:", \
                     MapUtils.dec_deg2deg_min_str(cur_long), \
-                    MapUtils.dec_deg2deg_min_str(cur_lat)
+                    MapUtils.dec_deg2deg_min_str(cur_lat))
 
             # Find angle and distance since last click.
             if self.controller.Debug or event.state & gtk.gdk.SHIFT_MASK:
@@ -1819,18 +1826,18 @@ that are expected by the MapCollection classes:
                                                         self.click_last_long,
                                                         cur_lat, cur_long)
                     if self.use_metric:
-                        print "Distance: %.2f km" % dist
+                        print("Distance: %.2f km" % dist)
                     else:
-                        print "Distance: %.2f mi" % (dist / 1.609)
-                        print "Haversine Distance: %.2f mi" % dist2
+                        print("Distance: %.2f mi" % (dist / 1.609))
+                        print("Haversine Distance: %.2f mi" % dist2)
 
                     # Now calculate bearing. I don't know how accurate this is.
                     xdiff = (cur_long - self.click_last_long)
                     ydiff = (cur_lat - self.click_last_lat)
                     angle = int(math.atan2(-ydiff, -xdiff) * 180 / math.pi)
                     angle = MapUtils.angle_to_bearing(angle)
-                    print "Bearing:", angle, "=", \
-                        MapUtils.angle_to_quadrant(angle)
+                    print("Bearing:", angle, "=", \
+                        MapUtils.angle_to_quadrant(angle))
 
             self.click_last_long = cur_long
             self.click_last_lat = cur_lat

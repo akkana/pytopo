@@ -7,6 +7,8 @@
    tile naming and zoom scheme.
 '''
 
+from __future__ import print_function
+
 from pytopo.TiledMapCollection import TiledMapCollection
 from pytopo.MapWindow import MapWindow
 
@@ -134,8 +136,8 @@ class OSMMapCollection(TiledMapCollection):
 
         if self.zoomlevel != newzoom:
             if newzoom > self.maxzoom:
-                print "Can't zoom past level", self.maxzoom, "in", \
-                    self.name, "map collections"
+                print("Can't zoom past level", self.maxzoom, "in", \
+                    self.name, "map collections")
                 return
             self.zoomlevel = newzoom
             self.powzoom = 2.0 ** self.zoomlevel
@@ -152,8 +154,8 @@ class OSMMapCollection(TiledMapCollection):
         self.xscale = 256. / (lon2 - lon1)
         self.yscale = 256. / (lat2 - lat1)
         if self.Debug:
-            print "Zoom to %d: Calculated scales: %f, %f" \
-                % (self.zoomlevel, self.xscale, self.yscale)
+            print("Zoom to %d: Calculated scales: %f, %f" \
+                % (self.zoomlevel, self.xscale, self.yscale))
         return
 
     def zoom(self, amount, latitude=45):
@@ -255,17 +257,17 @@ class OSMMapCollection(TiledMapCollection):
                     os.makedirs(thedir)
 
                 if self.Debug:
-                    print "Need to download", path
+                    print("Need to download", path)
                     if not on_disk:
-                        print "Wasn't on disk"
+                        print("Wasn't on disk")
                     else:
-                        print os.stat(path).st_mtime, "<", self.reload_tiles
+                        print(os.stat(path).st_mtime, "<", self.reload_tiles)
 
                 self.download_tiles.push(self.url_from_path(path), path)
 
             else:
                 if self.Debug:
-                    print "Downloads not enabled; skipping", path
+                    print("Downloads not enabled; skipping", path)
 
         # We've queued any needed downloads.
         # Now return the current pixbuf, if any.
@@ -280,7 +282,7 @@ class OSMMapCollection(TiledMapCollection):
 
         # In case something went wrong, don't keep a bad file around:
         if not pixbuf or pixbuf.get_width() <= 0 or pixbuf.get_height() <= 0:
-            print "Couldn't open pixbuf from", path
+            print("Couldn't open pixbuf from", path)
             os.rename(path, path + ".bad")
             pixbuf = None
         # XXX Sometimes despite that check, we mysteriously get

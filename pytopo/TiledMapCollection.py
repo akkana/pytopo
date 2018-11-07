@@ -6,6 +6,8 @@
    A base class for more specific downloaders.
 '''
 
+from __future__ import print_function
+
 from pytopo.MapCollection import MapCollection
 from pytopo.MapWindow import MapWindow
 from pytopo.MapUtils import MapUtils
@@ -46,10 +48,10 @@ TiledMapCollection classes must implement
     def set_reload_tiles(self, p):
         if p:
             if 'download_url' in dir(self) and self.download_url:
-                print "Will re-download all map tiles"
+                print("Will re-download all map tiles")
                 self.reload_tiles = p
             else:
-                print "Error: can't reload tiles without a download URL"
+                print("Error: can't reload tiles without a download URL")
                 self.reload_tiles = False
         else:
             self.reload_tiles = False
@@ -62,7 +64,7 @@ TiledMapCollection classes must implement
         # Get the current window size:
         win_width, win_height = mapwin.get_size()
         if (self.Debug):
-            print "Window is", win_width, "x", win_height
+            print("Window is", win_width, "x", win_height)
 
         # Now that we have a latitude, call zoom so we can finally
         # set the x and y scales accurately.
@@ -72,20 +74,20 @@ TiledMapCollection classes must implement
         # This may (indeed, usually will) include maps partly off the screen,
         # so the coordinates will span a greater area than the visible window.
         if (self.Debug):
-            print "Calculating boundaries: min =", \
+            print("Calculating boundaries: min =", \
                 MapUtils.dec_deg2deg_min_str(center_lon), \
                 center_lon, "+/-", win_width, \
-                "/", self.xscale, "/ 2"
+                "/", self.xscale, "/ 2")
         min_lon = center_lon - win_width / self.xscale / 2
         max_lon = center_lon + win_width / self.xscale / 2
         min_lat = center_lat - win_height / self.yscale / 2
         max_lat = center_lat + win_height / self.yscale / 2
 
         if (self.Debug):
-            print "Map from", min_lon, MapUtils.dec_deg2deg_min_str(min_lon), \
+            print("Map from", min_lon, MapUtils.dec_deg2deg_min_str(min_lon), \
                 MapUtils.dec_deg2deg_min_str(min_lat), \
                 "to", MapUtils.dec_deg2deg_min_str(max_lon), \
-                MapUtils.dec_deg2deg_min_str(max_lat)
+                MapUtils.dec_deg2deg_min_str(max_lat))
 
         # Start from the upper left: min_lon, max_lat
 
@@ -141,7 +143,7 @@ TiledMapCollection classes must implement
                     x_off = 0
 
                 if self.Debug:
-                    print "    ", x_maplet_name
+                    print("    ", x_maplet_name)
 
                 x = cur_x
                 y = cur_y
@@ -158,9 +160,9 @@ TiledMapCollection classes must implement
                 curlon += float(w) / self.xscale
 
             if (self.Debug):
-                print " "
-                print "New row: adding y =", h,
-                print "Subtracting lat", float(h) / self.yscale
+                print(" ")
+                print("New row: adding y =", h, end=' ')
+                print("Subtracting lat", float(h) / self.yscale)
 
             cur_y += h
             curlat -= float(h) / self.yscale
@@ -198,8 +200,8 @@ TiledMapCollection classes must implement
             w = pixbuf.get_width() - x_off
             h = pixbuf.get_height() - y_off
             if (self.Debug):
-                print "img size:", pixbuf.get_width(), \
-                      pixbuf.get_height()
+                print("img size:", pixbuf.get_width(), \
+                      pixbuf.get_height())
 
             # If the image won't completely fill the grid space,
             # fill the whole rectangle first with black.
@@ -211,8 +213,8 @@ TiledMapCollection classes must implement
                 mapwin.draw_rectangle(1, x, y,
                                       self.img_width, self.img_height)
                 if (self.Debug):
-                    print "Filling in background:", x, y,
-                    print self.img_width, self.img_height
+                    print("Filling in background:", x, y, end=' ')
+                    print(self.img_width, self.img_height)
 
             # if (self.Debug):
             #     print "Drawing maplet for",
@@ -265,7 +267,7 @@ TiledMapCollection classes must implement
             tiley = int(tiley)
             tilex = int(tilex)
         except ValueError:
-            print "Bad tile filename", path
+            print("Bad tile filename", path)
             return
         # Now we need to turn tilex and tiley into x, y, x_off, y_off
         # for the MapWindow's current position.
@@ -292,20 +294,20 @@ TiledMapCollection classes must implement
             pixbuf = MapWindow.load_image_from_file(path)
             self.draw_tile_at_position(pixbuf, mapwin, mapx, mapy,
                                        x_off, y_off)
-        except glib.GError, e:
-            print "Couldn't draw tile:", e,
+        except glib.GError as e:
+            print("Couldn't draw tile:", e, end=' ')
             if not self.Debug:
-                print "... deleting"
+                print("... deleting")
             else:
-                print ""
-            print ""
+                print("")
+            print("")
             if os.path.exists(path) and not self.Debug:
                 os.unlink(path)
             self.download_failures += 1
             # Usually this means OSM gave us a text file containing
             # a string like "Tile Not Available"
-        except Exception, e:
-            print "Error drawing tile:", e
+        except Exception as e:
+            print("Error drawing tile:", e)
             self.download_failures += 1
 
         # Redraw any trackpoints, zoom controls, and anything else that
@@ -326,7 +328,7 @@ TiledMapCollection classes must implement
         if path is None:
             self.download_failures += 1
             if self.download_failures > 10:
-                print "\nDownload failed; giving up"
+                print("\nDownload failed; giving up")
                 self.download_func = None
                 # Clear self.download_tiles, so that if the net returns
                 # we'll start on new stuff, not old stuff.
@@ -360,7 +362,7 @@ TiledMapCollection classes must implement
         # (eventually we'll want to run several in parallel).
         if self.download_func is not None:
             if self.Debug:
-                print "There's already a download going; not downloading more"
+                print("There's already a download going; not downloading more")
             return False
 
         # If there are no more tiles to download, we're done:
@@ -376,6 +378,6 @@ TiledMapCollection classes must implement
                                                                        path,
                                                      self.download_finished))
         if self.Debug:
-            print "Started download %s to %s" % (url, path)
+            print("Started download %s to %s" % (url, path))
 
         return False
