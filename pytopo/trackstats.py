@@ -294,7 +294,7 @@ def main():
     plt.gcf().canvas.set_window_title("%s: %s" % (progname, track_files[0]))
 
     plt.xlabel("miles")
-#    plt.get_current_fig_manager().window.set_title(os.path.basename(args[0] + ": " + title_string))
+#    plt.get_current_fig_manager().get_window().set_title(os.path.basename(args[0] + ": " + title_string))
     plt.ylabel("feet")
     plt.grid(True)
     plt.legend()

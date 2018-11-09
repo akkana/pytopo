@@ -98,7 +98,8 @@ class TrackPoints(object):
         '''Is this the start of a new track segment?
            If so, it's a string (or unicode), the name of the track section.
         '''
-        return isinstance(point, str) or isinstance(point, str)
+        return isinstance(point, str) or isinstance(point, unicode) \
+            or isinstance(point, bytes)
 
     def get_bounds(self):
         '''Get bounds encompassing all contained tracks and waypoints.'''
