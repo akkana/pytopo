@@ -325,13 +325,6 @@ that are expected by the MapCollection classes:
            Stop drawing if we reach another start string, and return the index
            of that string. Return None if we reach the end of the list.
         '''
-        # if not linestyle:
-        #     linestyle = gtk.gdk.LINE_ON_OFF_DASH
-        # self.set_color(linecolor)
-        # if linestyle:
-        #     self.xgc.line_style = linestyle
-        # self.xgc.line_width = linewidth
-        # self.cr.set_source_rgb(*linecolor)
         self.cr.set_source_rgb (*linecolor)
 
         cur_x = None
@@ -358,15 +351,15 @@ that are expected by the MapCollection classes:
             y = int((self.center_lat - pt.lat) * self.collection.yscale
                     + self.win_height / 2)
 
-            if ((x >= 0 and x < self.win_width and
-                 y >= 0 and y < self.win_height) or
-                    (cur_x < self.win_width and cur_y < self.win_height)):
-                if cur_x is not None and cur_y is not None:
-                    # self.set_color(self.track_color)
-                    self.draw_line(cur_x, cur_y, x, y)
-                    # self.set_color(self.black_color)
-                    # self.draw_circle(True, x, y, 3)
+            def on_screen(x, y):
+                if not x or not y:
+                    return False
+                return (x >= 0 and x < self.win_width and
+                        y >= 0 and y < self.win_height)
 
+            if on_screen(x, y):
+                if on_screen(cur_x, cur_y):
+                    self.draw_line(cur_x, cur_y, x, y)
                 cur_x = x
                 cur_y = y
             else:
@@ -906,7 +899,7 @@ that are expected by the MapCollection classes:
             # There's no documentation on what event.time is: it's
             # "the time of the event in milliseconds" -- but since when?
             # Not since the epoch.
-        menu.popup(None, None, None, button, t)
+        menu.popup(None, None, None, None, button, t)
 
     def change_collection(self, widget, name):
         newcoll = self.controller.find_collection(name)
@@ -1456,7 +1449,7 @@ that are expected by the MapCollection classes:
     def draw_rectangle(self, fill, x, y, w, h, color=None):
         """Draw a rectangle."""
         # self.drawing_area.get_window().draw_rectangle(self.xgc, fill, x, y, w, h)
-        print("draw_rectangle", x, y, w, h, fill)
+        # print("draw_rectangle", x, y, w, h, fill)
         if color:
             self.cr.set_source_rgb(*color)
         # cr.rectangle tends to die with TypeError: a float is required
