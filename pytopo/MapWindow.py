@@ -7,6 +7,12 @@
 
 from __future__ import print_function
 
+from gi import pygtkcompat
+pygtkcompat.enable()
+pygtkcompat.enable_gtk(version='3.0')
+
+# from gi.repository import Gtk, Gdk, cairo, Pango, PangoCairo
+
 from pytopo.MapUtils import MapUtils
 from pytopo.TrackPoints import TrackPoints
 from . import trackstats
@@ -26,8 +32,13 @@ import gtk
 import gobject
 import glib
 import pango
+import pangocairo
 
 from pkg_resources import resource_filename
+
+# As of GTK3 there's no longer any HSV support, because cairo is
+# solely RGB. Use colorsys instead
+import colorsys
 
 import traceback
 
@@ -106,7 +117,10 @@ that are expected by the MapCollection classes:
 
         # X/gtk graphics variables we need:
         self.drawing_area = 0
-        self.xgc = 0
+        # GTK2: X GC
+        self.xgc = None
+        # GTK3: all drawing is done through a Cairo context, cr.
+        self.cr = None
 
         self.click_last_long = 0
         self.click_last_lat = 0
@@ -135,18 +149,26 @@ that are expected by the MapCollection classes:
 
         # Colors and fonts should of course be configurable:
         # self.bg_color = gtk.gdk.color_parse("black")
-        self.black_color = gtk.gdk.color_parse("black")
-        self.white_color = gtk.gdk.color_parse("white")
-        self.yellow_color = gtk.gdk.color_parse("yellow")
-        self.red_color = gtk.gdk.color_parse("red")
+        # self.black_color = gtk.gdk.color_parse("black")
+        # self.white_color = gtk.gdk.color_parse("white")
+        # self.yellow_color = gtk.gdk.color_parse("yellow")
+        # self.red_color = gtk.gdk.color_parse("red")
+        # self.bg_scale_color = self.white_color
+        # self.first_track_color = gtk.gdk.color_parse("magenta")
+        # self.grid_color = gtk.gdk.color_parse("grey45")
+
+        self.black_color = (0., 0., 0.)
+        self.white_color = (1., 1., 1.)
+        self.yellow_color = (1., 1., 0.)
+        self.red_color = (1., 0., 0.)
         self.bg_scale_color = self.white_color
-        self.first_track_color = gtk.gdk.color_parse("magenta")
-        self.grid_color = gtk.gdk.color_parse("grey45")
+        self.first_track_color = (1., 0., 1.)
+        self.grid_color = (.45, .45, .45)
 
         # waypoint_color is the color for waypoint *labels*.
         # We'll try to give the actual waypoints the color of their track file.
-        self.waypoint_color = gtk.gdk.color_parse("yellow")
-        self.waypoint_color_bg = gtk.gdk.color_parse("black")
+        self.waypoint_color = self.yellow_color
+        self.waypoint_color_bg = self.black_color
 
         self.font_desc = pango.FontDescription("Sans 9")
         self.wpt_font_desc = pango.FontDescription("Sans Italic 10")
@@ -175,16 +197,25 @@ that are expected by the MapCollection classes:
         vbox.pack_start(self.drawing_area)
 
         self.drawing_area.set_events(gtk.gdk.EXPOSURE_MASK |
+                                     gtk.gdk.SCROLL_MASK |
                                      gtk.gdk.POINTER_MOTION_MASK |
                                      gtk.gdk.POINTER_MOTION_HINT_MASK |
                                      gtk.gdk.BUTTON_PRESS_MASK |
                                      gtk.gdk.BUTTON_RELEASE_MASK)
 
-        self.drawing_area.connect("expose-event", self.expose_event)
-        self.drawing_area.connect("button-press-event", self.mousepress)
+        try:
+            # GTK2:
+            self.drawing_area.connect("expose-event", self.expose_event)
+        except TypeError:
+            # Python3/GI GTK3:
+            self.drawing_area.connect('size-allocate', self.on_size_allocate)
+            self.width = self.height = 0
+            self.drawing_area.connect('draw', self.expose3)
+
+        self.drawing_area.connect("button-press-event",   self.mousepress)
         self.drawing_area.connect("button-release-event", self.mouserelease)
-        self.drawing_area.connect("scroll-event", self.scroll_event)
-        self.drawing_area.connect("motion_notify_event", self.drag_event)
+        self.drawing_area.connect("scroll-event",         self.scroll_event)
+        self.drawing_area.connect("motion_notify_event",  self.drag_event)
 
         # The default focus in/out handlers on drawing area cause
         # spurious expose events.  Trap the focus events, to block that:
@@ -193,9 +224,7 @@ that are expected by the MapCollection classes:
         self.drawing_area.connect("focus-out-event", self.nop)
 
         # Handle key presses on the drawing area.
-        # If seeing spurious expose events, try setting them on win instead,
-        # and comment out gtk.CAN_FOCUS.
-        self.drawing_area.set_flags(gtk.CAN_FOCUS)
+        self.drawing_area.set_property('can-focus', True)
         self.drawing_area.connect("key-press-event", self.key_press_event)
 
         # Resize the window now to the desired initial size:
@@ -218,7 +247,10 @@ that are expected by the MapCollection classes:
             # Not initialized yet, not ready to draw a map
             return
 
-        self.win_width, self.win_height = self.drawing_area.window.get_size()
+        self.cr = self.drawing_area.get_window().cairo_create()
+
+        self.win_width, self.win_height = \
+            self.drawing_area.get_window().get_geometry()[2:4]
 
         # XXX Collection.draw_map wants center, but we only have lower right.
         if self.controller.Debug:
@@ -251,11 +283,13 @@ that are expected by the MapCollection classes:
             label += "\n%.1f %s" % (stats['Total distance'], dist_units)
             label += "\nClimb: %d%s" % (stats['Smoothed total climb'],
                                         climb_units)
-            self.draw_label(label, -15, 15, self.yellow_color)
+            self.draw_label(label, -15, 15, self.yellow_color,
+                            dropshadow=True)
 
         if self.selected_waypoint is not None:
-            draw_selected_label(self.trackpoints.waypoints[self.selected_waypoint].name,
-                                "Waypoint: ", 15, 40)
+            self.draw_label("Waypoint: " +
+                                self.trackpoints.waypoints[self.selected_waypoint].name,
+                            15, 40, color=self.yellow_color)
 
         # Copyright info or other attribution
         self.set_color(self.grid_color)
@@ -278,21 +312,28 @@ that are expected by the MapCollection classes:
         if not color:
             return self.first_track_color
 
+        h, s, v = colorsys.rgb_to_hsv(*color)
+
         # Hue is a floating point between 0 and 1. How much should we jump?
         jump = .13
 
-        return gtk.gdk.color_from_hsv(color.hue + jump,
-                                      color.saturation, color.value)
+        return colorsys.hsv_to_rgb(h + jump, s, v)
 
     def draw_trackpoint_segment(self, start, linecolor, linewidth=3,
-                                linestyle=gtk.gdk.LINE_ON_OFF_DASH):
+                                linestyle=None):
         '''Draw a trackpoint segment, starting at the given index.
            Stop drawing if we reach another start string, and return the index
            of that string. Return None if we reach the end of the list.
         '''
-        self.set_color(linecolor)
-        self.xgc.line_style = linestyle
-        self.xgc.line_width = linewidth
+        # if not linestyle:
+        #     linestyle = gtk.gdk.LINE_ON_OFF_DASH
+        # self.set_color(linecolor)
+        # if linestyle:
+        #     self.xgc.line_style = linestyle
+        # self.xgc.line_width = linewidth
+        # self.cr.set_source_rgb(*linecolor)
+        self.cr.set_source_rgb (*linecolor)
+
         cur_x = None
         cur_y = None
         i = start
@@ -403,7 +444,7 @@ that are expected by the MapCollection classes:
         # so we can try to use that color for the matching waypoints.
         track_colors = {}
 
-        # win_width, win_height = self.drawing_area.window.get_size()
+        # win_width, win_height = self.drawing_area.get_window().get_geometry()[2:4]
         if len(self.trackpoints.points) > 0:
             cur_x = None
             cur_y = None
@@ -434,20 +475,12 @@ that are expected by the MapCollection classes:
 
                 if x >= 0 and x < self.win_width and \
                    y >= 0 and y < self.win_height:
-                    layout = self.drawing_area.create_pango_layout(pt.name)
-                    layout.set_font_description(self.wpt_font_desc)
-                    # tw = layout.get_size()[0] / pango.SCALE
-                    th = layout.get_size()[1] / pango.SCALE
-                    self.set_color(self.waypoint_color_bg)
-                    self.drawing_area.window.draw_layout(self.xgc,
-                                                         x + th / 3 + 1,
-                                                         y - th / 2 + 1,
-                                                         layout)
-                    self.set_color(self.waypoint_color)
-                    self.drawing_area.window.draw_layout(self.xgc,
-                                                         x + th / 3,
-                                                         y - th / 2,
-                                                         layout)
+                    self.draw_label(pt.name, x, y,
+                                    color=self.waypoint_color,
+                                    dropshadow=True,
+                                    font=self.font_desc,
+                                    offsets=(1, 1))
+
                     self.draw_pixbuf(self.pin, 0, 0,
                                      x + self.pin_xoff,
                                      y + self.pin_yoff, -1, -1)
@@ -470,7 +503,7 @@ that are expected by the MapCollection classes:
         nearest_waypoint = None
 
         halfwidth, halfheight = \
-            [s / 2 for s in self.drawing_area.window.get_size()]
+            [s / 2 for s in self.drawing_area.get_window().get_geometry()[2:4]]
         if x is None:
             x = halfwidth
         if y is None:
@@ -586,7 +619,7 @@ that are expected by the MapCollection classes:
         cos_lat = math.cos(lat_rad)
         R_meters = Req/math.sqrt(1 - esq*sin_lat_sq)             # earth radius (m)
         R_miles = R_meters/(0.0254*12*5280)                      # earth radius (miles)
-        R_km = R_meters/1000	                                   # earth radius (km)
+        R_km = R_meters/1000	                                 # earth radius (km)
         xscale_deg = self.collection.xscale                      # pixels per degree
         xscale_mi = xscale_deg*360/(2*math.pi*R_miles*cos_lat)   # pixels per mile
         xscale_km = xscale_deg*360/(2*math.pi*R_km*cos_lat)      # pixels per km
@@ -626,51 +659,56 @@ that are expected by the MapCollection classes:
 
         ##################################################
 
-        # Calculate coordinates of miles map-scale bar
-        x1 = int((self.win_width - length_mi) / 2 + 0.5)
-        y1 = int(self.win_height - 30 + 0.5)
-        x2 = int(x1 + length_mi + 0.5)
-        y2 = y1
-
         # Get label length in pixels;
         # length of "0" string is 7.
         layout = self.drawing_area.create_pango_layout(label_mi)
         layout.set_font_description(self.font_desc)
         width, height = layout.get_pixel_size()
         str_length_mi = width
+        str_height = height
 
-        # Draw white background for miles map-scale
-        self.xgc.line_style = gtk.gdk.LINE_SOLID
-        self.set_color(self.bg_scale_color)
-        self.xgc.line_width = 20
-        self.draw_line(x1 - 10 - 7 - 10, y1, x2 + 10 + str_length_mi + 10, y2)
+        text_padding_x = str_length_mi * 4
+        box_width = max(length_mi, length_km) + text_padding_x
+        box_height = height * 3.3
+        x_center = self.win_width / 2
+        y = int(self.win_height - box_height)
+
+        # Draw a white background for miles map-scale
+        # self.set_color(self.bg_scale_color)
+        # self.xgc.line_width = 20
+        # self.draw_line(x1 - 10 - 7 - 10, y1, x2 + 10 + str_length_mi + 10, y2)
+        self.draw_rectangle(True, x_center - box_width/2, y,
+                            box_width, box_height,
+                            self.bg_scale_color)
 
         # Draw miles map-scale bar
-        self.set_bg_color()
-        self.xgc.line_width = 1
-        self.draw_line(x1, y1, x2, y2)
+        y += str_height
+        x0 = x_center - length_mi/2 - text_padding_x / 4
+        self.draw_line(x0, y, x0 + length_mi, y, color=self.black_color)
+        # self.draw_line(x1, y, x2, y, color=self.black_color)
 
         # Draw tick marks on miles map-scale bar
-        x0 = x1
         for i in range(nticks):
-            x1 = x0 + int(i * length_mi / (nticks - 1) + 0.5)
-            x2 = x1
-            self.draw_line(x1, y1 - 3, x2, y2 + 3)
+            xx = x0 + int(i * length_mi / (nticks - 1) + 0.5)
+            self.draw_line(xx, y - 3, xx, y + 3)
 
         # Draw miles map-scale labels
-        x = x0 - 10 - 7
-        y = self.win_height - 36
-        self.draw_string_scale(x, y, "0")
-        x = x2 + 10
-        self.draw_string_scale(x, y, label_mi)
+        # y += str_height
+        self.draw_string_scale(xx + 10, y - str_height/2, "0 " + label_mi)
 
         ##################################################
 
         # Calculate coordinates of kilometers map-scale bar
-        x1 = int((self.win_width - length_km) / 2 + 0.5)
-        y1 = int(self.win_height - 10 + 0.5)
-        x2 = int(x1 + length_km + 0.5)
-        y2 = y1
+        x0 = x_center - length_km/2 - text_padding_x / 4
+        y += str_height * 1.5
+
+        # Draw kilometers map-scale bar
+        self.draw_line(x0, y, x0 + length_km, y, color=self.black_color)
+
+        # Draw tick marks on kilometers map-scale bar
+        for i in range(nticks):
+            x1 = x0 + int(i * length_km / (nticks - 1) + 0.5)
+            self.draw_line(x1, y - 3, x1, y + 3)
 
         # Get label length in pixels;
         # length of "0" string is 7.
@@ -679,29 +717,11 @@ that are expected by the MapCollection classes:
         width, height = layout.get_pixel_size()
         str_length_km = width
 
-        # Draw white background for kilometers map-scale
-        self.xgc.line_style = gtk.gdk.LINE_SOLID
-        self.set_color(self.bg_scale_color)
-        self.xgc.line_width = 20
-        self.draw_line(x1 - 10 - 7 - 10, y1, x2 + 10 + str_length_km + 10, y2)
-
-        # Draw kilometers map-scale bar
-        self.set_bg_color()
-        self.xgc.line_width = 1
-        self.draw_line(x1, y1, x2, y2)
-
-        # Draw tick marks on kilometers map-scale bar
-        x0 = x1
-        for i in range(nticks):
-            x1 = x0 + int(i * length_km / (nticks - 1) + 0.5)
-            x2 = x1
-            self.draw_line(x1, y1 - 3, x2, y2 + 3)
-
         # Draw kilometers map-scale labels
         x = x0 - 10 - 6
         y = self.win_height - 16
         self.draw_string_scale(x, y, "0")
-        x = x2 + 10
+        x = x1 + 10
         self.draw_string_scale(x, y, label_km)
 
     def draw_zoom_control(self):
@@ -713,17 +733,18 @@ that are expected by the MapCollection classes:
         self.zoom_X1 = 8
         self.zoom_in_Y1 = 10
         self.zoom_out_Y1 = self.zoom_in_Y1 + self.zoom_btn_size * 2
+
         textoffset = self.zoom_btn_size / 5
 
-        self.xgc.line_style = gtk.gdk.LINE_SOLID
         self.set_color(self.grid_color)
-        self.xgc.line_width = 3
 
         # Draw the boxes
         self.draw_rectangle(False, self.zoom_X1, self.zoom_in_Y1,
-                            self.zoom_btn_size, self.zoom_btn_size)
+                            self.zoom_btn_size, self.zoom_btn_size,
+                            color=self.grid_color)
         self.draw_rectangle(False, self.zoom_X1, self.zoom_out_Y1,
-                            self.zoom_btn_size, self.zoom_btn_size)
+                            self.zoom_btn_size, self.zoom_btn_size,
+                            color=self.grid_color)
 
         midpointx = self.zoom_X1 + self.zoom_btn_size / 2
         # Draw the -
@@ -1325,7 +1346,7 @@ that are expected by the MapCollection classes:
 
             # Show a busy cursor on the dialog:
             busy_cursor = gtk.gdk.Cursor(gtk.gdk.WATCH)
-            dialog.window.set_cursor(busy_cursor)
+            dialog.get_window().set_cursor(busy_cursor)
             flush_events()
             gtk.gdk.flush()
 
@@ -1400,60 +1421,92 @@ that are expected by the MapCollection classes:
 
     def get_size(self):
         """Return the width and height of the canvas."""
-        return self.drawing_area.window.get_size()
+        return self.drawing_area.get_window().get_geometry()[2:4]
 
     def set_bg_color(self):
         """Change to the normal background color (usually black)."""
         # self.xgc.set_rgb_fg_color(self.bg_color)
-        self.xgc.foreground = self.xgc.background
+        # self.xgc.foreground = self.xgc.background
+        self.set_color(self.black_color)
 
     def set_color(self, color):
-        self.xgc.set_rgb_fg_color(color)
+        # self.xgc.set_rgb_fg_color(color)
+        self.cr.set_source_rgb(*color)
 
     def draw_pixbuf(self, pixbuf, x_off, y_off, x, y, w, h):
         """Draw the pixbuf at the given position and size,
         starting at the specified offset."""
-        # Sometimes the next line prints:
-        # GtkWarning: gdk_drawable_real_draw_pixbuf: assertion 'width >= 0 && height >= 0' failed
-        # but checking width and height doesn't seem to guard against that.
-        # What does? This doesn't:
-        # print "Drawing pixbuf that is %d x %d!" \
-        #     % (pixbuf.get_width(), pixbuf.get_height())
-        # if (pixbuf.get_width() <= 0 or pixbuf.get_height() <= 0):
-        #     print "Bad pixbuf size!"
-        #     raise RuntimeError("pixbuf is size %d x %d!" \
-        #                        % (pixbuf.get_width(), pixbuf.get_height()))
-        self.drawing_area.window.draw_pixbuf(self.xgc, pixbuf, x_off, y_off,
-                                             x, y, w, h)
 
-    def draw_rect_between(self, fill, x1, y1, x2, y2):
-        """Draw a rectangle. between two sets of coordinates,
+        # GTK3 way: seems to be completely undocumented.
+        # Last 2 args here are where on the drawingarea it will draw:
+        gtk.gdk.cairo_set_source_pixbuf(self.cr, pixbuf, x-x_off, y-y_off)
+        self.cr.rectangle(-x_off, -y_off, w-x_off, h-y_off)
+        self.cr.paint()
+
+    def draw_rect_between(self, fill, x1, y1, x2, y2, color=None):
+        """Draw a rectangle. between two sets of ordinates,
            which are not necessarily in UL, LR order.
         """
         minx = min(x1, x2)
         miny = min(y1, y2)
         maxx = max(x1, x2)
         maxy = max(y1, y2)
-        self.drawing_area.window.draw_rectangle(self.xgc, fill, minx, miny,
-                                                maxx-minx, maxy-miny)
+        self.draw_rectangle(fill, x, y, w, h, color)
 
-    def draw_rectangle(self, fill, x, y, w, h):
+    def draw_rectangle(self, fill, x, y, w, h, color=None):
         """Draw a rectangle."""
-        self.drawing_area.window.draw_rectangle(self.xgc, fill, x, y, w, h)
+        # self.drawing_area.get_window().draw_rectangle(self.xgc, fill, x, y, w, h)
+        print("draw_rectangle", x, y, w, h, fill)
+        if color:
+            self.cr.set_source_rgb(*color)
+        # cr.rectangle tends to die with TypeError: a float is required
+        self.cr.rectangle(float(x), float(y), float(w), float(h))
+        if fill:
+            self.cr.fill()
+        else:
+            self.cr.stroke()
 
-    def draw_line(self, x, y, x2, y2):
+    def draw_line(self, x, y, x2, y2, color=None):
         """Draw a line."""
-        self.drawing_area.window.draw_line(self.xgc, x, y, x2, y2)
+        # print("draw_line", x, y, x2, y2)
+
+        if color:
+            self.cr.set_source_rgb(*color)
+
+        self.cr.move_to(x, y)
+        self.cr.line_to(x2, y2)
+        self.cr.stroke()
 
     def draw_circle(self, fill, xc, yc, r):
         """Draw a circle, filled or not, centered at xc, yc with radius r."""
-        self.drawing_area.window.draw_arc(self.xgc, fill, xc - r, yc - 4,
+        self.drawing_area.get_window().draw_arc(self.xgc, fill, xc - r, yc - 4,
                                           r * 2, r * 2, 0, 23040)  # 64 * 360
 
-    def draw_label(self, labelstring, x, y, color=None, dropshadow=True):
+    def draw_label(self, labelstring, x, y, color=None, dropshadow=True,
+                   font=None, offsets=None):
+        '''Draw a string at the specified point.
+           offsets is an optional tuple specifying where the string will
+           be drawn relative to the coordinates passed in;
+           for instance, if offsets are (-1, -1) the string will be
+           drawn with the bottom right edge at the given x, y.
+        '''
+        if not color:
+            color = self.black_color
+        if not font:
+            font = self.select_font_desc
+
         layout = self.drawing_area.create_pango_layout(labelstring)
-        layout.set_font_description(self.select_font_desc)
+        layout.set_font_description(font)
         label_width, label_height = layout.get_pixel_size()
+
+        if offsets:
+            if offsets[0] == 0:
+                x -= int(label_width/2)
+            elif offsets[0] != 1:
+                x += int(label_width * offsets[0])
+            if offsets[1] != 1:
+                y += int(label_height * offsets[1] - label_height/2)
+
         if x < 0:
             x = self.win_width - label_width + x
         if y < 0:
@@ -1463,13 +1516,27 @@ that are expected by the MapCollection classes:
             color = self.yellow_color
 
         if dropshadow:
-            self.xgc.set_rgb_fg_color(self.black_color)
-            self.drawing_area.window.draw_layout(self.xgc, x, y-2, layout)
-            self.drawing_area.window.draw_layout(self.xgc, x-2, y+2, layout)
-            self.drawing_area.window.draw_layout(self.xgc, x+2, y+2, layout)
+            self.cr.set_source_rgb(*self.black_color)
+            if (label_height < 15):
+                self.draw_rectangle(True, x, y, label_width, label_height)
+            else:
+                self.cr.move_to(x, y+2)
+                pangocairo.show_layout(self.cr, layout)
+                self.cr.stroke()
+                self.cr.move_to(x, y-2)
+                pangocairo.show_layout(self.cr, layout)
+                self.cr.stroke()
+                self.cr.move_to(x-2, y+2)
+                pangocairo.show_layout(self.cr, layout)
+                self.cr.stroke()
+                self.cr.move_to(x+2, y+2)
+                pangocairo.show_layout(self.cr, layout)
+                self.cr.stroke()
 
-        self.xgc.set_rgb_fg_color(color)
-        self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
+        self.cr.set_source_rgb(*color)
+        self.cr.move_to(x, y)
+        pangocairo.show_layout(self.cr, layout)
+        self.cr.stroke()
 
     @staticmethod
     def load_image_from_file(filename):
@@ -1482,7 +1549,9 @@ that are expected by the MapCollection classes:
            if "attribution" even bigger and also italic;
            if it's "select" it'll be a lot bigger.
         """
-        layout = self.drawing_area.create_pango_layout(s)
+        # layout = self.drawing_area.create_pango_layout(s)
+        layout = pangocairo.create_layout(self.cr)
+        layout.set_text(s, -1)
         if whichfont == "waypoint":
             layout.set_font_description(self.wpt_font_desc)
         elif whichfont == "attribution":
@@ -1493,12 +1562,21 @@ that are expected by the MapCollection classes:
             layout.set_font_description(self.font_desc)
         if x < 0 or y < 0:
             win_width, win_height = self.get_size()
-            lw, lh = layout.get_pixel_size()
+            lw, lh = layout.get_size()
             if x < 0:
                 x = win_width - lw + x
             if y < 0:
                 y = win_height - lh + y
-        self.drawing_area.window.draw_layout(self.xgc, x, y, layout)
+
+        # GTK2 way:
+        # self.drawing_area.get_window().draw_layout(self.xgc, x, y, layout)
+
+        # GTK3 way:
+        # pango_cr = pangocairo.CairoContext(self.cr)
+        # pango_cr.set_source_rgb(0, 0, 0)
+        self.cr.move_to(x, y)
+        pangocairo.show_layout(self.cr, layout)
+        self.cr.stroke()
 
     # Save the current map as something which could be gimped or printed.
     # XXX THIS IS BROKEN, code assumes start_lon/start_lat but has center_.
@@ -1540,14 +1618,25 @@ that are expected by the MapCollection classes:
         if (os.access(outfile, os.R_OK)):
             print("Saved:", outfile)
 
+    def on_size_allocate(self, _unused, allocation):
+        self.width = allocation.width
+        self.height = allocation.height
+
+    def expose3(self, _unused, _ctx):
+        self.expose_event(self.drawing_area, None)
+
     def expose_event(self, widget, event):
         """Handle exposes on the canvas."""
         # print "Expose:", event.type, "for object", self
         # print "area:", event.area.x, event.area.y, \
         #    event.area.width, event.area.height
 
-        if self.xgc == 0:
-            self.xgc = self.drawing_area.window.new_gc()
+        # Cairo requires creating a new context each time the
+        # window is exposed.
+        self.cr = self.drawing_area.get_window().cairo_create()
+
+        # if self.xgc == 0:
+        #     self.xgc = self.drawing_area.get_window().new_gc()
 
         # x, y, w, h = event.area
 
@@ -1649,11 +1738,12 @@ that are expected by the MapCollection classes:
         # ones are hints; but in practice, nothing but hints are
         # ever sent.
         if event.is_hint:
-            x, y, state = event.window.get_pointer()
+            bogo, x, y, state = event.window.get_pointer()
         else:
             x = event.x
             y = event.y
             state = event.state
+
         if not state & gtk.gdk.BUTTON1_MASK:
             return False
 
@@ -1684,6 +1774,10 @@ that are expected by the MapCollection classes:
         # traceback.print_stack()
         # print "======="
 
+        # I'm not clear on the rules for when a new cairo context
+        # is needed, but apparently it's needed here.
+        # I hope creating one is fast.
+        self.cr = self.drawing_area.get_window().cairo_create()
         if widget.drag_check_threshold(self.x_start_drag, self.y_start_drag,
                                        x, y):
             dx = x - self.x_start_drag
@@ -1724,7 +1818,7 @@ that are expected by the MapCollection classes:
 
         # Was it a right click?
         if event.button == 3:
-            x, y, state = self.drawing_area.window.get_pointer()
+            bogo, x, y, state = self.drawing_area.get_window().get_pointer()
             self.context_x = x
             self.context_y = y
             self.cur_lon, self.cur_lat = self.xy2coords(x, y)
@@ -1749,7 +1843,7 @@ that are expected by the MapCollection classes:
         if self.press_timeout:
             gobject.source_remove(self.press_timeout)
             self.press_timeout = None
-        x, y, state = self.drawing_area.window.get_pointer()
+        bogo, x, y, state = self.drawing_area.get_window().get_pointer()
         self.cur_lon, self.cur_lat = self.xy2coords(x, y)
         self.context_menu(None)
         return True
@@ -1788,7 +1882,7 @@ that are expected by the MapCollection classes:
 
         if self.is_dragging:
             self.is_dragging = False
-            x, y, state = event.window.get_pointer()
+            bogo, x, y, state = event.window.get_pointer()
             self.move_to(x, y, widget)
             self.draw_overlays()
             return True
