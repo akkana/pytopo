@@ -584,7 +584,7 @@ that are expected by the MapCollection classes:
         #    http://en.wikipedia.org/wiki/Geodetic_system
         #    http://www.gmat.unsw.edu.au/snap/gps/clynch_pdfs/radiigeo.pdf
         #
-        # Copyright (C) 2013 Spencer A. Buckner
+        # Scale algorithm Copyright (C) 2013 Spencer A. Buckner
         #
         ###################################################################
 
@@ -631,81 +631,54 @@ that are expected by the MapCollection classes:
         elif log10_5 <= fraction and fraction < log10_10:
             length = 5 * math.pow(10, power_10)   # (miles or kilometers)
             nticks = 6
+
         length_mi = xscale_mi * length   # (pixels)
         length_km = xscale_km * length   # (pixels)
-        label_mi = str(10)
-        label_km = str(10)
-        label_mi = '\0' * len(label_mi)
-        label_km = '\0' * len(label_km)
         label_mi = "%g mi" % length
         label_km = "%g km" % length
 
         ##################################################
-
-        # Get label length in pixels;
-        # length of "0" string is 7.
+        # Get label lengths in pixels
         layout = self.drawing_area.create_pango_layout(label_mi)
         layout.set_font_description(self.font_desc)
-        width, height = layout.get_pixel_size()
-        str_length_mi = width
-        str_height = height
+        str_width_mi, str_height_mi = layout.get_pixel_size()
 
-        text_padding_x = str_length_mi * 4
-        box_width = max(length_mi, length_km) + text_padding_x
-        box_height = height * 3.3
+        layout = self.drawing_area.create_pango_layout(label_km)
+        layout.set_font_description(self.font_desc)
+        str_width_km, str_height_km = layout.get_pixel_size()
+
+        box_width = max(length_mi, length_km) + \
+                    max(str_width_mi, str_width_km) * 3
+        box_height = max(str_height_mi, str_height_km) * 3.3
         x_center = self.win_width / 2
-        y = int(self.win_height - box_height)
 
-        # Draw a white background for both map-scales
-        # self.set_color(self.bg_scale_color)
-        # self.xgc.line_width = 20
-        # self.draw_line(x1 - 10 - 7 - 10, y1, x2 + 10 + str_length_mi + 10, y2)
-        self.draw_rectangle(True, x_center - box_width/2, y,
+        # Draw a background box to contain the map scales
+        boxtop = int(self.win_height - box_height)
+        self.draw_rectangle(True,
+                            int(x_center - box_width/2), boxtop,
                             box_width, box_height,
                             self.bg_scale_color)
 
-        # Draw miles map-scale bar
-        y += str_height
-        x0 = x_center - length_mi/2 - text_padding_x / 4
-        self.draw_line(x0, y, x0 + length_mi, y, color=self.black_color)
-        # self.draw_line(x1, y, x2, y, color=self.black_color)
+        def draw_scale_bar(y, barlength, nticks, label, textwidth, textheight):
+            HALFTIC = 3
+            TEXTPAD = 10
+            x0 = x_center - barlength/2
+            self.draw_line(x0, y, x0 + barlength, y, color=self.black_color)
 
-        # Draw tick marks on miles map-scale bar
-        for i in range(nticks):
-            xx = x0 + int(i * length_mi / (nticks - 1) + 0.5)
-            self.draw_line(xx, y - 3, xx, y + 3)
+            # Draw ticks
+            for i in range(nticks):
+                x1 = x0 + int(i * barlength / (nticks - 1) + 0.5)
+                self.draw_line(x1, y - HALFTIC, x1, y + HALFTIC)
 
-        # Draw miles map-scale labels
-        # y += str_height
-        self.draw_string_scale(xx + 10, y - str_height/2, "0 " + label_mi)
+            # Draw map-scale labels
+            self.draw_string_scale(x0 - TEXTPAD - textwidth/4,
+                                   y - textheight/2, "0")
+            self.draw_string_scale(x1 + TEXTPAD, y - textheight/2, label)
 
-        ##################################################
-
-        # Calculate coordinates of kilometers map-scale bar
-        x0 = x_center - length_km/2 - text_padding_x / 4
-        y += str_height * 1.5
-
-        # Draw kilometers map-scale bar
-        self.draw_line(x0, y, x0 + length_km, y, color=self.black_color)
-
-        # Draw tick marks on kilometers map-scale bar
-        for i in range(nticks):
-            x1 = x0 + int(i * length_km / (nticks - 1) + 0.5)
-            self.draw_line(x1, y - 3, x1, y + 3)
-
-        # Get label length in pixels;
-        # length of "0" string is 7.
-        layout = self.drawing_area.create_pango_layout(label_km)
-        layout.set_font_description(self.font_desc)
-        width, height = layout.get_pixel_size()
-        str_length_km = width
-
-        # Draw kilometers map-scale labels
-        x = x0 - 10 - 6
-        y = self.win_height - 16
-        self.draw_string_scale(x, y, "0")
-        x = x1 + 10
-        self.draw_string_scale(x, y, label_km)
+        draw_scale_bar(boxtop + str_height_mi, length_mi, nticks,
+                       label_mi, str_width_mi, str_height_mi)
+        draw_scale_bar(self.win_height - str_height_km, length_km, nticks,
+                       label_km, str_width_km, str_height_km)
 
     def draw_zoom_control(self):
         """Draw some zoom controls in case we're running on a tablet
