@@ -1428,13 +1428,29 @@ that are expected by the MapCollection classes:
 
     def draw_pixbuf(self, pixbuf, x_off, y_off, x, y, w, h):
         """Draw the pixbuf at the given position and size,
-        starting at the specified offset."""
+           starting at the specified offset.
+           If width and height are provided, assume the offset
+           has already been subtracted.
+        """
 
-        # GTK3 way: seems to be completely undocumented.
-        # Last 2 args here are where on the drawingarea it will draw:
+        if w <= 0:
+            w = pixbuf.get_width() - x_off
+        if h <= 0:
+            h = pixbuf.get_height() - y_off
+
+        # GTK3 way: seems to be almost completely undocumented.
+        # The last two args of cairo_set_source_pixbuf are the point
+        # on the canvas matching the (0, 0) point of the pixmap.
         gtk.gdk.cairo_set_source_pixbuf(self.cr, pixbuf, x-x_off, y-y_off)
-        self.cr.rectangle(-x_off, -y_off, w-x_off, h-y_off)
-        self.cr.paint()
+
+        # Then these are the coordinates of the rectangle to draw
+        # on the canvas.
+        self.cr.rectangle(x, y, w, h)
+
+        # Some examples use paint() instead of fill();
+        # I can't find any documentation explaining the difference,
+        # but using paint() adds black borders around the images.
+        self.cr.fill()
 
     def draw_rect_between(self, fill, x1, y1, x2, y2, color=None):
         """Draw a rectangle. between two sets of ordinates,
@@ -1448,12 +1464,14 @@ that are expected by the MapCollection classes:
 
     def draw_rectangle(self, fill, x, y, w, h, color=None):
         """Draw a rectangle."""
-        # self.drawing_area.get_window().draw_rectangle(self.xgc, fill, x, y, w, h)
         # print("draw_rectangle", x, y, w, h, fill)
+
         if color:
             self.cr.set_source_rgb(*color)
-        # cr.rectangle tends to die with TypeError: a float is required
+
+        # cr.rectangle tends to die with "TypeError: a float is required"
         self.cr.rectangle(float(x), float(y), float(w), float(h))
+
         if fill:
             self.cr.fill()
         else:
