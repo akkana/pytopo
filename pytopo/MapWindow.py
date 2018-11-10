@@ -147,21 +147,11 @@ that are expected by the MapCollection classes:
         # The timeout for long press events
         self.press_timeout = None
 
-        # Colors and fonts should of course be configurable:
-        # self.bg_color = gtk.gdk.color_parse("black")
-        # self.black_color = gtk.gdk.color_parse("black")
-        # self.white_color = gtk.gdk.color_parse("white")
-        # self.yellow_color = gtk.gdk.color_parse("yellow")
-        # self.red_color = gtk.gdk.color_parse("red")
-        # self.bg_scale_color = self.white_color
-        # self.first_track_color = gtk.gdk.color_parse("magenta")
-        # self.grid_color = gtk.gdk.color_parse("grey45")
-
         self.black_color = (0., 0., 0.)
         self.white_color = (1., 1., 1.)
         self.yellow_color = (1., 1., 0.)
         self.red_color = (1., 0., 0.)
-        self.bg_scale_color = self.white_color
+        self.bg_scale_color = (1., 1., 1., .3)
         self.first_track_color = (1., 0., 1.)
         self.grid_color = (.45, .45, .45)
 
@@ -666,7 +656,7 @@ that are expected by the MapCollection classes:
         x_center = self.win_width / 2
         y = int(self.win_height - box_height)
 
-        # Draw a white background for miles map-scale
+        # Draw a white background for both map-scales
         # self.set_color(self.bg_scale_color)
         # self.xgc.line_width = 20
         # self.draw_line(x1 - 10 - 7 - 10, y1, x2 + 10 + str_length_mi + 10, y2)
@@ -1467,7 +1457,10 @@ that are expected by the MapCollection classes:
         # print("draw_rectangle", x, y, w, h, fill)
 
         if color:
-            self.cr.set_source_rgb(*color)
+            if len(color) > 3:
+                self.cr.set_source_rgba(*color)
+            else:
+                self.cr.set_source_rgb(*color)
 
         # cr.rectangle tends to die with "TypeError: a float is required"
         self.cr.rectangle(float(x), float(y), float(w), float(h))
