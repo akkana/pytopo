@@ -81,6 +81,8 @@ class TrackPoints(object):
         self.minlat = 91
         self.maxlat = -91
 
+        self.saved_points = False
+
         self.Debug = False
 
     @staticmethod
@@ -141,16 +143,6 @@ class TrackPoints(object):
             self.waypoints.append(point)
         else:
             self.points.append(point)
-
-    def read_track_file(self, filename):
-        """Read a track file. Throw IOError if the file doesn't exist."""
-        # XXX Should read magic number rather than depending on extension
-        if filename.lower().endswith('.kml') or \
-           filename.lower().endswith('.kmz'):
-            return self.read_track_file_KML(filename)
-        elif filename.lower().endswith('json'):
-            return self.read_track_file_GeoJSON(filename)
-        return self.read_track_file_GPX(filename)
 
     def get_segment_name(self, seg):
         """See if this trkseg or trk has a <name> child.
@@ -290,6 +282,72 @@ class TrackPoints(object):
                 pt.timestamp = time.strftime('%Y-%m-%dT%H:%M:%S',
                                              time.gmtime(t))
                 t += interval
+
+    def undo(self):
+        if self.saved_points:
+            self.points = self.saved_points
+
+    def save_for_undo(self):
+        self.saved_points = self.points[:]
+
+    # For debugging: a concise way of representing all current tracks.
+    def print_tracks(self):
+        count = 0
+        curtrack = None
+        for pt in self.points:
+            if self.is_start(pt):
+                if curtrack:
+                    print("%s: %d points" % (curtrack, count))
+                count = 0
+                curtrack = pt
+            else:
+                count += 1
+        if curtrack:
+            print("%s: %d points" % (curtrack, count))
+
+    def remove_after(self, pointidx):
+        '''Remove all points after index pointidx.'''
+        self.save_for_undo()
+        nextstart = None
+        for i in range(pointidx+1, len(self.points)):
+            if self.is_start(self.points[i]):
+                nextstart = i
+                break
+        if nextstart:
+            self.points = self.points[:pointidx] + self.points[nextstart:]
+        else:
+            self.points = self.points[:pointidx]
+
+    def remove_before(self, pointidx):
+        '''Remove all points before index pointidx.'''
+        self.save_for_undo()
+        laststart = None
+
+        for i in range(pointidx+1, 0, -1):
+            if self.is_start(self.points[i]):
+                laststart = i
+                break
+
+        if laststart:
+            self.points = self.points[:laststart+1] + self.points[pointidx:]
+        else:
+            # This shouldn't happen: there should always be a track start.
+            print("Internal error, no track start")
+            self.points = [ "Track start" ] + self.points[pointidx+1:]
+
+    #
+    # Format handling, file reading and saving functions:
+    #
+
+    def read_track_file(self, filename):
+        """Read a track file. Throw IOError if the file doesn't exist."""
+        # XXX Should read magic number rather than depending on extension
+        if filename.lower().endswith('.kml') or \
+           filename.lower().endswith('.kmz'):
+            return self.read_track_file_KML(filename)
+        elif filename.lower().endswith('json'):
+            return self.read_track_file_GeoJSON(filename)
+        return self.read_track_file_GPX(filename)
 
     def save_GPX_in_region(self, start_lon, start_lat, end_lon, end_lat,
                            filename):

@@ -77,6 +77,8 @@ that are expected by the MapCollection classes:
         self.selected_track = None
         self.selected_waypoint = None
 
+        self.path_distance = 0
+
         self.win_width = 0
         self.win_height = 0
 
@@ -681,9 +683,8 @@ that are expected by the MapCollection classes:
                        label_km, str_width_km, str_height_km)
 
     def draw_zoom_control(self):
-        """Draw some zoom controls in case we're running on a tablet
-           and have no keyboard to zoom or move around.
-           Also draw any other controls we might need.
+        """Draw some large zoom controls in case we're running on a tablet
+           or phone and have no keyboard to zoom or move around.
         """
         self.zoom_btn_size = int(self.win_width / 25)
         self.zoom_X1 = 8
@@ -794,45 +795,63 @@ that are expected by the MapCollection classes:
     def context_menu(self, event):
         '''Create a context menu. This is called anew on every right-click.'''
 
+        SEPARATOR = "---"
+
+        # Labels for toggles, which change depending on whether
+        # the toggle is currently set:
+        if self.show_waypoints:
+            show_waypoint_label = "Hide waypoints"
+        else:
+            show_waypoint_label = "Show waypoints"
+        if self.drawing_track:
+            draw_track_label = "Finish drawing track"
+        else:
+            draw_track_label = "Draw a new track"
+
         contextmenu = collections.OrderedDict([
             (MapUtils.coord2str_dd(self.cur_lon, self.cur_lat),
              self.print_location),
             ("Zoom here...", self.zoom),
-            ("Go to pin...", self.set_center_to_pin),
             ("Add waypoint...", self.add_waypoint_by_mouse),
-            ("Draw a track", self.toggle_track_drawing),
+
+            ("Pins", SEPARATOR),
+            ("Go to pin...", self.set_center_to_pin),
             ("Pin this location", self.set_pin_by_mouse),
             ("Save pin location...", self.save_location),
+
+            ("Track Editing", SEPARATOR),
             ("Split track here", self.split_track_by_mouse),
+            ("Remove points before this", self.remove_before_mouse),
+            ("Remove points after this", self.remove_after_mouse),
             ("Remove this point", self.remove_trackpoint),
+            ("Undo", self.undo),
+            ("Save GPX...", self.save_all_tracks_as),
+            # ("Save Area as GPX...", self.save_area_tracks_as),
+
+            ("View", SEPARATOR),
+            (draw_track_label, self.toggle_track_drawing),
+            (show_waypoint_label, self.toggle_show_waypoints),
             ("My Locations...", self.mylocations),
             ("My Tracks...", self.mytracks),
-            ("Download Area...", self.download_area),
-            ("Show waypoints...", self.toggle_show_waypoints),
-            ("Save GPX...", self.save_all_tracks_as),
-            ("Save Area as GPX...", self.save_area_tracks_as),
+
+            ("Rest", SEPARATOR),
+            # ("Download Area...", self.download_area),
             ("Change background map", self.change_collection),
             ("Quit", self.graceful_exit)
         ])
 
         menu = gtk.Menu()
         for itemname in list(contextmenu.keys()):
+            if contextmenu[itemname] == SEPARATOR:
+                item = gtk.SeparatorMenuItem()
+                menu.append(item)
+                item.show()
+                continue
+
             item = gtk.MenuItem(itemname)
 
-            # Show/Hide waypoints changes its name since it's a toggle:
-            if contextmenu[itemname] == self.toggle_show_waypoints:
-                if self.show_waypoints:
-                    item.set_label("Hide waypoints...")
-                item.connect("activate", contextmenu[itemname])
-
-            # Likewise for Toggle track drawing
-            if contextmenu[itemname] == self.toggle_track_drawing:
-                if self.drawing_track:
-                    item.set_label("Finish drawing track")
-                item.connect("activate", contextmenu[itemname])
-
             # Change background map gives a submenu of available collections.
-            elif itemname == "Change background map":
+            if itemname == "Change background map":
                 submenu = gtk.Menu()
                 for coll in self.controller.collections:
                     subitem = gtk.MenuItem(coll.name)
@@ -1014,24 +1033,48 @@ that are expected by the MapCollection classes:
 
         self.trackpoints.save_GPX(outfile)
 
+    def undo(self, widget=None):
+        self.trackpoints.undo()
+        self.draw_map()
+
+    def remove_before_mouse(self, widget):
+        self.mod_track_by_mouse(remove = -1)
+
+    def remove_after_mouse(self, widget):
+        self.mod_track_by_mouse(remove = 1)
+
     def split_track_by_mouse(self, widget):
-        """Split a track at the current mouse location."""
+        self.mod_track_by_mouse(remove = 0)
+
+    def mod_track_by_mouse(self, remove=0):
+        """Split or modify a track at the current mouse location.
+           If remove is negative, remove all points in the current track
+           before the current one. If positive, remove all points after.
+           If remove is zero, split the track into two tracks.
+        """
 
         self.draw_map()
         near_track, near_point, near_waypoint = \
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
         if near_point is not None:
-            # Make a name for the new track segment
-            trackname = self.trackpoints.points[near_track]
-            match = re.search('(.*) (\d+)$', trackname)
-            if match:
-                trackname = "%s %d" % (match.group(1), int(match.group(2)) + 1)
+            if remove > 0:
+                # Remove all points after:
+                self.trackpoints.remove_after(near_point)
+            elif remove < 0:
+                # Remove all points before:
+                self.trackpoints.remove_before(near_point)
             else:
-                trackname += " 2"
+                # Split the track. Make a name for the new track segment:
+                trackname = self.trackpoints.points[near_track]
+                match = re.search('(.*) (\d+)$', trackname)
+                if match:
+                    trackname = "%s %d" % (match.group(1), int(match.group(2)) + 1)
+                else:
+                    trackname += " 2"
 
-            # Split the track there
-            self.trackpoints.points.insert(near_point, trackname)
+                # Split the track there
+                self.trackpoints.points.insert(near_point, trackname)
 
         self.draw_map()
 
@@ -1658,6 +1701,9 @@ that are expected by the MapCollection classes:
         elif event.keyval == gtk.keysyms.q and \
                 event.state == gtk.gdk.CONTROL_MASK:
             self.graceful_exit()
+        elif event.keyval == gtk.keysyms.z and \
+                event.state == gtk.gdk.CONTROL_MASK:
+            self.undo()
         # m pops up a window to choose a point
         elif event.string == "m":
             if self.selection_window():
@@ -1896,11 +1942,14 @@ that are expected by the MapCollection classes:
                     dist2 = MapUtils.haversine_distance(self.click_last_lat,
                                                         self.click_last_long,
                                                         cur_lat, cur_long)
+                    self.path_distance += dist
                     if self.use_metric:
                         print("Distance: %.2f km" % dist)
+                        print("Total distance: %.2f km" % self.path_distance)
                     else:
                         print("Distance: %.2f mi" % (dist / 1.609))
                         print("Haversine Distance: %.2f mi" % dist2)
+                        print("Total distance: %.2f mi" % self.path_distance)
 
                     # Now calculate bearing. I don't know how accurate this is.
                     xdiff = (cur_long - self.click_last_long)
