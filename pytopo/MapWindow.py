@@ -274,8 +274,9 @@ that are expected by the MapCollection classes:
             label = "Track: " + self.trackpoints.points[self.selected_track]
             if stats:
                 label += "\n%.1f %s" % (stats['Total distance'], dist_units)
-                label += "\nClimb: %d%s" % (stats['Smoothed total climb'],
-                                            climb_units)
+                if stats['Smoothed total climb']:
+                    label += "\nClimb: %d%s" % (stats['Smoothed total climb'],
+                                                climb_units)
             self.draw_label(label, -15, 15, self.yellow_color,
                             dropshadow=True)
 

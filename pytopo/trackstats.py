@@ -90,8 +90,6 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         except:
             t = None
             print("Some points don't have times! Can't calculate speed")
-            # Too much of the rest of the code depends on speed. Bail.
-            return
 
         lat =  float(lat)
         lon = float(lon)
@@ -106,30 +104,38 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
             lasttime = t
             continue
 
-        delta_t = t - lasttime   # a datetime.timedelta object
+        if t:
+            delta_t = t - lasttime   # a datetime.timedelta object
+        else:
+            delta_t = datetime.timedelta(0)
 
-        # Our speed and distance calculation isn't accurate.
+        speed = 0
+        dist = 0
+
+        # This speed and distance calculation isn't terribly accurate.
         # If there's a GPS speed recorded, use that and the
         # time interval for distance calculations.
         if pt.attrs and 'speed' in pt.attrs:
             speed = float(pt.attrs['speed'])    # in m/s
-            dist = speed * delta_t.seconds
-            # This is in meters/s. Convert to mi/hr or km/hr.
-            if metric:
-                dist /= 1000.
-                speed *= 3.6
-            else:
-                dist /= 1609.344
-                speed *= 2.2369363
+            if delta_t:
+                dist = speed * delta_t.seconds
+                # This is in meters/s. Convert to mi/hr or km/hr.
+                if metric:
+                    dist /= 1000.
+                    speed *= 3.6
+                else:
+                    dist /= 1609.344
+                    speed *= 2.2369363
 
-        else:
-            dist = MapUtils.haversine_distance(lat, lon, lastlat, lastlon, metric)
-            speed = dist / delta_t.seconds * 60 * 60    # miles (or km) / hour
+        if dist == 0:
+            dist = MapUtils.haversine_distance(lat, lon,
+                                               lastlat, lastlon, metric)
+            if delta_t:
+                speed = dist / delta_t.seconds * 60 * 60   # miles (or km) / hr
 
-        if speed > SPEED_THRESHOLD:
+        if speed > SPEED_THRESHOLD or not delta_t:
             total_dist += dist
             moving_time += delta_t
-            #print "moving\t",
 
             lasttime = t
             lastlat = lat
@@ -164,7 +170,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         = tot_climb(smoothed_eles)
     out['Moving time'] = moving_time.seconds
     out['Stopped time'] = stopped_time.seconds
-    out['Average moving speed'] = total_dist * 60 * 60 / moving_time.seconds
+    if moving_time:
+        out['Average moving speed'] = total_dist * 60 * 60 / moving_time.seconds
     out['Distances'] = distances
     out['Elevations'] = eles
     out['Smoothed elevations'] = smoothed_eles
