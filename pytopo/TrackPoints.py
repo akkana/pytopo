@@ -20,7 +20,11 @@ class GeoPoint(object):
     """A single track point or waypoint."""
     # Note: GPX files imported from KML may have no timestamps.
     # lat and lon are floats; the rest are strings.
-    # If you need to add them, see add_bogus_timestamps.
+    # At least from GPX format,
+    # ele is a string representing elevation in meters;
+    # timestamp is an string like 2014-08-07T01:19:24Z.
+    # If you need to add timestamps, see add_bogus_timestamps.
+    # attrs is an optional list of other attributes like hdop and speed.
     def __init__(self, lat, lon, ele=None,
                  name=False, timestamp=None, attrs=None):
         self.lat = lat
@@ -215,8 +219,9 @@ class TrackPoints(object):
             self.waypoints.append(first_segment_name)
             for pt in waypts:
                 lat, lon, ele, time, attrs = self.GPX_point_coords(pt)
-                name = "WP"
                 name = self.get_DOM_text(pt, "name")
+                if not name:
+                    name = "WP"
                 self.handle_track_point(lat, lon, ele=ele, timestamp=time,
                                         waypoint_name=name, attrs=attrs)
 
@@ -227,18 +232,21 @@ class TrackPoints(object):
            Or, if childname is specified, get the text out of a child
            node with node name childname.
         '''
-        # print "get_DOM_text", node
         if childname:
             nodes = node.getElementsByTagName(childname)
-            # print "node has", len(nodes), childname, "children"
             if not nodes:
                 return None
             node = nodes[0]
         if not node:
             return None
         n = node.childNodes
-        if len(n) >= 1 and n[0].nodeType == n[0].TEXT_NODE:
+        if len(n) < 1:
+            return None
+
+        if n[0].nodeType == n[0].TEXT_NODE or \
+           n[0].nodeType == n[0].CDATA_SECTION_NODE:
             return n[0].data
+
         return None
 
     def GPX_point_coords(self, pointnode):

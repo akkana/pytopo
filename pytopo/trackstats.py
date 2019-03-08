@@ -85,7 +85,14 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
 
         lat, lon, ele, t = pt.lat, pt.lon, pt.ele, pt.timestamp
 
-        t = datetime.datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ')
+        try:
+            t = datetime.datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ')
+        except:
+            t = None
+            print("Some points don't have times! Can't calculate speed")
+            # Too much of the rest of the code depends on speed. Bail.
+            return
+
         lat =  float(lat)
         lon = float(lon)
         if metric:

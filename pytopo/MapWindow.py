@@ -272,9 +272,10 @@ that are expected by the MapCollection classes:
             climb_units = 'm' if metric else "'"
             dist_units = 'km' if metric else 'mi'
             label = "Track: " + self.trackpoints.points[self.selected_track]
-            label += "\n%.1f %s" % (stats['Total distance'], dist_units)
-            label += "\nClimb: %d%s" % (stats['Smoothed total climb'],
-                                        climb_units)
+            if stats:
+                label += "\n%.1f %s" % (stats['Total distance'], dist_units)
+                label += "\nClimb: %d%s" % (stats['Smoothed total climb'],
+                                            climb_units)
             self.draw_label(label, -15, 15, self.yellow_color,
                             dropshadow=True)
 
