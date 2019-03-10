@@ -45,6 +45,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     eles = [ ]
     distances = [ ]
 
+    missing_times = False
+
     # Accumulators:
     lastlat = 0
     lastlon = 0
@@ -89,7 +91,7 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
             t = datetime.datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ')
         except:
             t = None
-            print("Some points don't have times! Can't calculate speed")
+            missing_times = True
 
         lat =  float(lat)
         lon = float(lon)
@@ -162,6 +164,9 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         halfwin = 15
 
     smoothed_eles = smooth(eles, halfwin, beta)
+
+    if missing_times:
+        print("Some points don't have times! Can't calculate speed")
 
     out = {}
     out['Total distance'] = total_dist
