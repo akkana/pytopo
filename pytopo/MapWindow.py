@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2016 by Akkana Peck.
+# Copyright (C) 2009-2019 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -84,6 +84,10 @@ that are expected by the MapCollection classes:
 
         self.prompt_dialog = None
         self.traildialog = None
+
+        # Following a GPS device? Not until one is set.
+        self.gps_poller = None
+        self.last_gpsd = None
 
         # Try to find the pytopo.pin image.
         try:
@@ -171,6 +175,12 @@ that are expected by the MapCollection classes:
         settings = gtk.settings_get_default()
         settings.set_property("gtk-touchscreen-mode", True)
 
+        # Some defaults that hopefully will never be used
+        self.zoom_btn_size = 25
+        self.zoom_X1 = 8
+        self.zoom_in_Y1 = 10
+        self.zoom_out_Y1 = self.zoom_in_Y1 + self.zoom_btn_size * 2
+
     def show_window(self, init_width, init_height):
         """Create the initial window."""
         win = gtk.Window()
@@ -224,13 +234,35 @@ that are expected by the MapCollection classes:
 
         win.show_all()
 
+        if self.gps_poller:
+            gobject.threads_init()
+
         gtk.main()
+
+
+    def gpsd_callback(self, gpsd):
+        # gpsd.fix.mode is 1 if no fix, 2 for a 2d fix, 3 for a 3d fix.
+        # mentioned in passing on http://www.catb.org/gpsd/client-howto.html
+        if gpsd and gpsd.fix.mode > 1:
+            self.last_gpsd = gpsd
+            gobject.idle_add(self.update_position_from_GPS)
+
+    def update_position_from_GPS(self):
+        if not self.last_gpsd:
+            print("No last_gpsd")    # shouldn't get here
+            return
+
+        self.center_lon = self.last_gpsd.fix.longitude
+        self.center_lat = self.last_gpsd.fix.latitude
+        self.draw_map()
 
     #
     # Draw maplets to fill the window, centered at center_lon, center_lat
     #
     def draw_map(self):
         """Redraw the map, centered at center_lon, center_lat."""
+
+        # If waiting for GPS, don't draw anything yet:
 
         if self.collection is None:
             print("No collection!")
@@ -243,6 +275,13 @@ that are expected by the MapCollection classes:
 
         self.win_width, self.win_height = \
             self.drawing_area.get_window().get_geometry()[2:4]
+
+        # If we're in follow GPS mode and don't yet have center lat, lon,
+        # display a message:
+        if self.gps_poller and not self.last_gpsd:
+            self.draw_label("Waiting for GPS fix ...", 10, self.win_height/2,
+                            color=self.black_color, dropshadow=False)
+            return
 
         # XXX Collection.draw_map wants center, but we only have lower right.
         if self.controller.Debug:
@@ -1989,6 +2028,11 @@ that are expected by the MapCollection classes:
         """Clean up the window and exit.
            The "extra" argument is so it can be calld from GTK callbacks.
         """
+        # Try to stop any GPS thread
+        if self.gps_poller:
+            print("Stopping GPS poller")
+            self.gps_poller.stopGPS()
+
         self.controller.save_sites()    # save any new sites/tracks
 
         gtk.main_quit()

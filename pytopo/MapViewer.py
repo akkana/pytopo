@@ -72,6 +72,9 @@ Usage: pytopo
        pytopo -r :     re-download all map tiles
        pytopo -h :     print this message
 
+Other flags:
+       -g: follow a GPS if available
+
 With no arguments, will display a list of known sites.
 
 Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
@@ -293,6 +296,17 @@ Shift-click in the map to print the coordinates of the clicked location.
                 #    series = 15
                 elif args[0] == "-p":
                     self.print_sites()
+
+                elif args[0] == "-g":
+                    try:
+                        from gpsdPoller import GpsdPoller
+                        # mapwin.gps_poller = GpsdPoller(10, self.gps_poll)
+                        mapwin.gps_poller = GpsdPoller(10, mapwin.gpsd_callback)
+                    except ImportError as e:
+                        print("Can't follow GPS")
+                        print(str(e))
+                        mapwin.gps_poller = None
+
                 elif args[0] == "-c":
                     # Specify a collection:
                     if len(args) < 2:
@@ -440,8 +454,13 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
         if mapwin.collection and mapwin.center_lon and mapwin.center_lat:
             return
 
+        # If we're following GPS, it's okay if we don't have center coords yet;
+        # the mapwin will wait for a fix.
+        if mapwin.collection and mapwin.gps_poller:
+            return
+
         # Didn't match any known run mode:
-        # start in GUI mode choosing a location:
+        # start in selector mode to choose a location:
         if not mapwin.selection_window():
             sys.exit(0)
 
