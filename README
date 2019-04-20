@@ -12,15 +12,26 @@ It can also display GPX, KML or KMZ track logs, and can measure
 distances and angles between points or give you the coordinates of
 a point.
 
-It uses PyGTK for its user interface, so you will need to PyGTK.
+It uses PyGTK for its user interface, so you will need PyGTK.
 Linux users can get it through their distro, or by compiling from source;
-Windows users can install it from pip. I don't have a good answer for
-Mac users; possibly the easiest solution is to install GIMP (follow
+on Debian or Raspbian, you'll probably need the following packages
+and their dependencies:
+```
+sudo apt-get install python-gi python-gi-cairo gir1.2-gtk-3.0 \
+                     python-simplejson python-pkg-resources
+```
+Windows users should be able to install these packages from pip.
+Mac users can get most of them from pip, but I don't have a good answer for
+PyGTK on Mac; possibly the easiest solution is to install GIMP (follow
 the install links from https://gimp.org) then munge paths so that
 other programs can find the PyGTK that comes with GIMP.
 
-You can install it with pip install pytopo.
-Or run it from the project directory by running pytopo/MapViewer.py
+If you want to read from gpsd, you'll also need python-gps.
+
+You can install it with ```pip install pytopo```
+(but it doesn't handle the GTK requirement because PyGTK in pip is
+broken on Linux and Mac).
+Or run it from the project directory by running ```pytopo/MapViewer.py```
 if you have the pytopo directory in your PYTHONPATH.
 But if you want to see pin images, create a directory
 /usr/share/pytopo and copy pytopo-pin.png into it.
