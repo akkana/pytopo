@@ -299,12 +299,19 @@ Shift-click in the map to print the coordinates of the clicked location.
 
                 elif args[0] == "-g":
                     try:
+                        import socket
                         from gpsdPoller import GpsdPoller
                         # mapwin.gps_poller = GpsdPoller(10, self.gps_poll)
                         mapwin.gps_poller = GpsdPoller(10, mapwin.gpsd_callback)
                     except ImportError as e:
-                        print("Can't follow GPS")
                         print(str(e))
+                        print()
+                        print("Can't follow GPS: python-gps isn't installed")
+                        mapwin.gps_poller = None
+                    except socket.error as e:
+                        print(str(e))
+                        print()
+                        print("Can't follow GPS: can't open GPS device")
                         mapwin.gps_poller = None
 
                 elif args[0] == "-c":
