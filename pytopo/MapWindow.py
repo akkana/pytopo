@@ -19,12 +19,14 @@ from . import trackstats
 
 import os
 import re
+
 try:
     # Python 3:
-    import urllib.request, urllib.parse, urllib.error
+    from urllib.request import urlretrieve
 except ImportError:
     # Python 2:
-    import urllib
+    from urllib import urlretrieve
+
 import math
 import collections
 
@@ -157,6 +159,7 @@ that are expected by the MapCollection classes:
         self.white_color = (1., 1., 1.)
         self.yellow_color = (1., 1., 0.)
         self.red_color = (1., 0., 0.)
+        self.blue_color = (0., 0., 1.)
         self.bg_scale_color = (1., 1., 1., .3)
         self.first_track_color = (1., 0., 1.)
         self.grid_color = (.45, .45, .45)
@@ -335,6 +338,18 @@ that are expected by the MapCollection classes:
         if self.pin:
             self.draw_pixbuf(self.pin, 0, 0, pin_x + self.pin_xoff,
                              pin_y + self.pin_yoff, -1, -1)
+
+        # draw GPS location
+        if self.last_gpsd and self.last_gpsd.fix:
+            gps_x, gps_y = self.coords2xy(self.last_gpsd.fix.longitude,
+                                          self.last_gpsd.fix.latitude,
+                                          self.win_width, self.win_height)
+
+            self.draw_circle(fill, xc, yc, 20, self.blue_color)
+            # self.draw_pixbuf(self.gps_marker, 0, 0,
+            #                  pin_x + self.gps_marker_xoff,
+            #                  pin_y + self.gps_marker_yoff,
+            #                  -1, -1)
 
         self.draw_map_scale()
 
@@ -876,7 +891,7 @@ that are expected by the MapCollection classes:
             ("My Tracks...", self.mytracks),
 
             ("Rest", SEPARATOR),
-            # ("Download Area...", self.download_area),
+            ("Download Area...", self.download_area),
             ("Change background map", self.change_collection),
             ("Quit", self.graceful_exit)
         ])
@@ -1264,7 +1279,8 @@ that are expected by the MapCollection classes:
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
         # dialog.set_size_request(200, 150)
         # dialog.vbox.set_spacing(10)
-        frame = gtk.Frame("Current zoom = %d" % self.collection.zoomlevel)
+        frame = gtk.Frame()
+        frame.label = "Current zoom = %d" % self.collection.zoomlevel
         dialog.vbox.pack_start(frame, True, True, 0)
 
         table = gtk.Table(4, 3, False)
@@ -1329,7 +1345,7 @@ that are expected by the MapCollection classes:
 
         def flush_events():
             while gtk.events_pending():
-                gtk.main_iteration(False)
+                gtk.main_iteration()
 
         def reset_download_dialog():
             minlon_entry.set_text(str(minlon))
@@ -1447,7 +1463,7 @@ that are expected by the MapCollection classes:
                          num_downloaded, numtiles))
                 progress_label.set_text("%d: %s" % (num_downloaded, url))
                 flush_events()
-                urllib.request.urlretrieve(url, filename)
+                urlretrieve(url, filename)
                 num_downloaded += 1
 
                 # XXX should show progress more graphically.
@@ -1538,8 +1554,10 @@ that are expected by the MapCollection classes:
         self.cr.line_to(x2, y2)
         self.cr.stroke()
 
-    def draw_circle(self, fill, xc, yc, r):
+    def draw_circle(self, fill, xc, yc, r, color=None):
         """Draw a circle, filled or not, centered at xc, yc with radius r."""
+        if color:
+            self.cr.set_source_rgb(*color)
         self.drawing_area.get_window().draw_arc(self.xgc, fill, xc - r, yc - 4,
                                           r * 2, r * 2, 0, 23040)  # 64 * 360
 
