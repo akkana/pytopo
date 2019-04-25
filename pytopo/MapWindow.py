@@ -345,7 +345,7 @@ that are expected by the MapCollection classes:
                                           self.last_gpsd.fix.latitude,
                                           self.win_width, self.win_height)
 
-            self.draw_circle(fill, xc, yc, 20, self.blue_color)
+            self.draw_circle(True, gps_x, gps_y, 10, self.blue_color)
             # self.draw_pixbuf(self.gps_marker, 0, 0,
             #                  pin_x + self.gps_marker_xoff,
             #                  pin_y + self.gps_marker_yoff,
@@ -1558,8 +1558,10 @@ that are expected by the MapCollection classes:
         """Draw a circle, filled or not, centered at xc, yc with radius r."""
         if color:
             self.cr.set_source_rgb(*color)
-        self.drawing_area.get_window().draw_arc(self.xgc, fill, xc - r, yc - 4,
-                                          r * 2, r * 2, 0, 23040)  # 64 * 360
+        self.cr.arc(xc, yc, r, 0, 2*math.pi)
+        self.cr.stroke_preserve()
+        if fill:
+            self.cr.fill()
 
     def draw_label(self, labelstring, x, y, color=None, dropshadow=True,
                    font=None, offsets=None):
