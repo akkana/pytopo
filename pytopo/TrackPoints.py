@@ -148,6 +148,13 @@ class TrackPoints(object):
         else:
             self.points.append(point)
 
+    def inside_box(self, pt, bb):
+        '''Is the point inside the given bounding box?
+           Bounding box is (min_lon, min_lat, max_lon, max_lat).
+        '''
+        return (pt.lon >= bb[0] and pt.lon <= bb[2] and
+                pt.lat >= bb[1] and pt.lat <= bb[3])
+
     def get_segment_name(self, seg):
         """See if this trkseg or trk has a <name> child.
            If so, return the text out of it, else None.
@@ -161,13 +168,6 @@ class TrackPoints(object):
             return trkname[0].firstChild.wholeText
         return None
 
-    def inside_box(self, pt, bb):
-        '''Is the point inside the given bounding box?
-           Bounding box is (min_lon, min_lat, max_lon, max_lat).
-        '''
-        return (pt.lon >= bb[0] and pt.lon <= bb[2] and
-                pt.lat >= bb[1] and pt.lat <= bb[3])
-
     def read_track_file_GPX(self, filename):
         """Read a GPX track file. Throw IOError if the file doesn't exist."""
 
@@ -177,46 +177,50 @@ class TrackPoints(object):
         if self.Debug:
             print("Reading track file", filename)
         dom = xml.dom.minidom.parse(filename)
-        first_segment_name = None
 
-        # Handle track(s).
-        segs = dom.getElementsByTagName("trkseg")
-        for seg in segs:
-            trkpts = seg.getElementsByTagName("trkpt")
+        # Handle track(s) and routes:
+        def handle_track(segname, ptname):
+            first_segment_name = None
+            segs = dom.getElementsByTagName(segname)
+            for seg in segs:
+                trkpts = seg.getElementsByTagName(ptname)
 
-            # need to keep different track files and segments separate: don't
-            # draw lines from the end of a track to the beginning of the next.
-            if trkpts:
-                # See if the segment itself has a name
-                segname = self.get_segment_name(seg)
-                # See if the parent track has a name.
-                trk = seg
-                while trk.nodeName != "trk":
-                    trk = trk.parentNode
-                trkname = self.get_segment_name(trk)
-                if trkname and segname:
-                    self.points.append(trkname + ':' + segname)
-                elif segname:
-                    self.points.append(segname)
-                elif trkname:
-                    self.points.append(trkname)
-                else:
-                    self.points.append(os.path.basename(filename))
-                if not first_segment_name:
-                    first_segment_name = self.points[-1]
+                # need to keep different track files and segments
+                # separate: don't draw lines from the end of a track
+                # to the beginning of the next.
+                if trkpts:
+                    # See if the segment itself has a name
+                    segname = self.get_segment_name(seg)
+                    # See if the parent track has a name.
+                    trk = seg
+                    while trk.nodeName != "trk" and trk.nodeName != "rte":
+                        trk = trk.parentNode
+                    trkname = self.get_segment_name(trk)
+                    if trkname and segname:
+                        self.points.append(trkname + ':' + segname)
+                    elif segname:
+                        self.points.append(segname)
+                    elif trkname:
+                        self.points.append(trkname)
+                    else:
+                        self.points.append(os.path.basename(filename))
+                    if not first_segment_name:
+                        first_segment_name = self.points[-1]
 
-                for pt in trkpts:
-                    lat, lon, ele, ts, attrs = self.GPX_point_coords(pt)
-                    "GPX_point_coords returned", lat, lon, ele, ts, attrs
-                    self.handle_track_point(lat, lon, ele=ele, timestamp=ts,
-                                            attrs=attrs)
+                    for pt in trkpts:
+                        lat, lon, ele, ts, attrs = self.GPX_point_coords(pt)
+                        "GPX_point_coords returned", lat, lon, ele, ts, attrs
+                        self.handle_track_point(lat, lon, ele=ele, timestamp=ts,
+                                                attrs=attrs)
+
+        handle_track("trkseg", "trkpt")
+        handle_track("rte", "rtept")
 
         # Handle waypoints
+        first_segment_name = None
         waypts = dom.getElementsByTagName("wpt")
         if waypts:
-            if not first_segment_name:
-                first_segment_name = os.path.basename(filename)
-            self.waypoints.append(first_segment_name)
+            self.waypoints.append(os.path.basename(filename))
             for pt in waypts:
                 lat, lon, ele, time, attrs = self.GPX_point_coords(pt)
                 name = self.get_DOM_text(pt, "name")
@@ -353,9 +357,14 @@ class TrackPoints(object):
         if filename.lower().endswith('.kml') or \
            filename.lower().endswith('.kmz'):
             return self.read_track_file_KML(filename)
-        elif filename.lower().endswith('json'):
+        elif filename.lower().endswith('.json'):
             return self.read_track_file_GeoJSON(filename)
-        return self.read_track_file_GPX(filename)
+        elif filename.lower().endswith('.gpx'):
+            return self.read_track_file_GPX(filename)
+        else:
+            raise(RuntimeError("Track file %s doesn't end in "
+                               ".gpx, .kml, .kmz or .json"
+                               % filename))
 
     def save_GPX_in_region(self, start_lon, start_lat, end_lon, end_lat,
                            filename):

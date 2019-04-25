@@ -365,10 +365,11 @@ Shift-click in the map to print the coordinates of the clicked location.
                 continue
 
             # args[0] doesn't start with '-'. Is it a track file?
-            if args[0].endswith(".gpx") \
-               or args[0].endswith(".kml") \
-               or args[0].endswith(".kmz") \
-               or args[0].endswith("json"):
+            lowerarg = args[0].lower()
+            if lowerarg.endswith(".gpx") \
+               or lowerarg.endswith(".kml") \
+               or lowerarg.endswith(".kmz") \
+               or lowerarg.endswith("json"):
                 try:
                     if mapwin.trackpoints:
                         mapwin.trackpoints.read_track_file(args[0])
@@ -376,12 +377,12 @@ Shift-click in the map to print the coordinates of the clicked location.
                         trackpoints = TrackPoints()
                         trackpoints.read_track_file(args[0])
                         mapwin.trackpoints = trackpoints
-                except IOError:
+                except (IOError, RuntimeError):
                     print("Can't read track file", args[0])
                 except xml.parsers.expat.ExpatError:
                     print("Can't read %s: syntax error." % args[0])
-                    if args[0].lower().endswith(".kml") or \
-                       args[0].lower().endswith(".kmz"):
+                    if lowerarg.endswith(".kml") or \
+                       lowerarg.endswith(".kmz"):
                         print("""
 Is this a KML made with ArcGIS?
 It may have an illegal xsi:schemaLocation.
