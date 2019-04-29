@@ -1039,7 +1039,7 @@ that are expected by the MapCollection classes:
                                                 gtk.RESPONSE_CANCEL,
                                                 gtk.STOCK_SAVE,
                                                 gtk.RESPONSE_OK))
-        dialog.set_current_folder(self.controller.config_dir)
+        # dialog.set_current_folder(self.controller.config_dir)
         filt = gtk.FileFilter()
         filt.set_name("GPX Files")
         filt.add_pattern("*.gpx")
@@ -1996,6 +1996,7 @@ that are expected by the MapCollection classes:
 
             # Find angle and distance since last click.
             if self.controller.Debug or event.state & gtk.gdk.SHIFT_MASK:
+                print("Shift click")
                 if self.click_last_long != 0 and self.click_last_lat != 0:
                     dist = MapUtils.distance_on_unit_sphere(self.click_last_lat,
                                                            self.click_last_long,
