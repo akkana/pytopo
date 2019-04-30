@@ -44,6 +44,8 @@ import colorsys
 
 import traceback
 
+GPS_MARKER_RADIUS=10
+
 
 class MapWindow(object):
 
@@ -90,6 +92,7 @@ that are expected by the MapCollection classes:
         # Following a GPS device? Not until one is set.
         self.gps_poller = None
         self.last_gpsd = None
+        self.gps_centered = True
 
         # Try to find the pytopo.pin image.
         try:
@@ -255,8 +258,10 @@ that are expected by the MapCollection classes:
             print("No last_gpsd")    # shouldn't get here
             return
 
-        self.center_lon = self.last_gpsd.fix.longitude
-        self.center_lat = self.last_gpsd.fix.latitude
+        if self.gps_centered:
+            self.center_lon = self.last_gpsd.fix.longitude
+            self.center_lat = self.last_gpsd.fix.latitude
+
         self.draw_map()
 
     #
@@ -345,7 +350,8 @@ that are expected by the MapCollection classes:
                                           self.last_gpsd.fix.latitude,
                                           self.win_width, self.win_height)
 
-            self.draw_circle(True, gps_x, gps_y, 10, self.blue_color)
+            self.draw_circle(True, gps_x, gps_y, GPS_MARKER_RADIUS,
+                             self.blue_color)
             # self.draw_pixbuf(self.gps_marker, 0, 0,
             #                  pin_x + self.gps_marker_xoff,
             #                  pin_y + self.gps_marker_yoff,
@@ -777,7 +783,6 @@ that are expected by the MapCollection classes:
 
     def was_click_in_zoom(self, x, y):
         """Do the coordinates fall within the zoom in or out buttons?
-           Returns 0 for none, 1 for zoom in, -1 for zoom out.
         """
         if x < self.zoom_X1 or x > self.zoom_X1 + self.zoom_btn_size:
             return 0
@@ -789,6 +794,17 @@ that are expected by the MapCollection classes:
             return -1
         # Must be between buttons
         return 0
+
+    def was_click_in_gps(self, event_x, event_y):
+        """Was the click over the blue GPS circle? True or False.
+        """
+        if not self.last_gpsd or not self.last_gpsd.fix:
+            return False
+        gps_x, gps_y = self.coords2xy(self.last_gpsd.fix.longitude,
+                                      self.last_gpsd.fix.latitude,
+                                      self.win_width, self.win_height)
+        return (abs(event_x - gps_x) < GPS_MARKER_RADIUS and
+                abs(event_y - gps_y) < GPS_MARKER_RADIUS)
 
     def print_location(self, widget=None):
         print("%30s     (decimal degrees)" % \
@@ -1745,17 +1761,22 @@ that are expected by the MapCollection classes:
         elif event.keyval == gtk.keysyms.Left:
             self.center_lon -= \
                 float(self.collection.img_width) / self.collection.xscale
+            self.gps_centered = False
         elif event.keyval == gtk.keysyms.Right:
             self.center_lon += \
                 float(self.collection.img_width) / self.collection.xscale
+            self.gps_centered = False
         elif event.keyval == gtk.keysyms.Up:
             self.center_lat += \
                 float(self.collection.img_height) / self.collection.yscale
+            self.gps_centered = False
         elif event.keyval == gtk.keysyms.Down:
             self.center_lat -= \
                 float(self.collection.img_height) / self.collection.yscale
+            self.gps_centered = False
         elif event.keyval == gtk.keysyms.space:
             self.set_center_to_pin(None)
+            self.gps_centered = False
         elif event.keyval == gtk.keysyms.l and \
                 event.state == gtk.gdk.CONTROL_MASK:
             pass    # Just fall through to draw_map()
@@ -1851,6 +1872,7 @@ that are expected by the MapCollection classes:
             self.y_last_drag = y
             return True
 
+        self.gps_centered = False
         self.move_to(x, y, widget)
         return True
 
@@ -1983,6 +2005,16 @@ that are expected by the MapCollection classes:
                                                      'zoomlevel'):
                     print("zoomed to", self.collection.zoomlevel)
                 self.draw_map()
+                return True
+
+            # Clicking on the blue GPS circle toggles following GPS,
+            # and recenters on the GPS position if there is one.
+            if  self.was_click_in_gps(event.x, event.y):
+                self.gps_centered = not self.gps_centered
+                if self.gps_centered and self.last_gpsd and self.last_gpsd.fix:
+                    self.center_lon = self.last_gpsd.fix.longitude
+                    self.center_lat = self.last_gpsd.fix.latitude
+                    self.draw_map()
                 return True
 
             # Is this needed for anything?
