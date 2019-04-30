@@ -69,9 +69,25 @@ class MapUtils:
         minutes = cls.truncate2frac(minutes, .01)
         return sgnstr + str(deg) + "^" + str(minutes) + "'"
 
-    @classmethod
-    def angle_to_bearing(cls, angle):
-        return (450 - angle) % 360
+    @staticmethod
+    def bearing(lat1, lon1, lat2, lon2):
+        '''Bearing from wp1 to wp2.'''
+        # Python's trig functions take radians, not degrees
+        lat1 = math.radians(lat1)
+        lon1 = math.radians(lon1)
+        lat2 = math.radians(lat2)
+        lon2 = math.radians(lon2)
+
+        # https://www.movable-type.co.uk/scripts/latlong.html
+        # Don't trust any code you find for this: test it extensively;
+        # most posted bearing finding code is bogus.
+        y = math.sin(lon2 - lon1) * math.cos(lat2)
+        x = math.cos(lat1) * math.sin(lat2) - \
+            math.sin(lat1) * math.cos(lat2) * math.cos(lon2-lon1)
+
+        # Convert back to degrees and make it positive between 0 and 360
+        brng = math.degrees(math.atan2(y, x)) % 360
+        return brng
 
     # Convert an angle (deg) to the appropriate quadrant string, e.g. N 57 E.
     @classmethod

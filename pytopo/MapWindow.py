@@ -2013,11 +2013,11 @@ that are expected by the MapCollection classes:
                         print("Haversine Distance: %.2f mi" % dist2)
                         print("Total distance: %.2f mi" % self.path_distance)
 
-                    # Now calculate bearing. I don't know how accurate this is.
-                    xdiff = (cur_long - self.click_last_long)
-                    ydiff = (cur_lat - self.click_last_lat)
-                    angle = int(math.atan2(-ydiff, -xdiff) * 180 / math.pi)
-                    angle = MapUtils.angle_to_bearing(angle)
+                    # Now calculate bearing.
+                    print("Calculating bearing")
+                    angle = MapUtils.bearing(self.click_last_lat,
+                                             self.click_last_long,
+                                             cur_lat, cur_long)
                     print("Bearing:", angle, "=", \
                         MapUtils.angle_to_quadrant(angle))
 
