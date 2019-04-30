@@ -11,7 +11,7 @@ def read(fname):
 
 def get_version():
     '''Read the pytopo module versions from pytopo/__init__.py'''
-    return "1.5b2"
+    return "1.6"
     with open("pytopo/__init__.py") as fp:
         for line in fp:
             line = line.strip()

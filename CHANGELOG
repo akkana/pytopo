@@ -1,3 +1,17 @@
+2019-04-30  Akkana Peck <akkana@shallowsky.com>
+	1.6 b1: Add basic GPS/gpsd support.
+	Better bearing calculations.
+	Re-enable Download Area.
+	Read routes from GPX files; some other improvements in GPX file reading.
+
+2018-12-13  Akkana Peck <akkana@shallowsky.com>
+	Python3/GTK3/Cairo improvements using pygtkcompat.
+	Path editing improvements.
+
+2018-09-03  Akkana Peck <akkana@shallowsky.com>
+	Show distance and elevation for selected tracks.
+	Redraw overlays after drawing each map tile.
+
 2017-07-17  Akkana Peck <akkana@shallowsky.com>
 	1.5b2:
 	* Integrate Marco Duiker's argparse and metric changes.
