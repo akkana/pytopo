@@ -405,23 +405,13 @@ that are expected by the MapCollection classes:
             y = int((self.center_lat - pt.lat) * self.collection.yscale
                     + self.win_height / 2)
 
-            def on_screen(x, y):
-                if not x or not y:
-                    return False
-                return (x >= 0 and x < self.win_width and
-                        y >= 0 and y < self.win_height)
-
-            if on_screen(x, y):
-                if on_screen(cur_x, cur_y):
-                    self.draw_line(cur_x, cur_y, x, y)
-                cur_x = x
-                cur_y = y
-            else:
-                # It's off the screen. Skip it.
-                # print "Skipping", pt.lon, pt.lat, \
-                #    ": would be", x, ",", y
-                cur_x = None
-                cur_y = None
+            # Call draw_line whether or not the point is visible;
+            # even with one or both endpoints off screen, some of
+            # the line might be visible.
+            if cur_x and cur_y and x and y:
+                self.draw_line(cur_x, cur_y, x, y)
+            cur_x = x
+            cur_y = y
 
     def select_track(self, trackindex):
         '''Mark a track as active.'''
