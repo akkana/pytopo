@@ -1699,7 +1699,7 @@ that are expected by the MapCollection classes:
         cmdstr = "montage -geometry 262x328 -tile " + \
                  str(nx) + "x" + str(ny) + " " + \
                  file_list + " " + outfile
-        # print "Running:", cmdstr
+        # print("Running:", cmdstr)
         os.system(cmdstr)
 
         if (os.access(outfile, os.R_OK)):
@@ -1714,9 +1714,9 @@ that are expected by the MapCollection classes:
 
     def expose_event(self, widget, event):
         """Handle exposes on the canvas."""
-        # print "Expose:", event.type, "for object", self
-        # print "area:", event.area.x, event.area.y, \
-        #    event.area.width, event.area.height
+        # print("Expose:", event.type, "for object", self)
+        # print("area:", event.area.x, event.area.y, \
+        #       event.area.width, event.area.height)
 
         # Cairo requires creating a new context each time the
         # window is exposed.
@@ -1784,7 +1784,7 @@ that are expected by the MapCollection classes:
             self.save_as()
             return True
         else:
-            # print "Unknown key,", event.keyval
+            # print("Unknown key,", event.keyval)
             return False
 
         self.draw_map()
@@ -1868,7 +1868,7 @@ that are expected by the MapCollection classes:
 
     def move_to(self, x, y, widget):
         # traceback.print_stack()
-        # print "======="
+        # print("=======")
 
         # I'm not clear on the rules for when a new cairo context
         # is needed, but apparently it's needed here.
@@ -1947,7 +1947,7 @@ that are expected by the MapCollection classes:
     def mouserelease(self, widget, event):
         """Handle button releases."""
 
-        # print "Setting context coords to", self.context_x, self.context_y
+        # print("Setting context coords to", self.context_x, self.context_y)
         if self.press_timeout:
             gobject.source_remove(self.press_timeout)
             self.press_timeout = None

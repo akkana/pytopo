@@ -4,6 +4,8 @@
 # License: GPL 2.0
 # Slightly modified by Akkana for PyTopo.
 
+from __future__ import print_function
+
 import os
 import gps
 import time
@@ -50,24 +52,24 @@ if __name__ == '__main__':
             # It may take a second or two to get good data
 
             os.system('clear')
-            print
-            print ' GPS reading'
-            print '----------------------------------------'
-            print 'latitude    ' , gpsp.gpsd.fix.latitude
-            print 'longitude   ' , gpsp.gpsd.fix.longitude
-            print 'time utc    ' , gpsp.gpsd.utc,' + ', gpsp.gpsd.fix.time
-            print 'altitude (m)' , gpsp.gpsd.fix.altitude
-            print 'eps         ' , gpsp.gpsd.fix.eps
-            print 'epx         ' , gpsp.gpsd.fix.epx
-            print 'epv         ' , gpsp.gpsd.fix.epv
-            print 'ept         ' , gpsp.gpsd.fix.ept
-            print 'speed (m/s) ' , gpsp.gpsd.fix.speed
-            print 'climb       ' , gpsp.gpsd.fix.climb
-            print 'track       ' , gpsp.gpsd.fix.track
-            print 'gpsd status:' , gpsp.gpsd.status
-            print 'mode        ' , gpsp.gpsd.fix.mode
-            print
-            print 'sats        ' , gpsp.gpsd.satellites
+            print()
+            print(' GPS reading')
+            print('----------------------------------------')
+            print('latitude    ' , gpsp.gpsd.fix.latitude)
+            print('longitude   ' , gpsp.gpsd.fix.longitude)
+            print('time utc    ' , gpsp.gpsd.utc,' + ', gpsp.gpsd.fix.time)
+            print('altitude (m)' , gpsp.gpsd.fix.altitude)
+            print('eps         ' , gpsp.gpsd.fix.eps)
+            print('epx         ' , gpsp.gpsd.fix.epx)
+            print('epv         ' , gpsp.gpsd.fix.epv)
+            print('ept         ' , gpsp.gpsd.fix.ept)
+            print('speed (m/s) ' , gpsp.gpsd.fix.speed)
+            print('climb       ' , gpsp.gpsd.fix.climb)
+            print('track       ' , gpsp.gpsd.fix.track)
+            print('gpsd status:' , gpsp.gpsd.status)
+            print('mode        ' , gpsp.gpsd.fix.mode)
+            print()
+            print('sats        ' , gpsp.gpsd.satellites)
 
             time.sleep(5) # set to whatever
 
@@ -75,6 +77,6 @@ if __name__ == '__main__':
         print("Control-C from gpsdPoller")
         gpsp.stopGPS()
 
-    print "Done.\nExiting."
+    print("Done.\nExiting.")
 
 

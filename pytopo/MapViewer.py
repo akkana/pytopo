@@ -140,7 +140,7 @@ Shift-click in the map to print the coordinates of the clicked location.
     def find_collection(self, collname):
         """Find a collection with the given name."""
 
-        # print "Looking for a collection named", collname
+        # print("Looking for a collection named", collname)
         # Make sure collname is a MapCollection we know about:
         collection = None
         for coll in self.collections:
@@ -263,12 +263,12 @@ Shift-click in the map to print the coordinates of the clicked location.
         mapwin.collection = collection
 
         # site[1] and site[2] are the long and lat in deg.minutes
-        # print site[0], site[1], site[2]
+        # print(site[0], site[1], site[2])
         mapwin.center_lon = MapUtils.deg_min2dec_deg(site[1])
         mapwin.center_lat = MapUtils.deg_min2dec_deg(site[2])
         mapwin.pin_lon = mapwin.center_lon
         mapwin.pin_lat = mapwin.center_lat
-        # print "Center in decimal degrees:", centerLon, centerLat
+        # print("Center in decimal degrees:", centerLon, centerLat)
         if (self.Debug):
             print(site[0] + ":", \
                 MapUtils.dec_deg2deg_min_str(mapwin.center_lon), \
@@ -681,7 +681,7 @@ You can add new sites and collections there; see the instructions at
         # For cProfile testing, run with a dummy collection (no data needed):
         # mapwin.collection = MapCollection("dummy", "/tmp")
 
-        # print cProfile.__file__
+        # print(cProfile.__file__)
         # cProfile.run('mapwin.show_window()', 'cprof.out')
         # http://docs.python.org/library/profile.html
         # To analyze cprof.out output, do this:

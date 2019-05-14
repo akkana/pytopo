@@ -67,9 +67,9 @@ class GenericMapCollection(TiledMapCollection):
         if (self.Debug):
             print("Generic get_maplet", longitude, latitude, "->", filename)
         if filename is None or not os.access(filename, os.R_OK):
-            # print "Can't open", filename, "for", longitude, latitude
+            # print("Can't open", filename, "for", longitude, latitude)
             return None, 0, 0, filename
-        # print "Opened", filename, "for", longitude, latitude
+        # print("Opened", filename, "for", longitude, latitude)
         pixbuf = MapWindow.load_image_from_file(filename)
 
         # Offsets aren't implemented yet:

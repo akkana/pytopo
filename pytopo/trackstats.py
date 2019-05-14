@@ -149,10 +149,10 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
             # If we're considered stopped, don't update lastlat/lastlon.
             # We'll calculate distance from the first stopped point.
             stopped_time += delta_t
-            #print "stopped\t",
+            #print("stopped\t")
 
-        # print total_dist, ele, "\t", time, lat, lon, "\t", total_climb
-        # print total_dist, ele, "\t", time, total_climb
+        # print(total_dist, ele, "\t", time, lat, lon, "\t", total_climb)
+        # print(total_dist, ele, "\t", time, total_climb)
 
         distances.append(total_dist)
         eles.append(ele)
@@ -160,7 +160,7 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     # If halfwin wasn't supplied, try to guess a good value.
     # XXX TO DO: figure out a way to guess.
     if not halfwin:
-        # print len(eles), "points", ", average distance per step", total_dist / len(eles)
+        # print(len(eles), "points", ", average distance per step", total_dist / len(eles))
         halfwin = 15
 
     smoothed_eles = smooth(eles, halfwin, beta)
@@ -273,7 +273,7 @@ def main():
         # XXX Read more than one file
     except IOError as e:
         print(e)
-        #print dir(e)
+        #print(dir(e))
         return e.errno
 
     out = statistics(trackpoints, halfwin, beta, metric)
@@ -294,10 +294,10 @@ def main():
     if not have_plt:
         return 0
 
-    # print "======= Distances", type(out['Distances'])
-    # print out['Distances']
-    # print "\n\n======= Elevations", type(out['Elevations'])
-    # print out['Elevations']
+    # print("======= Distances", type(out['Distances']))
+    # print(out['Distances'])
+    # print("\n\n======= Elevations", type(out['Elevations']))
+    # print(out['Elevations'])
 
     plt.plot(out['Distances'], out['Elevations'],
                label="GPS elevation data", color="gray")

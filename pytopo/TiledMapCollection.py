@@ -217,11 +217,11 @@ TiledMapCollection classes must implement
                     print(self.img_width, self.img_height)
 
             # if (self.Debug):
-            #     print "Drawing maplet for",
-            #     print MapUtils.dec_deg2deg_min_str(curlon),
-            #     print MapUtils.dec_deg2deg_min_str(curlat),
-            #     print "at", x, y, "offset", x_off, y_off,
-            #     print "size", w, h
+            #     print("Drawing maplet for", end='')
+            #     print(MapUtils.dec_deg2deg_min_str(curlon), end='')
+            #     print(MapUtils.dec_deg2deg_min_str(curlat), end='')
+            #     print("at", x, y, "offset", x_off, y_off, end='')
+            #     print("size", w, h)
 
             mapwin.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
 
@@ -229,8 +229,8 @@ TiledMapCollection classes must implement
             pixbuf = 0
         else:
             # if (self.Debug):
-            #     print "No maplet for", curlon, curlat,
-            #     print "at", x, y, "offset", x_off, y_off
+            #     print("No maplet for", curlon, curlat, end='')
+            #     print("at", x, y, "offset", x_off, y_off)
             mapwin.set_bg_color()
             w = self.img_width - x_off
             h = self.img_height - y_off

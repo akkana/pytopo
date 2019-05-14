@@ -368,7 +368,7 @@ class TrackPoints(object):
 
     def save_GPX_in_region(self, start_lon, start_lat, end_lon, end_lat,
                            filename):
-        # print "Save GPX in", filename, start_lon, start_lat, end_lon, end_lat
+        # print("Save GPX in", filename, start_lon, start_lat, end_lon, end_lat)
         self.save_GPX(filename, (start_lon, start_lat, end_lon, end_lat))
 
     def save_GPX(self, filename, boundingbox=None):
