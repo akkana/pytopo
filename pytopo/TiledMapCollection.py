@@ -3,6 +3,7 @@
 # the terms of the GPLv2 or, at your option, any later GPL.
 
 '''TiledMapCollection: a pytopo map collection that can download tiles.
+
    A base class for more specific downloaders.
 '''
 
@@ -22,7 +23,8 @@ import gc
 class TiledMapCollection(MapCollection):
 
     """Code common to map collections that have raster tiles of a fixed size.
-TiledMapCollection classes must implement
+TiledMapCollection classes must implement:
+
   (pixbuf, x_off, y_off, pathname) = get_maplet(curlon, curlat)
   (pixbuf, newpath) = get_next_maplet(oldpath, dX, dY)
   deg2num(self, lat_deg, lon_deg, zoom=None)
@@ -195,7 +197,7 @@ TiledMapCollection classes must implement
     def draw_tile_at_position(self, pixbuf, mapwin, x, y, x_off, y_off):
         """Draw a single tile, perhaps after downloading it,
            at a specified location.
-       ."""
+        """
         if pixbuf is not None:
             w = pixbuf.get_width() - x_off
             h = pixbuf.get_height() - y_off

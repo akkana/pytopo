@@ -40,6 +40,7 @@ map coordinates and need a starting place. Should probably remove it.
 
     def get_maplet(self, longitude, latitude):
         """Returns pixbuf, x_offset, y_offset:
+
          - the pixbuf for the maplet image (or null)
          - the offset in pixels into the image for the given coordinates,
            from top left.

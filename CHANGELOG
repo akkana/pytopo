@@ -1,3 +1,6 @@
+2019-05-14  Akkana Peck <akkana@shallowsky.com>
+	Finish the upgrade to Python 3. Should work in either 2 or 3 now.
+
 2019-04-30  Akkana Peck <akkana@shallowsky.com>
 	1.6 b1: Add basic GPS/gpsd support.
 	Better bearing calculations.

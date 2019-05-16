@@ -50,16 +50,19 @@ GPS_MARKER_RADIUS=10
 class MapWindow(object):
 
     """The pytopo UI: the map window.
+
 This holds the GTK specific drawing code,
 and is intended to be extensible into other widget libraries.
 To that end, it needs to implement the following methods
 that are expected by the MapCollection classes:
+
    win_width, win_height = get_size(), set_color(),
    draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
    draw_rectangle(fill, x, y, width, height)
    draw_line(x, y, width, height)
+
 (That list is very incomplete and needs to be updated, sorry.)
-"""
+    """
 
     def __init__(self, _controller):
         """Initialize variables, but don't create the window yet."""

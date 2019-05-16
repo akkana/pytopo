@@ -75,7 +75,7 @@ class DownloadTileQueue:
 
     @staticmethod
     def threaded_task(function, *args, **kwargs):
-        """Run function(*args, **kwargs) inside a thread, return the result."""
+        """Run function inside a thread, return the result."""
         def _task(task_return):
             def _thread():
                 result = function(*args, **kwargs)

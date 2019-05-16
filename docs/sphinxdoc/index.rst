@@ -159,22 +159,36 @@ clicked. I know that's not an optimal user interface, but not many
 people seem to need that feature and I find it useful enough when I
 need it.
 
-Sorry, PyTopo does not yet do anything useful with elevation or mileage
-on track logs. But in the meantime you may want to check out my
-standalone <a href="ellie/">Ellie</a> script; that's what I use.
+PyTopo does not yet do anything useful with elevation or mileage
+on track logs within the PyTopo application itself. But it comes with
+another script called ellie that can show mileage and elevation profiles.
 
-Getting Map Data
-================
+Take accumulated elevation numbers from any program, including ellie,
+with a grain of salt. They vary considerably depending on how granular
+the measurements are and how much smoothing the program does.
+
+About Map Tile Data
+===================
+
+Downloaded map tiles are cached forever. This is intentional, so it
+will be useful when not connected to a network.
+If you don't want to keep tiles that haven't been accessed in a while,
+use a command like one of these
+(test this first, don't just blindly paste it! The 90 is days)::
+
+  find <path-to-maps> -maxdepth 1 -name "*.png" -atime 90 -delete
+  find <path-to-maps> -atime 90 -iname '*.png' -exec rm {} \;
 
 MapCollections
 ==============
 
 There are lots of different types of MapCollection you can use.
-One useful one is to use map tiles from a different tile server.
-Most tile servers other than OpenStreetMap require you to sign up for
-an API key (which is usually free for light usage, but charges you
-for heavier usage). In that case your key will be encoded into the URL
-you set up in the MapCollection.
+The most common is OSMMapCollection, which derives from TiledMapCollection.
+You'll define the MapCollections you want to use in your *pytopo.sites* file.
+
+Most tile servers require you to sign up for an API key. Often the key
+usually free for light usage, but charges you for heavier usage.
+You can encode your API key into the URL you set up in the MapCollection.
 
 In the default *pytopo.sites*, there's an example of how to use
 the `ThunderForest map server <http://thunderforest.com/>`_
@@ -185,7 +199,6 @@ cache the tiles, the size and type of the tiles, the default zoom level
 (this is a function of the tile server), and an attribution string.
 
 ::
-
   OSMMapCollection( "opencyclemap",         # collection name
                     "~/Maps/opencyclemap",  # where to cache
                     ".png", 256, 256,       # file type and size
@@ -195,7 +208,6 @@ cache the tiles, the size and type of the tiles, the default zoom level
                     reload_if_older=90,     # reload if &gt; 90 days
                     attribution="Maps © www.thunderforest.com, Data © www.osm.org/copyright"),
 
-
 You can use the same syntax for many different tile servers to get a
 variety of different background map tile styles.
 ThunderForest has several nice styles besides OpenCycleMap: you'll see
@@ -203,23 +215,19 @@ their list if you sign up for an API key.
 You can set up as many MapCollections as you want, either different
 styles from the same server or from different servers.
 
-I don't currently know of a tile server that can serve satellite images,
-even with an API key.
-MapQuest used to offer this service but no longer does.
-Please tell me if you know of an alternate server.
 Note that the Google Maps terms of service do not allow using their tiles
-with non-Google mapping apps, so Google isn't an option.
+with non-Google mapping apps.
 
 Download Area
 =============
 
-*Download Area* is intended to make it easy to download a
-collection of tiles at different zoom levels for a specified area,
+*Download Area* in PyTopo's menus is intended to make it easy to download
+a collection of tiles at different zoom levels for a specified area,
 so you can have the tiles ready when you travel and will be offline.
-In practice, it doesn't work as well as intended, partly because most
+In practice, it doesn't work very well, largely because most
 map tile servers will throttle connections that request too many tiles,
 so it takes forever to download an area. I stopped using it and
-therefore it isn't very well maintained.
+therefore it isn't very well maintained; I don't recommend using it.
 
 Commercial Map Data
 ===================
