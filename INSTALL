@@ -1,5 +1,6 @@
 Install pytopo on your local machine with
 python setup.py install
+(you'll need Python's setuptools package).
 
 Or get it from PyPI:
 pip install pytopo

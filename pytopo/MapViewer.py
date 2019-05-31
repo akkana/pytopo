@@ -68,9 +68,9 @@ Usage: pytopo
        pytopo known_site
        pytopo [-t trackfile] [-c collection] [-r] [site_name]
        pytopo [-t trackfile] start_lat start_lon [collection]
-       pytopo -p :     list known sites and tracks
-       pytopo -r :     re-download all map tiles
-       pytopo -h :     print this message
+       pytopo -p :   list known sites and tracks
+       pytopo -r :   re-download all map tiles that need to be shown
+       pytopo -h :   print this message
 
 Other flags:
        -g: follow a GPS if available
