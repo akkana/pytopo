@@ -68,7 +68,7 @@ class OSMMapCollection(TiledMapCollection):
         if attribution:
             self.attribution = attribution
         else:
-            self.attribution = "Map tiles copyright Openstreetmap.org"
+            self.attribution = ""
 
         self.location = os.path.expanduser(self.location)
 

@@ -1652,7 +1652,7 @@ that are expected by the MapCollection classes:
             layout.set_font_description(self.font_desc)
         if x < 0 or y < 0:
             win_width, win_height = self.get_size()
-            lw, lh = layout.get_size()
+            lw, lh = layout.get_pixel_size()
             if x < 0:
                 x = win_width - lw + x
             if y < 0:

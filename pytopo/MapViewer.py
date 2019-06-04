@@ -615,7 +615,8 @@ from pytopo import GenericMapCollection
 Collections = [
     OSMMapCollection( "openstreetmap", "~/Maps/openstreetmap",
                       ".png", 256, 256, 10,
-                      "http://a.tile.openstreetmap.org" ),
+                      "http://a.tile.openstreetmap.org",
+                      attribution="© OpenStreetMap.org contributors, CC BY-SA"),
 
     # The USGS National Map provides various kinds of tiles.
     # Here's their basic Topo tile.
