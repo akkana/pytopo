@@ -12,14 +12,19 @@ import os
 
 try:
     # Python 3:
-    from urllib.request import urlretrieve
+    from urllib.request import urlopen, Request
 except ImportError:
     # Python 2:
-    from urllib import urlretrieve
+    from urllib2 import urlopen, Request
 
 import gobject
 
 import threading
+
+from pytopo import __version__
+
+user_agent = "PyTopo " + __version__
+headers = { 'User-Agent' : user_agent }
 
 # If we download files, we'll try to use the magic library to make
 # sure we got the right file type. But no need to import it
@@ -27,7 +32,6 @@ import threading
 magic_parser = None
 
 Debug = False    # XXX move this into a class
-
 
 class DownloadTileQueue:
     def __init__(self):
@@ -93,7 +97,11 @@ class DownloadTileQueue:
                 print("Downloading", url)
                 print("  to", localpath)
             try:
-                urlretrieve(url, localpath)
+                response = urlopen(Request(url, headers=headers))
+                data = response.read()
+                with open(localpath, "wb") as localfile:
+                    localfile.write(data)
+
             except IOError as e:
                 print("Couldn't download", url, ":")
                 print(e)
