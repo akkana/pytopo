@@ -28,3 +28,5 @@ from .MapWindow import MapWindow
 from .TrackPoints import TrackPoints
 from .MapViewer import MapViewer
 # import trackstats
+
+user_agent = "PyTopo " + __version__

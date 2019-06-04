@@ -21,10 +21,11 @@ import gobject
 
 import threading
 
-from pytopo import __version__
-
-user_agent = "PyTopo " + __version__
-headers = { 'User-Agent' : user_agent }
+# The only way I can find to have a module-wide user_agent variable
+# is to import pytopo and have it be pytopo.user_agent.
+# Things like from pytopo import user_agent makes a copy of
+# the variable and doesn't see later changes.
+import pytopo
 
 # If we download files, we'll try to use the magic library to make
 # sure we got the right file type. But no need to import it
@@ -97,7 +98,13 @@ class DownloadTileQueue:
                 print("Downloading", url)
                 print("  to", localpath)
             try:
-                response = urlopen(Request(url, headers=headers))
+
+                if pytopo.user_agent:
+                    headers = { 'User-Agent': pytopo.user_agent }
+                    response = urlopen(Request(url, headers=headers))
+                else:
+                    headers = {}
+                    response = urlopen(Request(url))
                 data = response.read()
                 with open(localpath, "wb") as localfile:
                     localfile.write(data)

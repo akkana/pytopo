@@ -14,6 +14,10 @@ from pytopo.MapWindow import MapWindow
 from pytopo.MapUtils import MapUtils
 from pytopo.TrackPoints import TrackPoints
 
+# For version and user_agent. See comment in DownloadTileQueue.py for why.
+import pytopo
+
+
 import sys
 import os
 import time
@@ -47,16 +51,9 @@ class MapViewer(object):
 
         self.Debug = False
 
+
     @staticmethod
     def get_version():
-        # There doesn't seem to be any good way of getting the current
-        # module's version. from . import __version__ works from external
-        # scripts that are importing the module, but if you try to run
-        # this file's main(), it dies with
-        #   ValueError: Attempted relative import in non-package
-        # The only solution I've found is to import the whole module,
-        # then get the version from it.
-        import pytopo
         return pytopo.__version__
 
     @classmethod
@@ -542,11 +539,20 @@ from pytopo import GenericMapCollection
             exec(execstring, globs, locs)
 
         # Then extract the changed values back out:
+        # These two are mandatory.
         self.collections = locs['Collections']
-        self.KnownSites = locs['KnownSites']
-        self.init_width = locs["init_width"]
-        self.init_height = locs["init_height"]
         self.default_collection = locs["defaultCollection"]
+
+        # Optional variables:
+        for key in [ 'KnownSites', 'init_width', 'init_height' ]:
+            if key in locs:
+                setattr(self, key, locs[key])
+
+        # user_agent is special: it needs to be a class variable
+        # so DownloadTileQueues can access it without needing a
+        # pointer to a specific object.
+        if 'user_agent' in locs:
+            pytopo.user_agent = locs['user_agent']
 
     def read_saved_sites(self):
         """Read previously saved (favorite) sites."""
@@ -613,10 +619,14 @@ from pytopo import GenericMapCollection
 # Map collections
 
 Collections = [
-    OSMMapCollection( "openstreetmap", "~/Maps/openstreetmap",
-                      ".png", 256, 256, 10,
-                      "http://a.tile.openstreetmap.org",
-                      attribution="© OpenStreetMap.org contributors, CC BY-SA"),
+    # OpenStreetMap's Tile Usage Policy is discussed at
+    # https://operations.osmfoundation.org/policies/tiles/
+    # and requests that apps not use tile.openstreetmap.org without permission.
+    # If you choose to use it, please add a user_agent line elsewhere
+    # in this file, such as
+    # user_agent = "PyTopo customized by Your Name Here"
+    # so OSM doesn't get upset and ban all PyTopo users.
+    # I have requested permission for PyTopo to use the tile server.
 
     # The USGS National Map provides various kinds of tiles.
     # Here's their basic Topo tile.
