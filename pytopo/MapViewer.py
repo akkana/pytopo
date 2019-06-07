@@ -114,13 +114,16 @@ Shift-click in the map to print the coordinates of the clicked location.
             return
 
         for site in self.KnownSites[self.first_saved_site:]:
-            # All sites have a string, two floats and another string;
-            # some sites may have additional ints after that.
-            print('[ "%s", %f, %f, "%s"' % \
-                (site[0], site[1], site[2], site[3]), end=' ', file=savefile)
+            # KnownSites is a list of lists:
+            # [ [ name, lon, lat, [collection], [zoomlevel]
+            print('[ "%s", %f, %f' % (site[0], site[1], site[2]),
+                  end='', file=savefile)
+            if len(site) > 3:
+                print(', %s' % site[3], end='', file=savefile)
             if len(site) > 4:
-                print(', ' + ', '.join(map(str, site[4:])), end=' ', file=savefile)
+                print(', %d' % site[4], end='', file=savefile)
             print("]", file=savefile)
+
         savefile.close()
 
     def print_sites(self):
@@ -254,7 +257,10 @@ Shift-click in the map to print the coordinates of the clicked location.
         return False
 
     def use_site(self, site, mapwin):
-        collection = self.find_collection(site[3])
+        if len(site) > 3 and site[3]:
+            collection = self.find_collection(site[3])
+        else:
+            collection = self.find_collection(self.default_collection)
         if not collection:
             return False
         mapwin.collection = collection
@@ -438,6 +444,12 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
         if not mapwin.collection and self.default_collection:
             mapwin.collection = self.find_collection(self.default_collection)
 
+        if not mapwin.collection:
+            print("Can't find a default Map Collection!")
+            print("There may be something wrong with your pytopo.sites")
+            print()
+            sys.exit(1)
+
         mapwin.collection.Debug = self.Debug
 
         # If we have a collection and a track but no center point,
@@ -544,9 +556,14 @@ from pytopo import GenericMapCollection
         self.default_collection = locs["defaultCollection"]
 
         # Optional variables:
-        for key in [ 'KnownSites', 'init_width', 'init_height' ]:
-            if key in locs:
-                setattr(self, key, locs[key])
+        if 'init_width' in locs:
+            self.init_width = locs['init_width']
+        if 'init_height' in locs:
+            self.init_width = locs['init_height']
+
+        if 'KnownSites' in locs:
+            for site in locs['KnownSites']:
+                self.KnownSites.append(site)
 
         # user_agent is special: it needs to be a class variable
         # so DownloadTileQueues can access it without needing a
@@ -625,13 +642,28 @@ Collections = [
     # If you choose to use it, please add a user_agent line elsewhere
     # in this file, such as
     # user_agent = "PyTopo customized by Your Name Here"
-    # so OSM doesn't get upset and ban all PyTopo users.
-    # I have requested permission for PyTopo to use the tile server.
+    # and use it sparingly, so OSM doesn't get upset and ban all PyTopo users.
+
+    # Humanitarian
+    OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
+                      ".png", 256, 256, 13,
+                      "http://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+                      maxzoom=15,
+                      attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
+
+
+    # Wikimedia Maps: experimental
+    OSMMapCollection( "Wikimedia", "~/Maps/Wikimedia",
+                      ".png", 256, 256, 13,
+                      "https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png",
+                      maxzoom=15,
+                      attribution="Wikimedia Maps, map data © OpenStreetMap contributors"),
 
     # The USGS National Map provides various kinds of tiles.
     # Here's their basic Topo tile.
     # Their documentation says they support zooms to 19,
     # but in practice they give an error after zoom level 15.
+    # They're a bit flaky: sometimes they don't load, or load blank tiles.
     OSMMapCollection( "USGS", "~/Maps/USGS",
                       ".jpg", 256, 256, 13,
                        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/WMTS?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=USGSTopo&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image%2Fjpeg",
@@ -645,8 +677,8 @@ Collections = [
                       maxzoom=15,
                       attribution="USGS National Map"),
 
-    # You will need an API key to get the OpenCycleMap tiles
-    # from http://thunderforest.com.
+    # ThunderForest offers OpenCycleMap tiles and several other good styles,
+    # but you'll need to sign up for an API key from http://thunderforest.com.
     # OSMMapCollection( "opencyclemap", "~/Maps/opencyclemap",
     #                   ".png", 256, 256, 13,
     #                   "https://tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=YOUR_API_KEY_HERE",
@@ -654,16 +686,17 @@ Collections = [
     #                   attribution="Maps © www.thunderforest.com, Data © www.osm.org/copyright"),
     ]
 
-defaultCollection = "openstreetmap"
+# Default to whichever MapCollection is listed first.
+defaultCollection = Collections[0].name
 
 KnownSites = [
     # Some base values to get new users started.
     # Note that these coordinates are a bit northwest of the city centers;
     # they're the coordinates of the map top left, not center.
-    [ "san-francisco", -121.75, 37.4, "openstreetmap" ],
-    [ "new-york", -73.466, 40.392, "openstreetmap" ],
-    [ "london", 0.1, 51.266, "openstreetmap" ],
-    [ "sydney", 151.0, -33.5, "openstreetmap" ],
+    [ "san-francisco", -122.245, 37.471, "", 11 ],
+    [ "new-york", -74.001, 40.4351, "", 11 ],
+    [ "london", -0.072, 51.3098, "", 11 ],
+    [ "sydney", 151.125, -33.517, "", 11 ],
     ]
 """, file=fp)
         fp.close()

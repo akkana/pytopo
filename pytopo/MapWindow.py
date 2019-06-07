@@ -985,7 +985,11 @@ that are expected by the MapCollection classes:
 
         # Create the list
         for site in self.controller.KnownSites:
-            store.append([site[0], site[3], site])
+            if len(site) > 3:
+                coll = site[3]
+            else:
+                coll = ''
+            store.append([site[0], coll, site])
 
         # http://pygtk.org/pygtk2tutorial/ch-TreeViewWidget.html
         # Make a treeview from the list:
