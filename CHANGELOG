@@ -1,3 +1,9 @@
+2019-06-07  Akkana Peck <akkana@shallowsky.com>
+	Adjust the default site file to reflect which maps are currently
+	free and unrestricted. Improvements to how KnownSites are specified,
+	specify UserAgent, and fixes to the coordinates for the default cities.
+	Assorted other bugfixes.
+
 2019-05-14  Akkana Peck <akkana@shallowsky.com>
 	Finish the upgrade to Python 3. Should work in either 2 or 3 now.
 
