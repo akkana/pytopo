@@ -1239,11 +1239,19 @@ that are expected by the MapCollection classes:
         """
         comment = ""
         while True:
-            name = self.prompt("Save location", comment).strip()
+            name = self.prompt("Save location", comment)
+            # name was empty; repeat the prompt dialog
             if name == None:
-                return
-            if not name:
-                comment = "Name can't be empty"
+                continue
+            name = name.strip()
+
+            # If there was a name, break out of the loop and
+            # add the point to Known Sites.
+            if name:
+                break
+
+            # name was empty; repeat the prompt dialog
+            comment = "Name can't be empty"
 
         # Add to KnownSites
         self.controller.append_known_site([name,
