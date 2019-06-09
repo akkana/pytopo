@@ -1195,7 +1195,9 @@ that are expected by the MapCollection classes:
 
     def prompt(self, prompt, comment="", default=""):
         """Prompt the user for a string, returning the string.
-           Returns None if the user presses CANCEL instead.
+           Returns None if the user presses CANCEL instead
+           (as opposed to an empty string, which means the
+           user didn't type anything but hit OK).
         """
         if not self.prompt_dialog:
             self.prompt_dialog = gtk.Dialog("PyTopo", None, 0,
@@ -1239,14 +1241,13 @@ that are expected by the MapCollection classes:
 
     def save_location(self, widget):
         """Save the pinned location.
-        XXX should save zoom level too, if different from collection default.
         """
         comment = ""
         while True:
             name = self.prompt("Save location", comment)
             # name was empty; repeat the prompt dialog
             if name == None:
-                continue
+                return
             name = name.strip()
 
             # If there was a name, break out of the loop and
@@ -1263,6 +1264,8 @@ that are expected by the MapCollection classes:
                             MapUtils.dec_deg2deg_min(self.pin_lat),
                             self.collection.name,
                             self.collection.zoomlevel])
+
+        self.controller.save_sites()
 
     def mytracks(self, widget):
         self.controller.track_select(self)

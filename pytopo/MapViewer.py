@@ -46,7 +46,7 @@ class MapViewer(object):
         self.default_collection = None
         self.needs_saving = False
         self.config_dir = os.path.expanduser("~/.config/pytopo",)
-        self.savefilename = os.path.join(self.config_dir, "saved.sites")
+        self.saved_sites_filename = os.path.join(self.config_dir, "saved.sites")
         self.reload_tiles = False
 
         self.Debug = False
@@ -108,9 +108,9 @@ Shift-click in the map to print the coordinates of the clicked location.
             return
 
         try:
-            savefile = open(self.savefilename, "w")
+            savefile = open(self.saved_sites_filename, "w")
         except:
-            print("Couldn't open save file", self.savefilename)
+            print("Couldn't open save file", self.saved_sites_filename)
             return
 
         for site in self.KnownSites[self.first_saved_site:]:
@@ -573,33 +573,71 @@ from pytopo import GenericMapCollection
 
     def read_saved_sites(self):
         """Read previously saved (favorite) sites."""
-        try:
-            savefile = open(self.savefilename, "r")
-        except:
-            return
 
         # A line typically looks like this:
         # [ "san-francisco", -121.750000, 37.400000, "openstreetmap" ]
-        # or, with an extra optional zoom level,
-        # [ "san-francisco", -121.750000, 37.400000, "openstreetmap", 11 ]
+        # or, with an extra optional zoom level and included comma,
+        # [ "Treasure Island, zoomed", -122.221, 37.493, humanitarian, 13 ]
+        try:
+            sitesfile = open(self.saved_sites_filename, "r")
+        except:
+            return
 
-        r = re.compile('\["([^"]*)",([-0-9\.]*),([-0-9\.]*),"([^"]*)",?([0-9]+)?\]')
-        for line in savefile:
-            # First remove all whitespace:
-            line = re.sub(r'\s', '', line)
-            match = r.search(line)
-            if match:
-                matches = match.groups()
-                # Convert from strings to numbers
-                site = [matches[0], float(matches[1]), float(matches[2]),
-                        matches[3]]
-                if len(matches) == 5 and matches[4] is not None:
-                    site.append(int(matches[4]))
-                if self.Debug:
-                    print("Adding", site[0], "to KnownSites")
-                self.KnownSites.append(site)
+        def strip_bracketed(s, c):
+            '''If s begins and ends with c, strip off c.
+               c can be a single character like '"',
+               or a pair of characters like '[]'.
+               Also removes trailing commas.
+            '''
+            start_char = c[0]
+            if len(c) > 1:
+                end_char = c[1]
+            else:
+                end_char = start_char
 
-        savefile.close()
+            # Strip out unneeded [ ]
+            s = s.strip()
+            if s.endswith(','):
+                s = s[:-1].strip()
+            if s.startswith(start_char):
+                s = s[1:].strip()
+            if s.endswith(end_char):
+                s = s[:-1].strip()
+
+            return s
+
+        quoting_regex = re.compile(r'''
+'.*?' | # single quoted substring
+".*?" | # double quoted substring
+\S+ # all the rest
+''', re.VERBOSE)
+
+        def parse_saved_site_line(line):
+            '''Parse lines like
+               [ "Treasure Island, zoomed", -122.221287, 37.493330, humanitarian, 13]
+               (enclosing brackets are optional, as are double quotes
+               for strings that don't include commas).
+               Clever way of avoiding needing the CSV module
+            '''
+
+            line = strip_bracketed(line, '[]')
+
+            parts = [ strip_bracketed(strip_bracketed(s, "'"), '"')
+                      for s in quoting_regex.findall(line)
+                      if s not in ',[]' ]
+            return parts
+
+        for line in sitesfile:
+            site = parse_saved_site_line(line)
+
+            site[1] = float(site[1])    # longitude
+            site[2] = float(site[2])    # latitude
+            if len(site) > 4:
+                site[4] = int(site[4])  # zoom level
+
+            self.KnownSites.append(site)
+
+        sitesfile.close()
 
     def read_tracks(self):
         trackdir = os.path.expanduser('~/Tracks')
@@ -714,7 +752,10 @@ You can add new sites and collections there; see the instructions at
         # Remember how many known sites we got from the config file;
         # the rest are read in from saved sites and may need to be re-saved.
         self.first_saved_site = len(self.KnownSites)
+
+        # Now it's safe to read the saved sites.
         self.read_saved_sites()
+
         self.read_tracks()
         gc.enable()
 
