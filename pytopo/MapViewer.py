@@ -31,6 +31,51 @@ import gtk    # XXX any gtk calls should be factored into a MapWindow method
 import gobject
 
 
+def strip_bracketed(s, c):
+    '''If s begins and ends with c, strip off c.
+       c can be a single character like '"',
+       or a pair of characters like '[]'.
+       Also removes trailing commas.
+    '''
+    start_char = c[0]
+    if len(c) > 1:
+        end_char = c[1]
+    else:
+        end_char = start_char
+
+    # Strip out unneeded [ ]
+    s = s.strip()
+    if s.endswith(','):
+        s = s[:-1].strip()
+    if s.startswith(start_char):
+        s = s[1:].strip()
+    if s.endswith(end_char):
+        s = s[:-1].strip()
+
+    return s
+
+quoting_regex = re.compile(r'''
+'.*?' | # single quoted substring
+".*?" | # double quoted substring
+\S+ # all the rest
+''', re.VERBOSE)
+
+def parse_saved_site_line(line):
+    '''Parse lines like
+       [ "Treasure Island, zoomed", -122.221287, 37.493330, humanitarian, 13]
+       (enclosing brackets are optional, as are double quotes
+       for strings that don't include commas).
+       Clever way of avoiding needing the CSV module
+    '''
+
+    line = strip_bracketed(line, '[]')
+
+    parts = [ strip_bracketed(strip_bracketed(s, "'"), '"')
+              for s in quoting_regex.findall(line)
+              if s not in ',[]' ]
+    return parts
+
+
 class MapViewer(object):
 
     """A class to hold the mechanics of running the pytopo program,
@@ -582,50 +627,6 @@ from pytopo import GenericMapCollection
             sitesfile = open(self.saved_sites_filename, "r")
         except:
             return
-
-        def strip_bracketed(s, c):
-            '''If s begins and ends with c, strip off c.
-               c can be a single character like '"',
-               or a pair of characters like '[]'.
-               Also removes trailing commas.
-            '''
-            start_char = c[0]
-            if len(c) > 1:
-                end_char = c[1]
-            else:
-                end_char = start_char
-
-            # Strip out unneeded [ ]
-            s = s.strip()
-            if s.endswith(','):
-                s = s[:-1].strip()
-            if s.startswith(start_char):
-                s = s[1:].strip()
-            if s.endswith(end_char):
-                s = s[:-1].strip()
-
-            return s
-
-        quoting_regex = re.compile(r'''
-'.*?' | # single quoted substring
-".*?" | # double quoted substring
-\S+ # all the rest
-''', re.VERBOSE)
-
-        def parse_saved_site_line(line):
-            '''Parse lines like
-               [ "Treasure Island, zoomed", -122.221287, 37.493330, humanitarian, 13]
-               (enclosing brackets are optional, as are double quotes
-               for strings that don't include commas).
-               Clever way of avoiding needing the CSV module
-            '''
-
-            line = strip_bracketed(line, '[]')
-
-            parts = [ strip_bracketed(strip_bracketed(s, "'"), '"')
-                      for s in quoting_regex.findall(line)
-                      if s not in ',[]' ]
-            return parts
 
         for line in sitesfile:
             site = parse_saved_site_line(line)
