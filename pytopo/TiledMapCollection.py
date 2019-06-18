@@ -239,11 +239,12 @@ TiledMapCollection classes must implement:
             mapwin.draw_rectangle(1, x, y, w, h)
 
         # Useful when testing:
-        if (self.Debug):
+        if (self.Debug > 1):
             mapwin.set_color(mapwin.grid_color)
             mapwin.draw_rectangle(0, x, y, w, h)
             mapwin.draw_line(x, y, x + w, y + h)
             mapwin.set_bg_color()
+
         return w, h
 
     # Utilities for mapping tiles to/from degrees.
@@ -342,10 +343,13 @@ TiledMapCollection classes must implement:
 
         # Otherwise, we got a path for a successful tile download.
         # Reset the failure counter:
-        # self.download_failures += 1
+        # self.download_failures = 0
 
         self.download_tiles.pop()   # Throw away url, path popped
-        self.draw_single_tile(path, self.mapwin)
+        # Calling draw_single_tile from idle_add makes the GTK3 window
+        # redraw much more promptly (didn't matter under GTK2).
+        # self.draw_single_tile(path, self.mapwin)
+        glib.idle_add(self.draw_single_tile, path, self.mapwin)
 
         # It's okay to start a new download now:
         self.download_func = None

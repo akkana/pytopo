@@ -115,7 +115,8 @@ Usage: pytopo
        pytopo -h :   print this message
 
 Other flags:
-       -g: follow a GPS if available
+       -g        : follow a GPS if available
+       -d[level] : debugging mode. Defaults to 1, level 2 shows a little more.
 
 With no arguments, will display a list of known sites.
 
@@ -383,11 +384,17 @@ Shift-click in the map to print the coordinates of the clicked location.
                             MapUtils.dec_deg2deg_min_str(mapwin.center_lat))
                     args = args[1:]
 
-                elif args[0] == "-d":
-                    self.Debug = True
-                    print("Debugging on")
+                elif args[0].startswith("-d"):
+                    try:
+                        debuglevel = int(args[0][2:])
+                        self.Debug = debuglevel
+                    except:
+                        self.Debug = 1
+                    print("Debugging level", self.Debug)
+
                 elif args[0] == "-r":
                     self.reload_tiles = time.time()
+
                 elif args[0] == "-t" and len(args) > 1:
                     if mapwin.trackpoints is None:
                         mapwin.trackpoints = TrackPoints()
