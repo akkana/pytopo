@@ -15,7 +15,7 @@ import datetime
 import numpy
 import argparse
 
-from MapUtils import MapUtils
+from pytopo.MapUtils import MapUtils
 
 
 CLIMB_THRESHOLD = 8
