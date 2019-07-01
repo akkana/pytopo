@@ -611,7 +611,7 @@ from pytopo import GenericMapCollection
         if 'init_width' in locs:
             self.init_width = locs['init_width']
         if 'init_height' in locs:
-            self.init_width = locs['init_height']
+            self.init_height = locs['init_height']
 
         if 'KnownSites' in locs:
             for site in locs['KnownSites']:
