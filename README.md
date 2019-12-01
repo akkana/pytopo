@@ -18,10 +18,12 @@ Linux users can't install these from PyPI, but they
 can get these through their distro, or by compiling from source;
 on Debian or Raspbian, you'll probably need the following packages
 and their dependencies:
+
 ```
 sudo apt-get install python-gi python-gi-cairo gir1.2-gtk-3.0 \
-                     python-simplejson python-numpy python-pkg-resources \
+                     python-simplejson python-numpy python-pkg-resources
 ```
+
 (or the python3- version of each of those packages, if you prefer).
 Windows users should be able to install these packages from pip.
 I don't have a good answer for Python and GTK on Mac; one possible

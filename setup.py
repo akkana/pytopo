@@ -23,6 +23,9 @@ def get_version():
                     versionpart = versionpart[:-1]
                 return versionpart
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
     user_options = []
@@ -37,7 +40,8 @@ setup(name='pytopo',
       packages=['pytopo'],
       version=get_version(),
       description='Map viewer, using cached offline map tiles and track files',
-      long_description=read('README'),
+      long_description=long_description,
+      long_description_content_type="text/markdown",
       author='Akkana Peck',
       author_email='akkana@shallowsky.com',
       license="GPLv2+",
