@@ -1,3 +1,6 @@
+2019-12-01  Akkana Peck <akkana@shallowsky.com>
+	Push 1.6 to PyPI.
+
 2019-06-07  Akkana Peck <akkana@shallowsky.com>
 	Adjust the default site file to reflect which maps are currently
 	free and unrestricted. Improvements to how KnownSites are specified,
