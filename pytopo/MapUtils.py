@@ -133,10 +133,10 @@ class MapUtils:
     def haversine_distance(cls, latitude_1, longitude_1,
                            latitude_2, longitude_2, metric=False):
         """
-        Haversine distance between two points, expressed in meters.
+        Haversine distance between two points.
         From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
         Implemented from http://www.movable-type.co.uk/scripts/latlong.html
-        Returns distance in miles.
+        Returns distance in miles or meters.
         """
         d_lat = math.radians(latitude_1 - latitude_2)
         d_lon = math.radians(longitude_1 - longitude_2)
