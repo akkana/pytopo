@@ -59,7 +59,7 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     def accumulate_climb(ele):
         global total_climb, this_climb, this_climb_start, lastele
 
-        if lastele >= 0:             # Not the first call
+        if lastele and lastele >= 0:             # Not the first call
             if ele > lastele:        # Climbed since last step
                 if this_climb == 0:
                     this_climb_start = lastele
@@ -95,10 +95,11 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
 
         lat =  float(lat)
         lon = float(lon)
-        if metric:
-            ele = round(float(ele),2)
-        else:
-            ele = round(float(ele) * 3.2808399, 2)    # convert meters->feet
+        if ele:
+            if metric:
+                ele = round(float(ele),2)
+            else:
+                ele = round(float(ele) * 3.2808399, 2)    # convert meters->feet
 
         if not lastlat or not lastlon:
             lastlat = lat
@@ -163,23 +164,29 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         # print(len(eles), "points", ", average distance per step", total_dist / len(eles))
         halfwin = 15
 
-    smoothed_eles = smooth(eles, halfwin, beta)
+    # Smoothing eles will fail if there are no eles.
+    try:
+        smoothed_eles = smooth(eles, halfwin, beta)
+    except TypeError:
+        smoothed_eles = None
 
     if missing_times:
         print("Some points don't have times! Can't calculate speed")
 
     out = {}
     out['Total distance'] = total_dist
-    out['Raw total climb'] = total_climb
-    out['Smoothed total climb'], out['Lowest'], out['Highest'] \
-        = tot_climb(smoothed_eles)
+    if eles and smoothed_eles:
+        out['Raw total climb'] = total_climb
+        out['Smoothed total climb'], out['Lowest'], out['Highest'] \
+            = tot_climb(smoothed_eles)
     out['Moving time'] = moving_time.seconds
     out['Stopped time'] = stopped_time.seconds
     if moving_time:
         out['Average moving speed'] = total_dist * 60 * 60 / moving_time.seconds
     out['Distances'] = distances
-    out['Elevations'] = eles
-    out['Smoothed elevations'] = smoothed_eles
+    if eles and smoothed_eles:
+        out['Elevations'] = eles
+        out['Smoothed elevations'] = smoothed_eles
 
     return out
 
