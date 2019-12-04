@@ -1,5 +1,7 @@
 2019-12-03  Akkana Peck <akkana@shallowsky.com>
+	Update version to 1.6.1.
 	Fix a bug clicking on tracks that don't have elevation info.
+	Lots of improvements to setup.py including requires.
 
 2019-12-01  Akkana Peck <akkana@shallowsky.com>
 	Push 1.6 to PyPI.

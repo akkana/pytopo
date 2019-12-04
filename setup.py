@@ -11,12 +11,12 @@ def read(fname):
 
 def get_version():
     '''Read the pytopo module versions from pytopo/__init__.py'''
-    return "1.6"
     with open("pytopo/__init__.py") as fp:
         for line in fp:
             line = line.strip()
             if line.startswith("__version__"):
-                versionpart = line.split("=").strip()
+                versionpart = line.split("=")[-1] \
+                                  .strip().replace('"', '').replace("'", '')
                 if versionpart.startswith('"') or versionpart.startswith("'"):
                     versionpart = versionpart[1:]
                 if versionpart.endswith('"') or versionpart.endswith("'"):
@@ -39,7 +39,7 @@ class CleanCommand(Command):
 setup(name='pytopo',
       packages=['pytopo'],
       version=get_version(),
-      description='Map viewer, using cached offline map tiles and track files',
+      description='Tiled map viewer and track editor, using cached offline map tiles and track files',
       long_description=long_description,
       long_description_content_type="text/markdown",
       author='Akkana Peck',
@@ -55,7 +55,7 @@ setup(name='pytopo',
       entry_points={
           # This probably should be gui_scripts according to some
           # pages I've found, but the official documentation
-          # mostly talks about console_scripts and not gui_scripts.
+          # discusses console_scripts and doesn't mention gui_scripts.
           # On Linux they're the same, but on Windows, console_scripts
           # bring up a terminal, gui_scripts don't.
           'gui_scripts': [
@@ -63,15 +63,23 @@ setup(name='pytopo',
               'ellie=pytopo.trackstats:main'
           ]
       },
-      download_url='https://github.com/akkana/pytopo/tarball/1.4',
-      # pip can't handle pygtk, so alas, we can't specify our dependency.
-      # install_requires=["pygtk"],
+      download_url='https://github.com/akkana/pytopo/tarball/1.6.1',
+
+      install_requires=["PyGObject", "pycairo", "simplejson", "numpy"],
+
+      # matplotlib is an optional dependency for ellie,
+      # but there doesn't seem to be any way for a user to see this.
+      extras_require={
+          'elliplots':  ["matplotlib"],
+      },
+
       keywords=['maps', 'map viewer', 'track files', 'track logs',
-                'GPX', 'KML'],
+                'GPX', 'KML', "GeoJSON"],
+
       # There aren't any appropriate classifiers for mapping apps.
       classifiers = [
           'Programming Language :: Python :: 2',
-          'Programming Language :: Python :: 2.7',
+          'Programming Language :: Python :: 3',
           'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
           'Intended Audience :: End Users/Desktop',
           'Topic :: Multimedia :: Graphics',

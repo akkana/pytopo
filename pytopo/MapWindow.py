@@ -11,8 +11,6 @@ from gi import pygtkcompat
 pygtkcompat.enable()
 pygtkcompat.enable_gtk(version='3.0')
 
-# from gi.repository import Gtk, Gdk, cairo, Pango, PangoCairo
-
 from pytopo.MapUtils import MapUtils
 from pytopo.TrackPoints import TrackPoints
 from . import trackstats
@@ -1799,9 +1797,12 @@ that are expected by the MapCollection classes:
         elif event.string == "m":
             if self.selection_window():
                 self.set_center_to_pin(None)
-        elif event.string == "s":
-            self.save_as()
-            return True
+
+        # Save As is broken, commented out.
+        # elif event.string == "s":
+        #     self.save_as()
+        #     return True
+
         else:
             # print("Unknown key,", event.keyval)
             return False

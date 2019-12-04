@@ -168,14 +168,16 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     try:
         smoothed_eles = smooth(eles, halfwin, beta)
     except TypeError:
-        smoothed_eles = None
+        smoothed_eles = []
 
     if missing_times:
         print("Some points don't have times! Can't calculate speed")
 
     out = {}
     out['Total distance'] = total_dist
-    if eles and smoothed_eles:
+    # numpy can't just consider an array to be truthy:
+    # "The truth value of an array with more than one element is ambiguous".
+    if len(eles) and len(smoothed_eles):
         out['Raw total climb'] = total_climb
         out['Smoothed total climb'], out['Lowest'], out['Highest'] \
             = tot_climb(smoothed_eles)
@@ -184,7 +186,7 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     if moving_time:
         out['Average moving speed'] = total_dist * 60 * 60 / moving_time.seconds
     out['Distances'] = distances
-    if eles and smoothed_eles:
+    if len(eles) and len(smoothed_eles):
         out['Elevations'] = eles
         out['Smoothed elevations'] = smoothed_eles
 
@@ -249,7 +251,8 @@ def main():
         have_plt = True
     except ImportError:
         have_plt = False
-        print("plt isn't installed; will print stats only, no plotting")
+        print("plt (matplotlib) isn't installed; "
+              "will print stats only, no plotting")
 
     progname = os.path.basename(sys.argv[0])
 
@@ -291,13 +294,20 @@ def main():
     climb_units = 'm' if metric else "'"
     dist_units = 'km' if metric else 'mi'
     print("%.1f %s" % (out['Total distance'], dist_units))
-    print("Raw total climb: %d%s" % (int(out['Raw total climb']), climb_units))
-    print("Smoothed climb: %d%s" % (out['Smoothed total climb'], climb_units))
-    print("  from %d to %d" % (out['Lowest'], out['Highest']))
-    print("%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
-                                             int(out['Stopped time'] / 60)))
-    print("Average speed moving: %.1f %s/h" % (out['Average moving speed'],
-                                               dist_units))
+    if 'Raw total climb' in out:
+        print("Raw total climb: %d%s" % (int(out['Raw total climb']),
+                                         climb_units))
+    if 'Smoothed total climb' in out:
+        print("Smoothed climb: %d%s" % (out['Smoothed total climb'],
+                                        climb_units))
+    if 'Lowest' in out and 'Highest' in out:
+        print("  from %d to %d" % (out['Lowest'], out['Highest']))
+    if 'Moving time' in out and 'Stopped time' in out:
+        print("%d minutes moving, %d stopped" % (int(out['Moving time'] / 60),
+                                                 int(out['Stopped time'] / 60)))
+    if 'Average moving speed' in out:
+        print("Average speed moving: %.1f %s/h" % (out['Average moving speed'],
+                                                   dist_units))
     if not have_plt:
         return 0
 

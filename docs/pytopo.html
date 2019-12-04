@@ -1,6 +1,6 @@
 <html>
 <head>
-<title>pytopo: Open-Source Tiled Map Viewer</title>
+<title>pytopo: An Open-Source Tiled Map Viewer and Track Editor</title>
 <style type="text/css">
 table { table-layout: fixed; }
 </style>
@@ -10,7 +10,7 @@ table { table-layout: fixed; }
 <img align=right src="topoicon.jpg" width=218 height=290
  alt="[PyTopo for Linux]">
 
-<h1>PyTopo: An Open-Source Tiled Map Viewer</h1>
+<h1>PyTopo: An Open-Source Tiled Map Viewer and Track Editor</h1>
 
 <p>
 <b>PyTopo</b> is an open source tiled map viewer,
@@ -52,7 +52,12 @@ PyTopo is available on PyPI:
 pip install pytopo
 </pre>
 <p>
-Then run pytopo.
+It installs two programs: pytopo, the map viewer, and ellie, which
+shows track log statistics. If you have matplotlib installed and
+your track log has elevations, ellie can plot them.
+<p>
+Some of PyTopo's requirements may require a C compiler
+and Python development headers.
 <p>
 <b><a href="https://github.com/akkana/pytopo">PyTopo's source is
 hosted on Github </a></b> if you want the latest and greatest.
@@ -106,8 +111,10 @@ this is mostly to show you how to add your own points of interest.
 <th>s
 <td>Save the current map to a file under <i>$HOME/Topo</i>
 <tr>
-<th>Space, m
+<th>Space
 <td>Jump back to the pinned location.
+<th>m
+<td>Switch to a different known site
 <tr>
 <th>q
 <td>Quit
@@ -115,10 +122,7 @@ this is mostly to show you how to add your own points of interest.
 
 <p>
 Dragging and mousewheel move and scroll the map, as you'd expect.
-Right-clicking in the map pops up a menu of various other options.
-
-<p>
-Click on a track or waypoint to select it and see what's known about it.
+Right-clicking pops up a menu of other options.
 
 <h3>Usage (commandline arguments)</h3>
 <pre>
@@ -177,9 +181,10 @@ You can toggle waypoint visibility with the right-click context menu
 (for when there are too many waypoints and they get in the way of
 reading the map).
 <p>
-You can select a track by clicking on it,
-split a track (right-click context menu again),
-and save a track as GPX after you've split it.
+You can select a track by left-clicking on it,
+split a track or delete everything before or after the mouse
+(right-click context menu again),
+and save a track as GPX after you've changed it.
 
 <h3>Pinning</h3>
 <p>
