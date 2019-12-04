@@ -5,9 +5,9 @@
 
 ================================================================
 PyTopo:
-================================================================
-A viewer for tiled maps, plus track and waypoint files.
-================================================================
+===========================================================================
+A viewer for tiled maps, plus viewing and editing track and waypoint files.
+===========================================================================
 
 .. toctree::
    :maxdepth: 2
@@ -20,6 +20,8 @@ local tiled maps or use commercial datasets.
 PyTopo can also show tracks and waypoints in several different formats,
 can save favorite places, and has some rudimentary track editing ability.
 
+Downloaded map tiles are cached forever (or until you remove them), so you can download tiles and then use PyTopo offline if, like me, you often travel to places where there's little or no internet access.
+
 ==========
 Installing
 ==========
@@ -28,11 +30,10 @@ PyTopo is available on PyPI::
 
   pip install pytopo
 
-It requires PyGTK.
-On Linux, you can get PyGTK through your distro;
-On Windows, you can use *pip install pygtk*.
-Mac is tricky since it has dependencies: the easiest way to get PyGTK
-may be to install `GIMP <http://gimp.org/>`_, which comes with PyGTK.
+It requires GTK and several related dependencies.
+I've tried to include the dependencies in setup.py so pip install
+will pull them in automatically. Some of the dependencies may require
+a C compiler and Python development headers.
 
 Once you've installed the package, the command to run is *pytopo*.
 
@@ -68,13 +69,20 @@ Left, Right,<br>Up, Down
     Scroll the map in the indicated direction.
 +/=, -
     Zoom in or out.
-s
-    Save the current map to a file under <i>$HOME/Topo</i>
-
 Space, m
     Jump back to the pinned location.
 q
     Quit
+
+With no arguments, will display a list of known sites.
+
+Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
+track points and/or waypoints; multiple track files are allowed.
+
+Use decimal degrees for start_lat and start_lon.
+
+Set up favorite site names in ~/.config/pytopo.sites,
+favorite track logs in ~/Tracks
 
 Dragging and mousewheel move and scroll the map, as you'd expect.
 Right-clicking in the map pops up a menu of various other options.
@@ -227,7 +235,8 @@ so you can have the tiles ready when you travel and will be offline.
 In practice, it doesn't work very well, largely because most
 map tile servers will throttle connections that request too many tiles,
 so it takes forever to download an area. I stopped using it and
-therefore it isn't very well maintained; I don't recommend using it.
+therefore it isn't very well maintained, and some map sources will
+blacklist you if you use it; I recommend avoiding it.
 
 Commercial Map Data
 ===================
