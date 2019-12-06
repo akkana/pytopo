@@ -72,7 +72,7 @@ class ParseTests(unittest.TestCase):
 
     def test_read_gpx(self):
         trackpoints = TrackPoints()
-        trackpoints.read_track_file('test/data/otowi-mesa-arch.gpx')
+        trackpoints.read_track_file('test/files/otowi-mesa-arch.gpx')
         self.verify_otowi(trackpoints, 'otowi-mesa-arch.gpx',
                           track_times=True, track_eles=True)
 
@@ -85,16 +85,16 @@ class ParseTests(unittest.TestCase):
 
     def test_read_kml(self):
         trackpoints = TrackPoints()
-        trackpoints.read_track_file('test/data/otowi-mesa-arch.kml')
+        trackpoints.read_track_file('test/files/otowi-mesa-arch.kml')
         self.verify_otowi(trackpoints, 'Otowi Mesa Trail',
                           track_times=False, track_eles=False)
 
 
     def test_read_geojson(self):
         trackpoints = TrackPoints()
-        trackpoints.read_track_file('test/data/otowi-mesa-arch.geojson')
+        trackpoints.read_track_file('test/files/otowi-mesa-arch.geojson')
         trackpoints2 = TrackPoints()
-        trackpoints2.read_track_file('test/data/otowi-mesa-arch.gpx')
+        trackpoints2.read_track_file('test/files/otowi-mesa-arch.gpx')
 
         for i, pt in enumerate(trackpoints.points):
             if not trackpoints.is_start(trackpoints.points[i]) and \
