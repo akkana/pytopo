@@ -14,12 +14,26 @@ class ArgparseTests(unittest.TestCase):
 
     # executed prior to each test
     def setUp(self):
-        self.configdir = 'test/files/config'
+        self.configparent = os.path.join('test', 'files', 'config')
+        self.assertNotEqual(self.configparent, '')
+        self.configdir = os.path.join(self.configparent, 'pytopo')
+        self.assertNotEqual(self.configdir, '')
         os.environ['XDG_CONFIG_HOME'] = self.configdir
+
+        try:
+            shutil.rmtree(self.configdir)
+        except:
+            pass
+
+        try:
+            os.mkdir(self.configparent)
+        except FileExistsError:
+            print("====", self.configparent, "already existed")
+
         try:
             os.mkdir(self.configdir)
         except FileExistsError:
-            pass
+            print("==== setUp:", self.configdir, "already existed")
 
         # A lot of this code mimcs MapViewer.main()
         self.viewer = MapViewer()
@@ -33,8 +47,14 @@ class ArgparseTests(unittest.TestCase):
 
     # executed after each test
     def tearDown(self):
-        shutil.rmtree(self.configdir)
+        self.assertNotEqual(self.configparent, '')
+        try:
+            shutil.rmtree(self.configparent)
+        except:
+            print("==== tearDown: Couldn't shutil.rmtree", self.configparent)
+
         self.configdir = None
+        self.configparent = None
 
 
     # unittest almostEqual requires more closeness than there is between
@@ -72,8 +92,20 @@ class ArgparseTests(unittest.TestCase):
     def test_known_site(self):
         args = [ 'pytopo', 'san-francisco' ]
 
-        with open(os.path.join(self.configdir, 'pytopo.sites'), "w") as cfp:
-            cfp.write('''KnownSites = [
+        with open(os.path.join(self.configdir, 'pytopo', 'pytopo.sites'),
+                  "w") as cfp:
+            cfp.write('''Collections = [
+    OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
+                      ".png", 256, 256, 13,
+                      "http://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+                      maxzoom=15,
+                      attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
+    ]
+
+# Default to whichever MapCollection is listed first.
+defaultCollection = Collections[0].name
+
+KnownSites = [
     [ "san-francisco", -122.245, 37.471, "", 11 ],
     ]''')
 
