@@ -26,7 +26,8 @@ from .OSMMapCollection import OSMMapCollection
 from .DownloadTileQueue import DownloadTileQueue
 from .MapWindow import MapWindow
 from .TrackPoints import TrackPoints
-from .MapViewer import MapViewer
+from .MapViewer import MapViewer, ArgParseException
 # import trackstats
+
 
 user_agent = "PyTopo " + __version__

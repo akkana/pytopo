@@ -27,8 +27,12 @@ import glob
 import gc
 import xml.parsers.expat
 
-import gtk    # XXX any gtk calls should be factored into a MapWindow method
+import gtk    # XXX any gtk calls should be moved into MapWindow
 import gobject
+
+
+class ArgParseException(Exception):
+    pass
 
 
 def strip_bracketed(s, c):
@@ -540,10 +544,8 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
         if mapwin.collection and mapwin.gps_poller:
             return
 
-        # Didn't match any known run mode:
-        # start in selector mode to choose a location:
-        if not mapwin.selection_window():
-            sys.exit(0)
+        raise(ArgParseException)
+
 
 # Check for a user config file named .pytopo
 # in either $HOME/.config/pytopo or $HOME.
@@ -770,7 +772,13 @@ You can add new sites and collections there; see the instructions at
 
         mapwin = MapWindow(self)
 
-        self.parse_args(mapwin, pytopo_args)
+        try:
+            self.parse_args(mapwin, pytopo_args)
+        except ArgParseException:
+            # Didn't match any known run mode:
+            # start in selector mode to choose a location:
+            if not mapwin.selection_window():
+                sys.exit(0)
 
         # For cProfile testing, run with a dummy collection (no data needed):
         # mapwin.collection = MapCollection("dummy", "/tmp")

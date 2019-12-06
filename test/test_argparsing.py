@@ -7,7 +7,7 @@ import math
 
 sys.path.insert(0, '..')
 
-from pytopo import MapViewer, MapWindow
+from pytopo import MapViewer, MapWindow, ArgParseException
 
 
 class ArgparseTests(unittest.TestCase):
@@ -97,6 +97,40 @@ class ArgparseTests(unittest.TestCase):
 
         self.assertCloseEnough(mapwin.center_lon, -122.245)
         self.assertCloseEnough(mapwin.center_lat, 37.471)
+
+
+    def test_explicit_coords_plus_gpx(self):
+        args = [ 'pytopo', '35.85', '-106.4', '-t',
+                 'test/files/otowi-mesa-arch.gpx' ]
+
+        mapwin =  MapWindow(self.viewer)
+        self.viewer.parse_args(mapwin, args)
+
+        self.assertEqual(len(mapwin.trackpoints.points), 1265)
+        self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
+        self.assertCloseEnough(mapwin.center_lon, -106.4)
+        self.assertCloseEnough(mapwin.center_lat, 35.85)
+
+
+    def test_bogus_args(self):
+        arglists = [ [ 'pytopo', 'test/test_argparsing.py' ],
+                     [ 'pytopo', 'rumplestiltskin' ],
+                     [ 'pytopo', '35.0', 'xyz' ],
+                   ]
+
+        for args in arglists:
+            mapwin =  MapWindow(self.viewer)
+
+            try:
+                self.viewer.parse_args(mapwin, args)
+                self.assertEqual("Should have barfed on the bogus args ["
+                                 + ', '.join(args) + "]", None)
+
+            except ArgParseException:
+                print("ArgParseException, good")
+
+            except SystemExit:
+                print("SystemExit, fine")
 
 
     def test_known_site(self):
