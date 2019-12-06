@@ -420,30 +420,36 @@ Shift-click in the map to print the coordinates of the clicked location.
                 continue
 
             # args[0] doesn't start with '-'. Is it a track file?
-            lowerarg = args[0].lower()
-            if lowerarg.endswith(".gpx") \
-               or lowerarg.endswith(".kml") \
-               or lowerarg.endswith(".kmz") \
-               or lowerarg.endswith("json"):
-                try:
-                    if mapwin.trackpoints:
-                        mapwin.trackpoints.read_track_file(args[0])
-                    else:
-                        trackpoints = TrackPoints()
-                        trackpoints.read_track_file(args[0])
-                        mapwin.trackpoints = trackpoints
-                except (IOError, RuntimeError):
-                    print("Can't read track file", args[0])
-                except xml.parsers.expat.ExpatError:
-                    print("Can't read %s: syntax error." % args[0])
-                    if lowerarg.endswith(".kml") or \
-                       lowerarg.endswith(".kmz"):
-                        print("""
+            if not mapwin.trackpoints:
+                mapwin.trackpoints = TrackPoints()
+
+            try:
+                mapwin.trackpoints.read_track_file(args[0])
+                args = args[1:]
+                continue
+
+            except IOError:
+                print("Can't read track file", args[0])
+                args = args[1:]
+                continue
+
+            # Catch a special case for a common KML error:
+            except xml.parsers.expat.ExpatError:
+                print("Can't read %s: syntax error." % args[0])
+                lowerarg = args[0].lower()
+                if lowerarg.endswith(".kml") or \
+                   lowerarg.endswith(".kmz"):
+                    print("""
 Is this a KML made with ArcGIS?
 It may have an illegal xsi:schemaLocation.
 If so, try changing xsi:schemaLocation to just schemaLocation.""")
-                args = args[1:]
-                continue
+                    args = args[1:]
+                    sys.exit(1)
+
+            except (RuntimeError, FileNotFoundError):
+                # It wasn't a track file; continue trying to parse it
+                # print(args[0], "is not a track file")
+                pass
 
             # Try to match a known site:
             for site in self.KnownSites:
@@ -506,7 +512,7 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
 
         # If we have a collection and a track but no center point,
         # center it on the trackpoints, and set scale appropriately:
-        if mapwin.trackpoints is not None and mapwin.collection is not None \
+        if mapwin.trackpoints and mapwin.collection is not None \
                 and not (mapwin.center_lat and mapwin.center_lon):
             minlon, minlat, maxlon, maxlat = mapwin.trackpoints.get_bounds()
             mapwin.center_lon = (maxlon + minlon) / 2

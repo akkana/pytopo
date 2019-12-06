@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import unittest
 import sys
-import datetime
+import math
 
 sys.path.insert(0, '..')
 
@@ -24,6 +24,12 @@ class ParseTests(unittest.TestCase):
         pass
 
 
+    # unittest almostEqual requires more closeness than there is between
+    # gpx and kml.
+    def assertClose(self, a, b, tolerance=1e6):
+        return self.assertTrue(math.isclose(a, b, rel_tol=tolerance))
+
+
     def test_parse_saved_sites(self):
         lines = [
             '"San Francisco", -122.245, 37.471',
@@ -41,33 +47,63 @@ class ParseTests(unittest.TestCase):
             self.assertEqual(parsed, expected[i])
 
 
-    def verify_otowi(self, trackpoints):
+    def verify_otowi(self, trackpoints, trackname, track_times, track_eles):
         self.assertEqual(len(trackpoints.points), 1265)
-        self.assertAlmostEqual(trackpoints.minlon, -106.2534204)
-        self.assertAlmostEqual(trackpoints.maxlon, -106.2283611)
-        self.assertAlmostEqual(trackpoints.minlat, 35.8849806)
-        self.assertAlmostEqual(trackpoints.maxlat, 35.895508)
 
         # Check points, the first label and the first real point
         self.assertEqual(len(trackpoints.points), 1265)
 
         self.assertIsInstance(trackpoints.points[0], str)
-        self.assertEqual(trackpoints.points[0], 'otowi-mesa-arch.gpx')
+        self.assertEqual(trackpoints.points[0], trackname)
 
         self.assertIsInstance(trackpoints.points[1], GeoPoint)
-        self.assertAlmostEqual(float(trackpoints.points[1].ele), 2108.0)
-        self.assertEqual(trackpoints.points[1].timestamp,
-                         '2016-03-02T17:28:45Z')
+        if track_eles:
+            self.assertClose(float(trackpoints.points[1].ele), 2108.0)
+        if track_times:
+            self.assertEqual(trackpoints.points[1].timestamp,
+                             '2016-03-02T17:28:45Z')
 
-        self.assertEqual(len(trackpoints.waypoints), 3)
+        self.assertEqual(len(trackpoints.waypoints), 2)
         lastpt = trackpoints.waypoints[-1]
         self.assertEqual(lastpt.name, 'Arches')
-        self.assertAlmostEqual(lastpt.lat, 35.8872124)
-        self.assertAlmostEqual(lastpt.lon, -106.2297864)
+        self.assertClose(lastpt.lat, 35.8872124)
+        self.assertClose(lastpt.lon, -106.2297864)
 
 
     def test_read_gpx(self):
         trackpoints = TrackPoints()
         trackpoints.read_track_file('test/data/otowi-mesa-arch.gpx')
-        self.verify_otowi(trackpoints)
+        self.verify_otowi(trackpoints, 'otowi-mesa-arch.gpx',
+                          track_times=True, track_eles=True)
+
+        # GPX specifies region boundaries, but not all formats do.
+        self.assertClose(trackpoints.minlon, -106.2534204)
+        self.assertClose(trackpoints.maxlon, -106.2283611)
+        self.assertClose(trackpoints.minlat, 35.8849806)
+        self.assertClose(trackpoints.maxlat, 35.895508)
+
+
+    def test_read_kml(self):
+        trackpoints = TrackPoints()
+        trackpoints.read_track_file('test/data/otowi-mesa-arch.kml')
+        self.verify_otowi(trackpoints, 'Otowi Mesa Trail',
+                          track_times=False, track_eles=False)
+
+
+    def test_read_geojson(self):
+        trackpoints = TrackPoints()
+        trackpoints.read_track_file('test/data/otowi-mesa-arch.geojson')
+        trackpoints2 = TrackPoints()
+        trackpoints2.read_track_file('test/data/otowi-mesa-arch.gpx')
+
+        for i, pt in enumerate(trackpoints.points):
+            if not trackpoints.is_start(trackpoints.points[i]) and \
+               not trackpoints.is_start(trackpoints2.points[i]):
+                self.assertClose(trackpoints.points[i].lat,
+                                 trackpoints2.points[i].lat)
+                self.assertClose(trackpoints.points[i].lon,
+                                 trackpoints2.points[i].lon)
+
+        self.verify_otowi(trackpoints, 'unnamed',
+                          track_times=False, track_eles=True)
 

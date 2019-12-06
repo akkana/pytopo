@@ -89,6 +89,16 @@ class TrackPoints(object):
 
         self.Debug = False
 
+
+    def __repr__(self):
+        return "<TrackPoints: %d points, %s waypoints>" % (len(self.points),
+                                                           len(self.waypoints))
+
+
+    def __bool__(self):
+        return bool(self.points) or bool(self.waypoints)
+
+
     @staticmethod
     def get_version():
         # There doesn't seem to be any good way of getting the current
@@ -169,10 +179,11 @@ class TrackPoints(object):
         return None
 
     def read_track_file_GPX(self, filename):
-        """Read a GPX track file. Throw IOError if the file doesn't exist."""
-
-        if not os.path.exists(filename):
-            raise IOError("Can't open track file %s" % filename)
+        """Read a GPX track file into the current TrackPoints object.
+           Raise FileNotFoundError if the file doesn't exist,
+           RuntimeError if it's not a track file,
+           IOError or other exceptions as needed.
+        """
 
         if self.Debug:
             print("Reading track file", filename)
@@ -220,7 +231,7 @@ class TrackPoints(object):
         first_segment_name = None
         waypts = dom.getElementsByTagName("wpt")
         if waypts:
-            self.waypoints.append(os.path.basename(filename))
+            # self.waypoints.append(os.path.basename(filename))
             for pt in waypts:
                 lat, lon, ele, time, attrs = self.GPX_point_coords(pt)
                 name = self.get_DOM_text(pt, "name")
@@ -352,19 +363,44 @@ class TrackPoints(object):
     #
 
     def read_track_file(self, filename):
-        """Read a track file. Throw IOError if the file doesn't exist."""
+        """Read a track file.
+           Raise FileNotFoundError if the file doesn't exist,
+           RuntimeError if it's not a track file,
+           IOError or other exceptions as needed.
+        """
         # XXX Should read magic number rather than depending on extension
-        if filename.lower().endswith('.kml') or \
-           filename.lower().endswith('.kmz'):
-            return self.read_track_file_KML(filename)
-        elif filename.lower().endswith('.json'):
-            return self.read_track_file_GeoJSON(filename)
-        elif filename.lower().endswith('.gpx'):
-            return self.read_track_file_GPX(filename)
-        else:
-            raise(RuntimeError("Track file %s doesn't end in "
-                               ".gpx, .kml, .kmz or .json"
-                               % filename))
+
+        ext = self.lowerext(filename)
+
+        # mappers has to be defined at the end of the class
+        # or it won't see the function names like read_track_file_GPX.
+        for mapper in self.mappers:
+            if ext in mapper[0]:
+                return mapper[1](self, filename)
+
+        raise(RuntimeError("Track file %s doesn't end in one of " % filename
+                           + ', '.join([ ', '.join(m[0])
+                                         for m in self.mappers])))
+
+    @classmethod
+    def lowerext(classname, filename):
+        base, ext = os.path.splitext(filename)
+        if ext.startswith('.'):
+            ext = ext[1:]
+        ext = ext.lower()
+        return ext
+
+    @classmethod
+    def is_track_file(classname, filename):
+        '''Is the file a type PyTopo recognizes as a track file?
+           But it's more efficient to call read_track_file() wrapped in a try
+           to avoid checking the extension twice.
+        '''
+        ext = classname.lowerext(filename)
+        for mapper in classname.mappers:
+            if ext in mapper[0]:
+                return True
+        return False
 
     def save_GPX_in_region(self, start_lon, start_lat, end_lon, end_lat,
                            filename):
@@ -457,6 +493,9 @@ class TrackPoints(object):
 
     def read_track_file_GeoJSON(self, filename):
         """Read a GeoJSON track file.
+           Raise FileNotFoundError if the file doesn't exist,
+           RuntimeError if it's not a track file,
+           IOError or other exceptions as needed.
         """
         with open(filename) as fp:
             gj = simplejson.loads(fp.read())
@@ -468,8 +507,19 @@ class TrackPoints(object):
             return
         for feature in gj["features"]:
             featuretype = feature["geometry"]["type"]
+
+            if featuretype == 'Point':
+                lon = feature["geometry"]["coordinates"][0]
+                lat = feature["geometry"]["coordinates"][1]
+                if "name" in feature["properties"]:
+                    name = feature["properties"]["name"]
+                elif "description" in feature["properties"]:
+                    name = feature["properties"]["description"]
+                self.handle_track_point(lat, lon, waypoint_name=name)
+
             if featuretype != "LineString" and featuretype != "MultiLineString":
                 continue
+
             # It's a track. Add it.
             name = None
             if "properties" in feature:
@@ -485,29 +535,32 @@ class TrackPoints(object):
 
             if featuretype == "LineString":
                 self.points.append(name)
-                if "properties" in feature:
-                    self.points.append(feature["properties"])
+                # What is in feature["properties"] in a GeoJSON?
+                # How should it be represented?
+                # if "properties" in feature and feature["properties"]:
+                #     self.points.append(feature["properties"])
                 for coords in feature["geometry"]["coordinates"]:
                     lon, lat, ele = coords
                     self.handle_track_point(lat, lon, ele=ele)
+
             elif featuretype == "MultiLineString":
                 for linestring in feature["geometry"]["coordinates"]:
                     self.points.append(name)
-                    if "properties" in feature:
-                        self.points.append(feature["properties"])
+                    # if "properties" in feature:
+                    #     self.points.append(feature["properties"])
                     for coords in linestring:
                         lon, lat, ele = coords
                         self.handle_track_point(lat, lon, ele=ele)
+
 
     def read_track_file_KML(self, filename):
         """Read a KML or KMZ track file.
            Just read Placemarks (which cover both paths and points);
            ignore all styles.
-           Throw IOError if the file doesn't exist.
+           Raise FileNotFoundError if the file doesn't exist,
+           RuntimeError if it's not a track file,
+           IOError or other exceptions as needed.
         """
-
-        if not os.path.exists(filename):
-            raise IOError("Can't open track file %s" % filename)
 
         if self.Debug:
             print("Reading track file", filename)
@@ -604,3 +657,11 @@ class TrackPoints(object):
             ret.append(triple)
 
         return ret
+
+    # mappers has to be defined at the end of the class
+    # or it won't see the function names like read_track_file_GPX.
+    mappers = (
+        ( ('gpx',),            read_track_file_GPX ),
+        ( ('kml', 'kmz'),      read_track_file_KML ),
+        ( ('json', 'geojson'), read_track_file_GeoJSON )
+    )
