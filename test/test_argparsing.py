@@ -53,7 +53,6 @@ class ArgparseTests(unittest.TestCase):
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
         self.assertClose(mapwin.center_lon, -106.24089075)
-        print("center lat", mapwin.center_lat)
         self.assertClose(mapwin.center_lat, 35.890244)
 
 

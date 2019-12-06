@@ -670,23 +670,12 @@ from pytopo import GenericMapCollection
 
     def create_initial_config(self):
         """Make an initial configuration file.
-           If the user has a ~/.config, make ~/.config/pytopo/pytopo.sites
-           else fall back on ~/.pytopo.
+           If the user has a ~/.config, make ~/.config/pytopo/pytopo.sites.
         """
-        confdir = os.path.expanduser("~/.config/pytopo")
-        try:
-            if not os.access(confdir, os.W_OK):
-                os.mkdir(confdir)
-            userfile = os.path.join(confdir, "pytopo.sites")
-            fp = open(userfile, 'w')
-        except:
-            fp = None
-        if not fp:
-            userfile = os.path.expanduser("~/.pytopo")
-            try:
-                fp = open(userfile, 'w')
-            except:
-                return None
+        if not os.access(self.config_dir, os.W_OK):
+            os.makedirs(self.config_dir)
+        userfile = os.path.join(self.config_dir, "pytopo.sites")
+        fp = open(userfile, 'w')
 
         # Now we have fp open. Write a very basic config to it.
         print("""# Pytopo site file
