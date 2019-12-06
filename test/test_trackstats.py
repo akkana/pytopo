@@ -22,7 +22,7 @@ class ParseTests(unittest.TestCase):
 
     def test_track_stats(self):
         trackpoints = pytopo.TrackPoints()
-        trackpoints.read_track_file('test/data/otowi-mesa-arch.gpx')
+        trackpoints.read_track_file('test/files/otowi-mesa-arch.gpx')
 
         halfwin = 0
         beta = 2

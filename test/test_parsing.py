@@ -3,7 +3,7 @@
 from __future__ import print_function
 
 import unittest
-import sys
+import sys, os
 import math
 
 sys.path.insert(0, '..')
@@ -88,6 +88,22 @@ class ParseTests(unittest.TestCase):
         trackpoints.read_track_file('test/files/otowi-mesa-arch.kml')
         self.verify_otowi(trackpoints, 'Otowi Mesa Trail',
                           track_times=False, track_eles=False)
+
+
+    def test_read_kmz(self):
+        filebase = 'test/files/otowi-mesa-arch'
+        kmlfile = filebase + ".kml"
+        zipfile = filebase + ".zip"
+        kmzfile = filebase + ".kmz"
+        # XXX Could do this the hard way with the zipfile library
+        os.system("/usr/bin/zip -9 %s %s" % (zipfile, kmlfile))
+        # zip has no option to specify the output file name!
+        os.rename(zipfile, kmzfile)
+        trackpoints = TrackPoints()
+        trackpoints.read_track_file(kmzfile)
+        self.verify_otowi(trackpoints, 'Otowi Mesa Trail',
+                          track_times=False, track_eles=False)
+        os.unlink(kmzfile)
 
 
     def test_read_geojson(self):

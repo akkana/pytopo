@@ -566,15 +566,26 @@ class TrackPoints(object):
             print("Reading track file", filename)
 
         # Handle kmz compressed files, which are much more common in practice
-        # than actual KML files:
+        # than actual KML files.
+        # XXX Supposedly kmz can include supporting files as well as
+        # the main .kml file, but I haven't seen an example in practice yet.
         if filename.lower().endswith(".kmz") and zipfile.is_zipfile(filename):
             zipf = zipfile.ZipFile(filename)
             namelist = zipf.namelist()
-            if "doc.kml" not in namelist:
-                raise ValueError("No doc.kml in %s" % filename)
+            kmlfile = 'doc.kml'
+            if kmlfile not in namelist:
+                kmlfile = None
+                for n in namelist:
+                    if n.lower().endswith('.kml'):
+                        kmlfile = n
+                        break
+            if not kmlfile:
+                raise ValueError("No *.kml in %s" % filename)
             if len(namelist) > 1:
-                print("Warning: ignoring files other than doc.kml in", filename)
-            kmlfp = zipf.open("doc.kml")
+                print("Warning: ignoring files besides %s in %s:"
+                      % (kmlfile, filename))
+                print(" ", " ".join(namelist))
+            kmlfp = zipf.open(kmlfile)
             doc_kml = kmlfp.read()
             kmlfp.close()
             dom = xml.dom.minidom.parseString(doc_kml)
