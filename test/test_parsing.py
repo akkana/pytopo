@@ -26,8 +26,9 @@ class ParseTests(unittest.TestCase):
 
     # unittest almostEqual requires more closeness than there is between
     # gpx and kml.
-    def assertClose(self, a, b, tolerance=1e6):
-        return self.assertTrue(math.isclose(a, b, rel_tol=tolerance))
+    def assertClose(self, a, b, tolerance=1e-6):
+        if not math.isclose(a, b, rel_tol=tolerance):
+            raise AssertionError('%f not close enough to %f' % (a, b))
 
 
     def test_parse_saved_sites(self):

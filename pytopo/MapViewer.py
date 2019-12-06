@@ -90,7 +90,13 @@ class MapViewer(object):
         self.init_height = 600
         self.default_collection = None
         self.needs_saving = False
-        self.config_dir = os.path.expanduser("~/.config/pytopo",)
+
+        if 'XDG_CONFIG_HOME' in os.environ:
+            self.config_dir = os.path.join(os.environ['XDG_CONFIG_HOME'],
+                                                      "pytopo")
+        else:
+            self.config_dir = os.path.expanduser("~/.config/pytopo",)
+
         self.saved_sites_filename = os.path.join(self.config_dir, "saved.sites")
         self.reload_tiles = False
 
