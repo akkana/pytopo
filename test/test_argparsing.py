@@ -59,7 +59,7 @@ class ArgparseTests(unittest.TestCase):
 
     # unittest almostEqual requires more closeness than there is between
     # gpx and kml.
-    def assertClose(self, a, b, tolerance=1e-5):
+    def assertCloseEnough(self, a, b, tolerance=1e-5):
         if not math.isclose(a, b, rel_tol=tolerance):
             raise AssertionError('%f not close enough to %f' % (a, b))
 
@@ -72,8 +72,8 @@ class ArgparseTests(unittest.TestCase):
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
-        self.assertClose(mapwin.center_lon, -106.24089075)
-        self.assertClose(mapwin.center_lat, 35.890244)
+        self.assertCloseEnough(mapwin.center_lon, -106.24089075)
+        self.assertCloseEnough(mapwin.center_lat, 35.890244)
 
 
     def test_gpx_and_kml_arg(self):
@@ -85,8 +85,18 @@ class ArgparseTests(unittest.TestCase):
 
         self.assertEqual(len(mapwin.trackpoints.points), 2530)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 4)
-        self.assertClose(mapwin.center_lon, -106.24089075)
-        self.assertClose(mapwin.center_lat, 35.890244)
+        self.assertCloseEnough(mapwin.center_lon, -106.24089075)
+        self.assertCloseEnough(mapwin.center_lat, 35.890244)
+
+
+    def test_explicit_coords(self):
+        args = [ 'pytopo', '37.471', '-122.245' ]
+
+        mapwin =  MapWindow(self.viewer)
+        self.viewer.parse_args(mapwin, args)
+
+        self.assertCloseEnough(mapwin.center_lon, -122.245)
+        self.assertCloseEnough(mapwin.center_lat, 37.471)
 
 
     def test_known_site(self):
@@ -116,6 +126,8 @@ KnownSites = [
         self.assertEqual(len(mapwin.trackpoints.waypoints), 0)
         # XXX The default san-francisco coordinates are 37.471, -122.245
         # so it's not entirely clear why that isn't the center location.
+        # That's not the case in the test_explicit_coords case,
+        # where the center is exactly the coordinates specified.
         # Investigate this.
-        self.assertClose(mapwin.center_lon, -122.4083)
-        self.assertClose(mapwin.center_lat, 37.7850)
+        self.assertCloseEnough(mapwin.center_lon, -122.4083)
+        self.assertCloseEnough(mapwin.center_lat, 37.7850)

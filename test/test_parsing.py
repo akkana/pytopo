@@ -26,7 +26,7 @@ class ParseTests(unittest.TestCase):
 
     # unittest almostEqual requires more closeness than there is between
     # gpx and kml.
-    def assertClose(self, a, b, tolerance=1e-6):
+    def assertCloseEnough(self, a, b, tolerance=1e-6):
         if not math.isclose(a, b, rel_tol=tolerance):
             raise AssertionError('%f not close enough to %f' % (a, b))
 
@@ -59,7 +59,7 @@ class ParseTests(unittest.TestCase):
 
         self.assertIsInstance(trackpoints.points[1], GeoPoint)
         if track_eles:
-            self.assertClose(float(trackpoints.points[1].ele), 2108.0)
+            self.assertCloseEnough(float(trackpoints.points[1].ele), 2108.0)
         if track_times:
             self.assertEqual(trackpoints.points[1].timestamp,
                              '2016-03-02T17:28:45Z')
@@ -67,8 +67,8 @@ class ParseTests(unittest.TestCase):
         self.assertEqual(len(trackpoints.waypoints), 2)
         lastpt = trackpoints.waypoints[-1]
         self.assertEqual(lastpt.name, 'Arches')
-        self.assertClose(lastpt.lat, 35.8872124)
-        self.assertClose(lastpt.lon, -106.2297864)
+        self.assertCloseEnough(lastpt.lat, 35.8872124)
+        self.assertCloseEnough(lastpt.lon, -106.2297864)
 
 
     def test_read_gpx(self):
@@ -78,10 +78,10 @@ class ParseTests(unittest.TestCase):
                           track_times=True, track_eles=True)
 
         # GPX specifies region boundaries, but not all formats do.
-        self.assertClose(trackpoints.minlon, -106.2534204)
-        self.assertClose(trackpoints.maxlon, -106.2283611)
-        self.assertClose(trackpoints.minlat, 35.8849806)
-        self.assertClose(trackpoints.maxlat, 35.895508)
+        self.assertCloseEnough(trackpoints.minlon, -106.2534204)
+        self.assertCloseEnough(trackpoints.maxlon, -106.2283611)
+        self.assertCloseEnough(trackpoints.minlat, 35.8849806)
+        self.assertCloseEnough(trackpoints.maxlat, 35.895508)
 
 
     def test_read_kml(self):
@@ -116,9 +116,9 @@ class ParseTests(unittest.TestCase):
         for i, pt in enumerate(trackpoints.points):
             if not trackpoints.is_start(trackpoints.points[i]) and \
                not trackpoints.is_start(trackpoints2.points[i]):
-                self.assertClose(trackpoints.points[i].lat,
+                self.assertCloseEnough(trackpoints.points[i].lat,
                                  trackpoints2.points[i].lat)
-                self.assertClose(trackpoints.points[i].lon,
+                self.assertCloseEnough(trackpoints.points[i].lon,
                                  trackpoints2.points[i].lon)
 
         self.verify_otowi(trackpoints, 'unnamed',
