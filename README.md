@@ -60,9 +60,14 @@ Also in this project: ellie, a little script for reporting and plotting
 statistics (distance and elevation change) from a GPX track log.
 More information: http://shallowsky.com/software/ellie/
 
-There are also a small number of tests in the test/ directory;
+There are some unit tests in the test/ directory;
 run them with
     python -m unittest discover
 from the top-level directory.
+
+There's API as well as command args documentation in the docs directory.
+To build the API doc:
+    cd sphinxdoc
+    make html
 
 Have fun!
