@@ -6,7 +6,7 @@
 ================================================================
 PyTopo:
 ===========================================================================
-A viewer for tiled maps, plus viewing and editing track and waypoint files.
+PyTopo: View and edit tiled maps, track and waypoint files.
 ===========================================================================
 
 .. toctree::
@@ -20,7 +20,7 @@ local tiled maps or use commercial datasets.
 PyTopo can also show tracks and waypoints in several different formats,
 can save favorite places, and has some rudimentary track editing ability.
 
-Downloaded map tiles are cached forever (or until you remove them), so you can download tiles and then use PyTopo offline if, like me, you often travel to places where there's little or no internet access.
+Downloaded map tiles are cached forever (or until you remove them), so you can download tiles and then use PyTopo offline in places where there's little or no internet access.
 
 ==========
 Installing
@@ -30,15 +30,15 @@ PyTopo is available on PyPI::
 
   pip install pytopo
 
-It requires GTK and several related dependencies.
-I've tried to include the dependencies in setup.py so pip install
-will pull them in automatically. Some of the dependencies may require
-a C compiler and Python development headers.
+It requires GTK and several related packages.
+Some of the dependencies may require a C compiler and Python development headers on some systems.
 
-Once you've installed the package, the command to run is *pytopo*.
+The package installs two commands: ```pytopo``, the main map viewer,
+and ```ellie```, which analyzes track logs and can print statistics
+or, if you have matplotlib installed, plot an elevation profile.
 
 `PyTopo's source is hosted on GitHub <https://github.com/akkana/pytopo>`_
-if you want the latest and greatest.
+if you want the latest and greatest. It may be well ahead of the PyPI version.
 
 
 ============

@@ -248,6 +248,7 @@ that are expected by the MapCollection classes:
 
 
     def gpsd_callback(self, gpsd):
+        """Update the map given the GPS location"""
         # gpsd.fix.mode is 1 if no fix, 2 for a 2d fix, 3 for a 3d fix.
         # mentioned in passing on http://www.catb.org/gpsd/client-howto.html
         if gpsd and gpsd.fix.mode > 1:
@@ -255,6 +256,7 @@ that are expected by the MapCollection classes:
             gobject.idle_add(self.update_position_from_GPS)
 
     def update_position_from_GPS(self):
+        """If gpsd is running, move the map to center the new GPS location."""
         if not self.last_gpsd:
             print("No last_gpsd")    # shouldn't get here
             return
@@ -469,9 +471,11 @@ that are expected by the MapCollection classes:
         self.traildialog.show_all()
 
     def hide_traildialog(self, d, responseid=None):
+        """Hide the track dialog"""
         d.hide()
 
     def draw_trackpoints(self):
+        """Draw any trackpoints that are currently visible."""
         if not self.trackpoints:
             return
 
@@ -616,12 +620,17 @@ that are expected by the MapCollection classes:
         return nearest_track, nearest_point, nearest_waypoint
 
     def draw_overlays(self):
+        """Draw overlays: tile attribution, zoom control, scale,
+           plus any visible trackpoints and waypoints.
+        """
         self.collection.draw_attribution(self)
         self.draw_zoom_control()
         self.draw_map_scale()
         self.draw_trackpoints()
 
     def draw_map_scale(self):
+        """Draw a map scale at the bottom of the map window.
+        """
         ###################################################################
         #
         # The draw_map_scale function calculates and draws a map scale
@@ -811,12 +820,14 @@ that are expected by the MapCollection classes:
              MapUtils.dec_deg2deg_min_str(self.cur_lat)))
 
     def zoom(self, widget=None):
+        """Zoom the map by 1 unit."""
         self.center_lon = self.cur_lon
         self.center_lat = self.cur_lat
         self.collection.zoom(1)
         self.draw_map()
 
     def scroll_event(self, button, event):
+        """Zoom in or out in response to mousewheel events."""
         if event.direction != gtk.gdk.SCROLL_UP and \
            event.direction != gtk.gdk.SCROLL_DOWN:
             return False
@@ -845,6 +856,7 @@ that are expected by the MapCollection classes:
         return True
 
     def toggle_track_drawing(self, mode):
+        """Toggle whether tracks are drawn."""
         if self.drawing_track:
             self.draw_map()
 
@@ -958,10 +970,12 @@ that are expected by the MapCollection classes:
             print("Couldn't find a collection named '%s'" % name)
 
     def toggle_show_waypoints(self, widget):
+        """Toggle whether waypoints are shown."""
         self.show_waypoints = not self.show_waypoints
         self.draw_map()
 
     def mylocations(self, widget):
+        """Show the location_select dialog"""
         self.controller.location_select(self)
 
 
@@ -1102,16 +1116,22 @@ that are expected by the MapCollection classes:
         self.trackpoints.save_GPX(outfile)
 
     def undo(self, widget=None):
+        """Undo the last change to trackpoints: for instance,
+           splitting a track or deleting early or late points.
+        """
         self.trackpoints.undo()
         self.draw_map()
 
     def remove_before_mouse(self, widget):
+        """Remove any points before the current mouse position."""
         self.mod_track_by_mouse(remove = -1)
 
     def remove_after_mouse(self, widget):
+        """Remove any points after the current mouse position."""
         self.mod_track_by_mouse(remove = 1)
 
     def split_track_by_mouse(self, widget):
+        """Split a track at the current mouse position."""
         self.mod_track_by_mouse(remove = 0)
 
     def mod_track_by_mouse(self, remove=0):
@@ -1267,20 +1287,28 @@ that are expected by the MapCollection classes:
         self.controller.save_sites()
 
     def mytracks(self, widget):
+        """Try to center the loaded trackpoints in the window
+           and show the map.
+        """
         self.controller.track_select(self)
         if self.trackpoints is not None:
             self.trackpoints_center()
         self.draw_map()
 
     def trackpoints_center(self):
+        """Try to center the loaded trackpoints in the window"""
         minlon, minlat, maxlon, maxlat = self.trackpoints.get_bounds()
         self.center_lon = (maxlon + minlon) / 2
         self.center_lat = (maxlat + minlat) / 2
 
     def cancel_download(self, widget, data=None):
+        """Cancel any pending downloads."""
         self.cancelled = True
 
     def download_area(self, widget):
+        """Download tiles covering an area. Not well supported
+           and can get your client blacklisted.
+        """
         if not self.collection.zoomlevel:
             print("Can't download an area for this collection")
             return
@@ -1509,6 +1537,7 @@ that are expected by the MapCollection classes:
         self.set_color(self.black_color)
 
     def set_color(self, color):
+        """Change the foreground color, e.g. for drawing text."""
         # self.xgc.set_rgb_fg_color(color)
         self.cr.set_source_rgb(*color)
 
@@ -1723,10 +1752,12 @@ that are expected by the MapCollection classes:
             print("Saved:", outfile)
 
     def on_size_allocate(self, _unused, allocation):
+        """Notice a new window width and height"""
         self.width = allocation.width
         self.height = allocation.height
 
     def expose3(self, _unused, _ctx):
+        """An expose event for Cairo drawing."""
         self.expose_event(self.drawing_area, None)
 
     def expose_event(self, widget, event):
@@ -1749,7 +1780,7 @@ that are expected by the MapCollection classes:
         return True
 
     def key_press_event(self, widget, event):
-        """Handle any key press."""
+        """Handle key presses."""
         if event.string == "q":
             self.graceful_exit()
             # Must return here: gtk.main_quit() (called from graceful_exit())
@@ -1887,6 +1918,7 @@ that are expected by the MapCollection classes:
         return True
 
     def move_to(self, x, y, widget):
+        """Move the map, e.g. during a mouse drag."""
         # traceback.print_stack()
         # print("=======")
 
@@ -1906,7 +1938,7 @@ that are expected by the MapCollection classes:
             self.y_start_drag = y
 
     def click_draw(self, widget, event):
-        """Handle mouse button presses if we're in drawing mode"""
+        """Handle mouse button presses when in drawing mode"""
         if event.button != 1:
             print("We only handle button 1 so far when drawing tracks.")
             return False
@@ -1956,6 +1988,9 @@ that are expected by the MapCollection classes:
         return True
 
     def longpress(self):
+        """Handle longpress, for running on tablets.
+           Hasn't been tested in a long time.
+        """
         if self.press_timeout:
             gobject.source_remove(self.press_timeout)
             self.press_timeout = None

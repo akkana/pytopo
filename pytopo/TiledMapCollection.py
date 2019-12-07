@@ -48,6 +48,9 @@ TiledMapCollection classes must implement:
         self.mapwin = None
 
     def set_reload_tiles(self, p):
+        """Set a flag indicating that all map tiles need to be re-downloaded,
+           if the collection has a valid download location.
+        """
         if p:
             if 'download_url' in dir(self) and self.download_url:
                 print("Will re-download all map tiles")
@@ -250,9 +253,11 @@ TiledMapCollection classes must implement:
     # Utilities for mapping tiles to/from degrees.
     # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
     def deg2num(self, lat_deg, lon_deg, zoom=None):
+        """Undefined, must be defined by subclasses"""
         raise RuntimeError("TiledMapCollection subclasses must define deg2num")
 
     def num2deg(self, xtile, ytile):
+        """Undefined, must be defined by subclasses"""
         raise RuntimeError("TiledMapCollection subclasses must define num2deg")
 
     def draw_single_tile(self, path, mapwin):

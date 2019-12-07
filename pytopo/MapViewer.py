@@ -153,6 +153,7 @@ Shift-click in the map to print the coordinates of the clicked location.
         MapViewer.Usage()
 
     def append_known_site(self, site):
+        """Append the given site to KnownSites."""
         self.KnownSites.append(site)
         self.needs_saving = True
 
@@ -211,6 +212,8 @@ Shift-click in the map to print the coordinates of the clicked location.
         return collection
 
     def track_select(self, mapwin):
+        """Show a dialog giving a choice of known tracks.
+        """
         dialog = gtk.Dialog("Tracks", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -256,6 +259,8 @@ Shift-click in the map to print the coordinates of the clicked location.
         return False
 
     def location_select(self, mapwin):
+        """Bring up a dialog giving a choice of known starting locations.
+        """
         dialog = gtk.Dialog("Locations", None, 0,
                             (gtk.STOCK_REMOVE, gtk.RESPONSE_APPLY,
                              gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
@@ -313,6 +318,8 @@ Shift-click in the map to print the coordinates of the clicked location.
         return False
 
     def use_site(self, site, mapwin):
+        """Given a starting site, center the map on it and show the map.
+        """
         if len(site) > 3 and site[3]:
             collection = self.find_collection(site[3])
         else:
@@ -662,6 +669,7 @@ from pytopo import GenericMapCollection
         sitesfile.close()
 
     def read_tracks(self):
+        """Read in all tracks from ~/Tracks."""
         trackdir = os.path.expanduser('~/Tracks')
 
         if os.path.isdir(trackdir):

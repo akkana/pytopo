@@ -65,9 +65,18 @@ run them with
     python -m unittest discover
 from the top-level directory.
 
-There's API as well as command args documentation in the docs directory.
-To build the API doc:
-    cd sphinxdoc
-    make html
+The docs directory contains documentation on the two apps and the API.
+To build the documentation:
 
-Have fun!
+```
+python setup.py build_sphinx
+```
+
+or
+
+```
+cd sphinxdoc
+make html
+```
+
+Happy mapping!

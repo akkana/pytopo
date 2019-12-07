@@ -85,16 +85,19 @@ map coordinates and need a starting place. Should probably remove it.
     # Spherical Mercator code,
     # from http://wiki.openstreetmap.org/wiki/Mercator#Python
     def y2lat(self, a):
+        """Spherical Mercator conversion to latitude (decimal degrees)"""
         return (180.0 / math.pi
                 * (2.0 * math.atan(math.exp(a * math.pi / 180.0))
                    - math.pi / 2.0))
 
     def lat2y(self, a):
+        """Spherical Mercator conversion from latitude (decimal degrees)"""
         return (180.0 / math.pi
                 * math.log(math.tan(math.pi / 4.0
                                     + a * (math.pi / 180.0) / 2.0)))
 
     def zoom_to_bounds(self, minlon, minlat, maxlon, maxlat):
+        """Zoom to a reasonable level for the given bounds."""
         # http://gis.stackexchange.com/questions/19632/how-to-calculate-the-optimal-zoom-level-to-display-two-or-more-points-on-a-map
         # Find spherical Mercator distances:
         xdist = maxlon - minlon

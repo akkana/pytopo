@@ -307,14 +307,16 @@ class TrackPoints(object):
                 t += interval
 
     def undo(self):
+        """Undo a change to a track, like removing early or late points."""
         if self.saved_points:
             self.points = self.saved_points
 
     def save_for_undo(self):
+        """Save points that have been deleted, so they're available for undo."""
         self.saved_points = self.points[:]
 
-    # For debugging: a concise way of representing all current tracks.
     def print_tracks(self):
+        """For debugging: a concise way of representing all current tracks."""
         count = 0
         curtrack = None
         for pt in self.points:
@@ -676,3 +678,4 @@ class TrackPoints(object):
         ( ('kml', 'kmz'),      read_track_file_KML ),
         ( ('json', 'geojson'), read_track_file_GeoJSON )
     )
+    '''A list of file extensions recognized, and the functions that read them'''
