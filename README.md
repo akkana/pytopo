@@ -2,7 +2,9 @@
 
 PyTopo is a tiled map viewer and a track log viewer/editor.
 
-![PyTopo screenshot, Bandelier National Monument](http://shallowsky.com/software/topo/screenshots/bandelier-ssT.jpg "PyTopo Screenshot")
+![PyTopo screenshot, Bandelier National Monument](http://shallowsky.com/software/topo/screenshots/bandelier-ssT.jpg http://shallowsky.com/software/topo/screenshots/bandelier-ss.jpg)
+
+[![Foo](http://www.google.com.au/images/nav_logo7.png)](http://google.com.au/)
 
 Downloaded map tiles are cached locally, so you can use PyTopo offline
 if you've already cached the tiles for an area.
