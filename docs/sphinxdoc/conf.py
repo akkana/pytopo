@@ -60,7 +60,21 @@ author = u'Akkana Peck'
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
-#
+
+def get_version():
+    '''Read the pytopo module versions from pytopo/__init__.py'''
+    with open("../../pytopo/__init__.py") as fp:
+        for line in fp:
+            line = line.strip()
+            if line.startswith("__version__"):
+                versionpart = line.split("=")[-1] \
+                                  .strip().replace('"', '').replace("'", '')
+                if versionpart.startswith('"') or versionpart.startswith("'"):
+                    versionpart = versionpart[1:]
+                if versionpart.endswith('"') or versionpart.endswith("'"):
+                    versionpart = versionpart[:-1]
+                return versionpart
+
 # The short X.Y version.
 version = u'1.6'
 # The full version, including alpha/beta/rc tags.

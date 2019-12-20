@@ -48,6 +48,7 @@ setup(name='pytopo',
       url='http://shallowsky.com/software/topo/',
       zip_safe=False,
 
+      # Data files.
       # This only works if the data files are inside the package directory,
       # i.e. from here they have to be in pytopo/resources, not just resources.
       include_package_data=True,
