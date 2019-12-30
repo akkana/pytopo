@@ -2,8 +2,8 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''MapCollection: the base class for all pytopo map collections.
-'''
+"""MapCollection: the base class for all pytopo map collections.
+"""
 
 from __future__ import print_function
 

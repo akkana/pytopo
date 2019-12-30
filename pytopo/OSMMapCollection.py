@@ -2,10 +2,10 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''OSMMapCollection: tiles downloaded from the OpenStreetMap project,
+"""OSMMapCollection: tiles downloaded from the OpenStreetMap project,
    one of its renderers, or any other source that uses a similar
    tile naming and zoom scheme.
-'''
+"""
 
 from __future__ import print_function
 
@@ -34,15 +34,25 @@ class OSMMapCollection(TiledMapCollection):
                  _img_width, _img_height, _init_zoom,
                  _download_url=None, maxzoom=19,
                  reload_if_older=None, attribution=None):
-        """arguments:
-        name         -- user-visible name of the collection
-        location     -- directory on disk where the maps reside
-        ext          -- filename extension including the dot, e.g. .jpg
-        img_width    -- width of each maplet
-        img_height   -- height of each maplet
-        init_zoom    -- default initial zoom level
-        download_url -- try to download missing maplets from here
-        reload_if_older: if set, reload tiles older than this (in days)
+        """
+        Parameters
+        ----------
+        name         : str
+            user-visible name of the collection
+        location     : str
+            directory on disk where the maps reside
+        ext          : str
+            filename extension including the dot, e.g. .jpg
+        img_width    : int
+            width of each maplet in pixels
+        img_height   : int
+            height of each maplet in pixels
+        init_zoom    : int
+            default initial zoom level
+        download_url : str
+            try to download missing maplets from here
+        reload_if_older : bool
+            if set, reload tiles older than this (in days)
         """
         TiledMapCollection.__init__(self, _name, _location,
                                     _img_width, _img_height)

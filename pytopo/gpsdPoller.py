@@ -14,9 +14,9 @@ import threading
 
 class GpsdPoller(threading.Thread):
     def __init__(self, polltime=10, callback=None):
-        '''Poll time is in seconds.
+        """Poll time is in seconds.
            Callback has one argument: a gps.gpsd object.
-        '''
+        """
 
         threading.Thread.__init__(self, name="gpsd_poller")
 

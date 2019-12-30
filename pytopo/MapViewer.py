@@ -5,8 +5,8 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''MapViewer, the main pytopo application, which controls the MapWindow.
-'''
+"""MapViewer, the main pytopo application, which controls the MapWindow.
+"""
 
 from __future__ import print_function
 
@@ -36,11 +36,11 @@ class ArgParseException(Exception):
 
 
 def strip_bracketed(s, c):
-    '''If s begins and ends with c, strip off c.
+    """If s begins and ends with c, strip off c.
        c can be a single character like '"',
        or a pair of characters like '[]'.
        Also removes trailing commas.
-    '''
+    """
     start_char = c[0]
     if len(c) > 1:
         end_char = c[1]
@@ -65,12 +65,12 @@ quoting_regex = re.compile(r'''
 ''', re.VERBOSE)
 
 def parse_saved_site_line(line):
-    '''Parse lines like
+    """Parse lines like
        [ "Treasure Island, zoomed", -122.221287, 37.493330, humanitarian, 13]
        (enclosing brackets are optional, as are double quotes
        for strings that don't include commas).
        Clever way of avoiding needing the CSV module
-    '''
+    """
 
     line = strip_bracketed(line, '[]')
 

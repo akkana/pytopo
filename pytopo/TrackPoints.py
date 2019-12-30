@@ -2,8 +2,8 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''Parsing and handling of GPS track files in pytopo.
-'''
+"""Parsing and handling of GPS track files in pytopo.
+"""
 
 from __future__ import print_function
 
@@ -111,23 +111,23 @@ class TrackPoints(object):
         return __version__
 
     def is_start(self, point):
-        '''Is this the start of a new track segment?
+        """Is this the start of a new track segment?
            If so, it's a string (or unicode), the name of the track section.
-        '''
+        """
         # Apparently there's no good way in Python
         return not isinstance(point, GeoPoint)
 
     def get_bounds(self):
-        '''Get bounds encompassing all contained tracks and waypoints.'''
+        """Get bounds encompassing all contained tracks and waypoints."""
         return self.minlon, self.minlat, self.maxlon, self.maxlat
 
     def is_attributes(self, point):
-        '''Is this point actually a set of attributes?'''
+        """Is this point actually a set of attributes?"""
         return isinstance(point, dict)
 
     def attributes(self, trackindex):
-        '''Does the indicated track have attributes? Then return them.
-        '''
+        """Does the indicated track have attributes? Then return them.
+        """
         # Currently attributes are represented by a dictionary
         # as the next item after the name in the trackpoints list.
         if self.is_attributes(self.points[trackindex + 1]):
@@ -136,11 +136,11 @@ class TrackPoints(object):
 
     def handle_track_point(self, lat, lon, ele=None,
                            timestamp=None, waypoint_name=False, attrs=None):
-        '''Add a new trackpoint or waypoint after some basic sanity checks.
+        """Add a new trackpoint or waypoint after some basic sanity checks.
            If waypoint_name, we assume this is a waypoint,
            otherwise assume it's a track point.
            attrs is an optional dict of other attributes, like hdop or speed.
-        '''
+        """
         if lon < self.minlon:
             self.minlon = lon
         if lon > self.maxlon:
@@ -159,9 +159,9 @@ class TrackPoints(object):
             self.points.append(point)
 
     def inside_box(self, pt, bb):
-        '''Is the point inside the given bounding box?
+        """Is the point inside the given bounding box?
            Bounding box is (min_lon, min_lat, max_lon, max_lat).
-        '''
+        """
         return (pt.lon >= bb[0] and pt.lon <= bb[2] and
                 pt.lat >= bb[1] and pt.lat <= bb[3])
 
@@ -243,10 +243,10 @@ class TrackPoints(object):
         # GPX also allows for routing, rtept, but I don't think we need those.
 
     def get_DOM_text(self, node, childname=None):
-        '''Get the text out of a DOM node.
+        """Get the text out of a DOM node.
            Or, if childname is specified, get the text out of a child
            node with node name childname.
-        '''
+        """
         if childname:
             nodes = node.getElementsByTagName(childname)
             if not nodes:
@@ -265,10 +265,10 @@ class TrackPoints(object):
         return None
 
     def GPX_point_coords(self, pointnode):
-        '''Parse a new trackpoint or waypoint from a GPX node.
+        """Parse a new trackpoint or waypoint from a GPX node.
            Returns lat (float), lon (float), ele (string or NOne),
            time (string or None), attrs (dict or None).
-        '''
+        """
         lat = float(pointnode.getAttribute("lat"))
         lon = float(pointnode.getAttribute("lon"))
         ele = self.get_DOM_text(pointnode, "ele")
@@ -295,7 +295,7 @@ class TrackPoints(object):
         return lat, lon, ele, time, attrs
 
     def add_bogus_timestamps(self):
-        '''Add made-up timestamps to every track point.'''
+        """Add made-up timestamps to every track point."""
         # 2007-10-02T09:22:06Z
         t = time.time()
         # How many seconds will we advance each time?
@@ -331,7 +331,7 @@ class TrackPoints(object):
             print("%s: %d points" % (curtrack, count))
 
     def remove_after(self, pointidx):
-        '''Remove all points after index pointidx.'''
+        """Remove all points after index pointidx."""
         self.save_for_undo()
         nextstart = None
         for i in range(pointidx+1, len(self.points)):
@@ -344,7 +344,7 @@ class TrackPoints(object):
             self.points = self.points[:pointidx]
 
     def remove_before(self, pointidx):
-        '''Remove all points before index pointidx.'''
+        """Remove all points before index pointidx."""
         self.save_for_undo()
         laststart = None
 
@@ -394,10 +394,10 @@ class TrackPoints(object):
 
     @classmethod
     def is_track_file(classname, filename):
-        '''Is the file a type PyTopo recognizes as a track file?
+        """Is the file a type PyTopo recognizes as a track file?
            But it's more efficient to call read_track_file() wrapped in a try
            to avoid checking the extension twice.
-        '''
+        """
         ext = classname.lowerext(filename)
         for mapper in classname.mappers:
             if ext in mapper[0]:
@@ -410,9 +410,9 @@ class TrackPoints(object):
         self.save_GPX(filename, (start_lon, start_lat, end_lon, end_lat))
 
     def save_GPX(self, filename, boundingbox=None):
-        '''Save all known tracks and waypoints as a GPX file.
+        """Save all known tracks and waypoints as a GPX file.
            XXX We don't have valid <time> saved for these points.
-        '''
+        """
         if boundingbox:
             # Make sure it's ordered right
             boundingbox = (min(boundingbox[0], boundingbox[2]),
@@ -650,13 +650,13 @@ class TrackPoints(object):
                                                 waypoint_name=name)
 
     def get_KML_coordinates(self, el):
-        '''Get the contents of the first <coordinates> triple
+        """Get the contents of the first <coordinates> triple
            inside the given element (which is inside a KML file).
            Inside a LineString, coordinate pairs or triples are separated
            by whitespace, which may include newlines.
            Return a list of triples [[lat, lon, ele], [lat, lon, ele] ...]
            Not all KMLs have elevation, so use None in that case.
-        '''
+        """
         coords = el.getElementsByTagName("coordinates")
         if not coords or len(coords) < 1:
             return None
@@ -678,4 +678,4 @@ class TrackPoints(object):
         ( ('kml', 'kmz'),      read_track_file_KML ),
         ( ('json', 'geojson'), read_track_file_GeoJSON )
     )
-    '''A list of file extensions recognized, and the functions that read them'''
+    """A list of file extensions recognized, and the functions that read them"""

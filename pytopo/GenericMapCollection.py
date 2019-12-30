@@ -2,10 +2,10 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''GenericMapCollection: a tiled map collection that can use
+"""GenericMapCollection: a tiled map collection that can use
    any naming scheme, suitable for home-built tiled maps
    or maps adapted from other data sources.
-'''
+"""
 
 from __future__ import print_function
 
@@ -27,21 +27,35 @@ class GenericMapCollection(TiledMapCollection):
                  _left_long, _top_lat,
                  _img_width, _img_height, _xscale, _yscale,
                  _numdigits, _usedash, _latfirst):
-        """arguments:
-        name       -- user-visible name of the collection
-        location   -- directory on disk where the maps reside
-        prefix     -- initial part of each maplet filename
-        ext        -- filename extension including the dot, e.g. .jpg
-        left_long  -- longitude of the left edge
-        top_lat    -- latitude of the top edge
-        img_width  -- width of each maplet in pixels
-        img_height -- height of each maplet in pixels
-        xscale     -- pixels per degree longitude
-        yscale     -- pixels per degree latitude
-        numdigits  -- number of digits in x and y file specifiers
-        usedash    -- Boolean, use a dash between x and y in filenames?
-        latfirst   -- Boolean, is latitude the first of the two numbers?
-
+        """Create a generic map collection.
+        Parameters
+        ----------
+        name       : str
+            user-visible name of the collection
+        location   : str
+            directory on disk where the maps reside
+        prefix     : str
+            initial part of each maplet filename
+        ext        : str
+            filename extension including the dot, e.g. .jpg
+        left_long  : float
+            longitude of the left edge
+        top_lat    : float
+            latitude of the top edge
+        img_width  : int
+            width of each maplet in pixels
+        img_height : int
+            height of each maplet in pixels
+        xscale     : float
+            pixels per degree longitude
+        yscale     : float
+            pixels per degree latitude
+        numdigits  : int
+            number of digits in x and y file specifiers
+        usedash    : bool
+            use a dash between x and y in filenames?
+        latfirst   : bool
+            is latitude the first of the two numbers?
         """
         TiledMapCollection.__init__(self, _name, _location,
                                     _img_width, _img_height, )

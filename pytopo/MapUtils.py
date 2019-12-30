@@ -2,8 +2,8 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''MapUtils: some useful utility functions useful for mapping classes.
-'''
+"""MapUtils: some useful utility functions useful for mapping classes.
+"""
 
 import math
 
@@ -71,7 +71,7 @@ class MapUtils:
 
     @staticmethod
     def bearing(lat1, lon1, lat2, lon2):
-        '''Bearing from wp1 to wp2.'''
+        """Bearing from wp1 to wp2."""
         # Python's trig functions take radians, not degrees
         lat1 = math.radians(lat1)
         lon1 = math.radians(lon1)
@@ -155,9 +155,9 @@ class MapUtils:
 
     @classmethod
     def distance_on_unit_sphere(cls, lat1, long1, lat2, long2):
-        '''Linear distance between two points on a globe, in km.
+        """Linear distance between two points on a globe, in km.
            Divide by 1.609 to get miles.
-        '''
+        """
         # Thanks http://www.johndcook.com/blog/python_longitude_latitude/
 
         # Convert latitude and longitude to

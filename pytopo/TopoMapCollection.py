@@ -2,9 +2,9 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''TopoMapCollection: a pytopo map collection using Topo!
+"""TopoMapCollection: a pytopo map collection using Topo!
    commercial map datasets.
-'''
+"""
 
 from __future__ import print_function
 

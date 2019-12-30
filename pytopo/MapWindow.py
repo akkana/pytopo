@@ -2,8 +2,8 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''MapWindow: pytopo's GTK-based window for showing tiled maps.
-'''
+"""MapWindow: pytopo's GTK-based window for showing tiled maps.
+"""
 
 from __future__ import print_function
 
@@ -364,9 +364,9 @@ that are expected by the MapCollection classes:
         self.draw_map_scale()
 
     def contrasting_color(self, color):
-        '''Takes a gtk.gdk.Color (RGB values 0:65535)
+        """Takes a gtk.gdk.Color (RGB values 0:65535)
            and converts it to a similar saturation and value but different hue
-        '''
+        """
         if not color:
             return self.first_track_color
 
@@ -379,10 +379,10 @@ that are expected by the MapCollection classes:
 
     def draw_trackpoint_segment(self, start, linecolor, linewidth=3,
                                 linestyle=None):
-        '''Draw a trackpoint segment, starting at the given index.
+        """Draw a trackpoint segment, starting at the given index.
            Stop drawing if we reach another start string, and return the index
            of that string. Return None if we reach the end of the list.
-        '''
+        """
         self.cr.set_source_rgb (*linecolor)
 
         cur_x = None
@@ -418,7 +418,7 @@ that are expected by the MapCollection classes:
             cur_y = y
 
     def select_track(self, trackindex):
-        '''Mark a track as active.'''
+        """Mark a track as active."""
         if self.controller.Debug:
             # Test against None specifically, else we won't be able
             # to select the first track starting at index 0.
@@ -441,7 +441,7 @@ that are expected by the MapCollection classes:
         self.show_traildialog(attrstr)
 
     def show_traildialog(self, attrstr):
-        '''Show a dialog giving information about a selected track.'''
+        """Show a dialog giving information about a selected track."""
         trailname = self.trackpoints.points[self.selected_track]
         if not self.traildialog:
             self.traildialog = gtk.Dialog(trailname,
@@ -869,7 +869,7 @@ that are expected by the MapCollection classes:
         self.drawing_track = not self.drawing_track
 
     def context_menu(self, event):
-        '''Create a context menu. This is called anew on every right-click.'''
+        """Create a context menu. This is called anew on every right-click."""
 
         SEPARATOR = "---"
 
@@ -980,9 +980,9 @@ that are expected by the MapCollection classes:
 
 
     def selection_window(self):
-        '''Show a window that lets the user choose a known starting point.
+        """Show a window that lets the user choose a known starting point.
            Returns True if the user chose a valid site, otherwise False.
-        '''
+        """
         dialog = gtk.Dialog("Choose a point", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -1043,22 +1043,22 @@ that are expected by the MapCollection classes:
         return False
 
     def save_all_tracks_as(self, widget):
-        '''Prompt for a filename to save all tracks and waypoints.'''
+        """Prompt for a filename to save all tracks and waypoints."""
         return self.save_tracks_as(widget, False)
 
     def save_area_tracks_as(self, widget):
-        '''Prompt for a filename to save all tracks and waypoints,
+        """Prompt for a filename to save all tracks and waypoints,
            then let the user drag out an area with the mouse
            and save all tracks that are completely within that area.
-        '''
+        """
         return self.save_tracks_as(widget, True)
 
     def save_tracks_as(self, widget, select_area=False):
-        '''Prompt for a filename to save all tracks and waypoints.
+        """Prompt for a filename to save all tracks and waypoints.
            Then either let the user drag out an area with the mouse
            and save all tracks that are completely within that area,
            or save all tracks we know about.
-        '''
+        """
         dialog = gtk.FileChooserDialog(title="Save GPX",
                                        action=gtk.FILE_CHOOSER_ACTION_SAVE,
                                        buttons=(gtk.STOCK_CANCEL,
@@ -1617,12 +1617,12 @@ that are expected by the MapCollection classes:
 
     def draw_label(self, labelstring, x, y, color=None, dropshadow=True,
                    font=None, offsets=None):
-        '''Draw a string at the specified point.
+        """Draw a string at the specified point.
            offsets is an optional tuple specifying where the string will
            be drawn relative to the coordinates passed in;
            for instance, if offsets are (-1, -1) the string will be
            drawn with the bottom right edge at the given x, y.
-        '''
+        """
         if not color:
             color = self.black_color
         if not font:

@@ -2,10 +2,10 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''TiledMapCollection: a pytopo map collection that can download tiles.
+"""TiledMapCollection: a pytopo map collection that can download tiles.
 
    A base class for more specific downloaders.
-'''
+"""
 
 from __future__ import print_function
 
@@ -261,9 +261,9 @@ TiledMapCollection classes must implement:
         raise RuntimeError("TiledMapCollection subclasses must define num2deg")
 
     def draw_single_tile(self, path, mapwin):
-        '''After a new tile is downloaded, fetch its pixbuf and draw it
+        """After a new tile is downloaded, fetch its pixbuf and draw it
            in the right place for our currently displayed map.
-        '''
+        """
         # Calculate x, y, x_offset, y_offset from the tile name.
         # Make sure it's even still visible.
         # Tile name is /path/to/zoom/x/y.ext

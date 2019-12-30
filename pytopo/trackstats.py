@@ -4,9 +4,9 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-'''Statistics on track logs,
+"""Statistics on track logs,
    such as total distance, average speed, and total climb.
-'''
+"""
 
 from __future__ import print_function
 
@@ -34,11 +34,11 @@ lastele = -1
 
 
 def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
-    '''Accumulate statistics like mileage and total climb.
+    """Accumulate statistics like mileage and total climb.
        Return a dictionary of stats collected.
        If startpt is provided, start from a sub-track.
        If onetrack is True, only analyze one track segment.
-    '''
+    """
     global total_climb, this_climb, this_climb_start, lastele
 
     # The variables we're going to plot:
