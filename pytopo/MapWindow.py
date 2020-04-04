@@ -328,10 +328,14 @@ that are expected by the MapCollection classes:
                    stats['Smoothed total climb']:
                     label += "\nClimb: %d%s" % (stats['Smoothed total climb'],
                                                 climb_units)
+            trackfilename = self.trackpoints.filename_for_index(
+                self.selected_track)
+            if trackfilename:
+                label += '\n(' + trackfilename + ')'
             self.draw_label(label, -15, 15, self.yellow_color,
                             dropshadow=True)
 
-        if self.selected_waypoint is not None:
+        if self.selected_waypoint is not None and self.show_waypoints:
             self.draw_label("Waypoint: " +
                                 self.trackpoints.waypoints[self.selected_waypoint].name,
                             15, 40, color=self.yellow_color)

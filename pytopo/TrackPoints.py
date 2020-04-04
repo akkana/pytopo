@@ -85,6 +85,10 @@ class TrackPoints(object):
         self.minlat = 91
         self.maxlat = -91
 
+        # Remember which files each set of points came from,
+        # as { index: filename }
+        self.srcfiles = {}
+
         self.saved_points = False
 
         self.Debug = False
@@ -242,6 +246,13 @@ class TrackPoints(object):
 
         # GPX also allows for routing, rtept, but I don't think we need those.
 
+    def filename_for_index(self, index):
+        filename = ''
+        for i in self.srcfiles:
+            if i > index:
+                return filename
+            filename = self.srcfiles[i]
+
     def get_DOM_text(self, node, childname=None):
         """Get the text out of a DOM node.
            Or, if childname is specified, get the text out of a child
@@ -378,6 +389,7 @@ class TrackPoints(object):
         # or it won't see the function names like read_track_file_GPX.
         for mapper in self.mappers:
             if ext in mapper[0]:
+                self.srcfiles[len(self.points)] = filename
                 return mapper[1](self, filename)
 
         raise(RuntimeError("Track file %s doesn't end in one of " % filename
