@@ -1,14 +1,22 @@
 Install pytopo on your local machine with
-python setup.py install
+    python setup.py install
 (you'll need Python's setuptools package).
 
 Or get it from PyPI:
-pip install pytopo
+    pip install pytopo
+
+Install from the development directory to a virtualenv:
+    pip install .
 
 Either way, the executables will be called pytopo and ellie.
 On its first run it will create the configuration file it needs.
 
-Developers: you can run pytopo from the development directory by running
+Developers: To run from the development directory
+    pip install -e .
+or
+    setup.py develop
+
+Or you can run pytopo from the development directory by running
 pytopo/MapViewer.py, as long as your PYTHONPATH points to somewhere
 where Python can import the pytopo module.
 
