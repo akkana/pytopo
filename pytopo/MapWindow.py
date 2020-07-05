@@ -893,6 +893,7 @@ that are expected by the MapCollection classes:
              self.print_location),
             ("Zoom here...", self.zoom),
             ("Add waypoint...", self.add_waypoint_by_mouse),
+            ("Remove waypoint", self.remove_waypoint),
 
             ("Pins", SEPARATOR),
             ("Go to pin...", self.set_center_to_pin),
@@ -903,7 +904,7 @@ that are expected by the MapCollection classes:
             ("Split track here", self.split_track_by_mouse),
             ("Remove points before this", self.remove_before_mouse),
             ("Remove points after this", self.remove_after_mouse),
-            ("Remove this point", self.remove_trackpoint),
+            ("Remove point from track", self.remove_trackpoint),
             ("Undo", self.undo),
             ("Save GPX...", self.save_all_tracks_as),
             # ("Save Area as GPX...", self.save_area_tracks_as),
@@ -1177,13 +1178,29 @@ that are expected by the MapCollection classes:
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
         if near_point is None:
-            print("There's no point near the mouse")
+            print("There's no trackpoint near the mouse")
             return
 
         # Nuttiness: even if you know the index, apparently the only
         # way to remove something from a list is to search through the
         # list for an exact item match.
         self.trackpoints.points.remove(self.trackpoints.points[near_point])
+        self.draw_map()
+
+    def remove_waypoint(self, widget):
+        """Remove the point nearest the mouse from its track."""
+
+        near_track, near_point, near_waypoint = \
+            self.find_nearest_trackpoint(self.context_x, self.context_y)
+
+        if near_waypoint is None:
+            print("There's no waypoint near the mouse")
+            return
+
+        # Nuttiness: even if you know the index, apparently the only
+        # way to remove something from a list is to search through the
+        # list for an exact item match.
+        self.trackpoints.waypoints.remove(self.trackpoints.waypoints[near_waypoint])
         self.draw_map()
 
     def add_waypoint_by_mouse(self, widget):
