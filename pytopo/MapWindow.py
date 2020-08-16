@@ -32,6 +32,7 @@ import gtk
 import gobject
 import glib
 import pango
+import cairo    # needed only for creating a region
 import pangocairo
 
 from pkg_resources import resource_filename
@@ -59,7 +60,9 @@ that are expected by the MapCollection classes:
    draw_rectangle(fill, x, y, width, height)
    draw_line(x, y, width, height)
 
-(That list is very incomplete and needs to be updated, sorry.)
+(That list is very incomplete and needs to be updated, sorry.
+No one has ever actually tried to adapt this code for a different toolkit,
+but if you want to, contact me and I'll help you figure it out.)
     """
 
     def __init__(self, _controller):
@@ -72,10 +75,10 @@ that are expected by the MapCollection classes:
         # The current map collection being used:
         self.collection = None
 
-        self.center_lon = 0
-        self.center_lat = 0
-        self.cur_lon = 0
-        self.cur_lat = 0
+        self.center_lon = None
+        self.center_lat = None
+        self.cur_lon = None
+        self.cur_lat = None
         self.trackpoints = None
         self.show_waypoints = True
         self.drawing_track = False
@@ -241,11 +244,11 @@ that are expected by the MapCollection classes:
 
         win.show_all()
 
+        # So the downloader can use threads:
         if self.gps_poller:
             gobject.threads_init()
 
         gtk.main()
-
 
     def gpsd_callback(self, gpsd):
         """Update the map given the GPS location"""
@@ -366,6 +369,10 @@ that are expected by the MapCollection classes:
             #                  -1, -1)
 
         self.draw_map_scale()
+
+        # Most of the time it's better to keep self.cr unset,
+        # so it will be created when necessary.
+        self.cr = None
 
     def contrasting_color(self, color):
         """Takes a gtk.gdk.Color (RGB values 0:65535)
@@ -1568,6 +1575,16 @@ that are expected by the MapCollection classes:
            If width and height are provided, assume the offset
            has already been subtracted.
         """
+        # When this is called from draw_map, self.cr should already be set.
+        # In most other cases, it isn't and needs to be created.
+        if not self.cr:
+            self.cr = self.drawing_area.get_window().cairo_create()
+            # XXX Theoretically would be good to limit the region to
+            # just the rect being drawn. But apparently self.cr.clip()
+            # expects that a region has already been set somehow,
+            # like by calling self.cr.rectangle(); and calling clip()
+            # after that makes painting fail when updating single tiles
+            # if they need to be downloaded at startup.
 
         if w <= 0:
             w = pixbuf.get_width() - x_off
@@ -1943,20 +1960,20 @@ that are expected by the MapCollection classes:
         # traceback.print_stack()
         # print("=======")
 
-        # I'm not clear on the rules for when a new cairo context
-        # is needed, but apparently it's needed here.
-        # I hope creating one is fast.
-        self.cr = self.drawing_area.get_window().cairo_create()
-        if widget.drag_check_threshold(self.x_start_drag, self.y_start_drag,
-                                       x, y):
-            dx = x - self.x_start_drag
-            dy = y - self.y_start_drag
-            self.center_lon -= dx / self.collection.xscale
-            self.center_lat += dy / self.collection.yscale
-            self.draw_map()
-            # Reset the drag coordinates now that we're there
-            self.x_start_drag = x
-            self.y_start_drag = y
+        # Has the position changed enough to redraw?
+        if not widget.drag_check_threshold(self.x_start_drag, self.y_start_drag,
+                                           x, y):
+            return
+
+        dx = x - self.x_start_drag
+        dy = y - self.y_start_drag
+        self.center_lon -= dx / self.collection.xscale
+        self.center_lat += dy / self.collection.yscale
+        self.draw_map()
+
+        # Reset the drag coordinates now that we're there
+        self.x_start_drag = x
+        self.y_start_drag = y
 
     def click_draw(self, widget, event):
         """Handle mouse button presses when in drawing mode"""

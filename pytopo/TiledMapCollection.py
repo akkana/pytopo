@@ -12,7 +12,12 @@ from __future__ import print_function
 from pytopo.MapCollection import MapCollection
 from pytopo.MapWindow import MapWindow
 from pytopo.MapUtils import MapUtils
-from pytopo.DownloadTileQueue import DownloadTileQueue
+
+# For downloading tiles:
+from requests_futures.sessions import FuturesSession
+from concurrent.futures import ThreadPoolExecutor
+# import threading
+import time
 
 import os
 import glib
@@ -32,20 +37,35 @@ TiledMapCollection classes must implement:
   deg2num
 """
 
+    MAX_FAILED_DOWNLOADS = 4
+    RETRY_DOWNLOADS_AFTER = 300    #seconds
+
     def __init__(self, _name, _location, _tile_w, _tile_h):
         MapCollection.__init__(self, _name, _location)
         self.img_width = _tile_w
         self.img_height = _tile_h
 
-        # For collections that support downloading new tiles,
-        # keep a list of tiles that still need downloading:
-        self.download_tiles = DownloadTileQueue()
-        self.download_func = None
-        self.download_failures = 0
-
         # We need to keep a pointer to the map window for redrawing
         # when downloaded tiles come in.
         self.mapwin = None
+
+        self.init_downloader()
+        # If it ever becomes needed to run the FuturesSession
+        # tile downloader in a separate thread, do this:.
+        # threading.Thread(target=self.init_downloader).start()
+        # But actually this doesn't seem to be needed,
+        # because FuturesSession starts its own theads anyway.
+
+        # Keep track of how many downloads have failed.
+        # Give up after a certain number -- but not forever.
+        self.num_failed_downloads = 0
+        self.last_failed_download_time = 0
+
+    def init_downloader(self):
+        self.downloader = \
+            FuturesSession(executor=ThreadPoolExecutor(max_workers=3))
+        self.downloader.hooks['response'] = self.response_hook
+        self.url_to_path = {}
 
     def set_reload_tiles(self, p):
         """Set a flag indicating that all map tiles need to be re-downloaded,
@@ -180,11 +200,6 @@ TiledMapCollection classes must implement:
         # http://www.daa.com.au/pipermail/pygtk/2003-December/006499.html
         # (At this indentation level, we free after drawing the whole map.)
         gc.collect()
-
-        # If we queued any downloads and aren't currently downloading,
-        # schedule a function to take care of that:
-        if len(self.download_tiles) > 0 and self.download_func is None:
-            gobject.timeout_add(300, self.download_more)
 
     def get_next_maplet_name(self, fullpathname, dX, dY):
         """Starting from a maplet name, get the one a set distance away."""
@@ -324,71 +339,44 @@ TiledMapCollection classes must implement:
         # redrawing large sets of trackpoints each time a new tile comes in.
         mapwin.draw_overlays()
 
-    def download_finished(self, path):
-        """Callback when a tile finishes downloading.
-           The path argument is either the local file path just downloaded,
-           or an exception, e.g. IOError.
+    def queue_download(self, url, path):
+        """Add a URL to the FuturesSession downloader queue,
+           and keep a record of what file path it should use.
         """
+        if self.num_failed_downloads > self.MAX_FAILED_DOWNLOADS:
+            if self.last_failed_download_time \
+               and time.time() - self.last_failed_download_time \
+                    < self.RETRY_DOWNLOADS_AFTER:
+                # too many failed downloads, too recently
+                return
 
-        # If we got too many failures -- usually IOError,
-        # perhaps we're offline -- path will be None here.
-        # In that case, just give up on downloading.
-        if path is None:
-            self.download_failures += 1
-            if self.download_failures > 10:
-                print("\nDownload failed; giving up")
-                self.download_func = None
-                # Clear self.download_tiles, so that if the net returns
-                # we'll start on new stuff, not old stuff.
-                # Not clear if this is the right thing to do or not.
-                self.download_tiles = DownloadTileQueue()
-                self.download_failures = 0
-            # We can't draw this tile, so return.
+            # Downloads failed a while ago, but some time has passed.
+            # Try again.
+            self.num_failed_downloads = 0
+            self.last_failed_download_time = 0
+
+        self.url_to_path[url] = path
+        self.downloader.get(url)
+
+    def response_hook(self, response, *args, **kwargs):
+        """When the FuturesSession completes downloading a tile,
+           draw it on the map as soon as possible.
+        """
+        if response.status_code != 200:
+            print("Error", response.status_code, "on", response.url)
+            # XXX should check response, and maybe retry
+
+            self.num_failed_downloads += 1
+            self.last_failed_download_time = time.time()
             return
 
-        # Otherwise, we got a path for a successful tile download.
-        # Reset the failure counter:
-        # self.download_failures = 0
-
-        self.download_tiles.pop()   # Throw away url, path popped
-        # Calling draw_single_tile from idle_add makes the GTK3 window
-        # redraw much more promptly (didn't matter under GTK2).
-        # self.draw_single_tile(path, self.mapwin)
-        glib.idle_add(self.draw_single_tile, path, self.mapwin)
-
-        # It's okay to start a new download now:
-        self.download_func = None
-
-        # Anything more to download?
-        if len(self.download_tiles) > 0:
-            self.download_more()
-
-    def download_more(self):
-        """Idle/timeout proc to download any pending tiles.
-           Should always return False so it won't get rescheduled.
-           Eventually this should download in a separate thread.
-        """
-
-        # If we already have a download going, don't start another one
-        # (eventually we'll want to run several in parallel).
-        if self.download_func is not None:
+        self.num_failed_downloads = 0
+        self.last_failed_download_time = 0
+        tilepath = self.url_to_path[response.url]
+        with open(tilepath, 'wb') as tilefp:
+            tilefp.write(response.content)
             if self.Debug:
-                print("There's already a download going; not downloading more")
-            return False
+                print("Wrote", response.url, "to", tilepath)
 
-        # If there are no more tiles to download, we're done:
-        if len(self.download_tiles) == 0:
-            self.download_func = None
-            return False
-
-        url, path = self.download_tiles.peek()
-        # Don't actually pop() it until it has downloaded.
-        # urllib.urlretrieve(url, path)
-        self.download_func = \
-            DownloadTileQueue.start_job(DownloadTileQueue.download_job(url,
-                                                                       path,
-                                                     self.download_finished))
-        if self.Debug:
-            print("Started download %s to %s" % (url, path))
-
-        return False
+        # Schedule a redraw for this tile.
+        glib.idle_add(self.draw_single_tile, tilepath, self.mapwin)

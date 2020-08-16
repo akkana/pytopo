@@ -273,7 +273,7 @@ class OSMMapCollection(TiledMapCollection):
                     else:
                         print(os.stat(path).st_mtime, "<", self.reload_tiles)
 
-                self.download_tiles.push(self.url_from_path(path), path)
+                self.queue_download(self.url_from_path(path), path)
 
             else:
                 if self.Debug:

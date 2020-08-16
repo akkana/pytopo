@@ -66,7 +66,9 @@ setup(name='pytopo',
       },
       download_url='https://github.com/akkana/pytopo/tarball/1.6.1',
 
-      install_requires=["PyGObject", "pycairo", "simplejson", "numpy"],
+      install_requires=["PyGObject", "pycairo",
+                        "requests-futures",
+                        "simplejson", "numpy"],
 
       # matplotlib is an optional dependency for ellie,
       # but there doesn't seem to be any way for a user to see this.

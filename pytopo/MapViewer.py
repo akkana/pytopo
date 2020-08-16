@@ -359,6 +359,7 @@ Shift-click in the map to print the coordinates of the clicked location.
 
                 # Next clause is impossible because of the prev isdigit check:
                 # if args[0] == "-15":
+
                 #    series = 15
                 elif args[0] == "-p":
                     self.print_sites()
@@ -481,25 +482,36 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
 
             # Doesn't match a known site. Maybe the args are coordinates?
             try:
-                if len(args) >= 2 and \
-                   len(args[0]) > 1 and args[0][1].isdigit() and \
-                   len(args[1]) > 1 and args[1][1].isdigit():
-                    mapwin.center_lat = float(args[0])
-                    mapwin.center_lon = float(args[1])
+                def to_coord(s):
+                    if len(s) <= 0:
+                        return None
+                    try:
+                        f = float(s)
+                        return f
+                    except:
+                        return None
 
-                    # Set a pin on the specified point.
-                    mapwin.pin_lat = mapwin.center_lat
-                    mapwin.pin_lon = mapwin.center_lon
+                if len(args) >= 2:
+                    lat = to_coord(args[0])
+                    lon = to_coord(args[1])
+                    if lat is not None and lon is not None:
+                        mapwin.center_lat = lat
+                        mapwin.center_lon = lon
 
-                    args = args[2:]
+                        # Set a pin on the specified point.
+                        mapwin.pin_lat = mapwin.center_lat
+                        mapwin.pin_lon = mapwin.center_lon
 
-                    if args:
-                        mapwin.collection = self.find_collection(args[0])
-                        args = args[1:]
-                    else:
-                        mapwin.collection = \
-                            self.find_collection(self.default_collection)
-                    continue
+                        args = args[2:]
+
+                        if args:
+                            mapwin.collection = self.find_collection(args[0])
+                            args = args[1:]
+                        else:
+                            mapwin.collection = \
+                                self.find_collection(self.default_collection)
+
+                        continue
 
                 print("Can't make sense of argument:", args[0])
                 args = args[1:]
@@ -543,7 +555,8 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
 
         # By now, we hope we have the mapwin positioned with a collection
         # and starting coordinates:
-        if mapwin.collection and mapwin.center_lon and mapwin.center_lat:
+        if mapwin.collection and \
+           mapwin.center_lon is not None and mapwin.center_lat is not None:
             return
 
         # If we're following GPS, it's okay if we don't have center coords yet;
