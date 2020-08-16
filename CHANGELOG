@@ -1,9 +1,9 @@
 2020-08-16  Akkana Peck <akkana@shallowsky.com>
 	Replace the crufty DownloadTileQueue.py code
-        (which never worked well anyway) with requests_futures
-        (a new dependency), which works much faster and more reliably.
-        Fix the bug on drawing tiles that need downloading at startup.
-        Fix a bug starting up at lat or lon 0.
+	(which never worked well anyway) with requests_futures
+	(a new dependency), which works much faster and more reliably.
+	Fix the bug on drawing tiles that need downloading at startup.
+	Fix a bug starting up at lat or lon 0.
 
 2020-04-04  Akkana Peck <akkana@shallowsky.com>
 	When selecting a track, show the file it came from.

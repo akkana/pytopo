@@ -14,9 +14,8 @@ from pytopo.MapWindow import MapWindow
 from pytopo.MapUtils import MapUtils
 from pytopo.TrackPoints import TrackPoints
 
-# For version and user_agent. See comment in DownloadTileQueue.py for why.
+# For version and user_agent, so the downloader can access them.
 import pytopo
-
 
 import sys
 import os
@@ -652,7 +651,7 @@ from pytopo import GenericMapCollection
                 self.KnownSites.append(site)
 
         # user_agent is special: it needs to be a class variable
-        # so DownloadTileQueues can access it without needing a
+        # so the downloader can access it without needing a
         # pointer to a specific object.
         if 'user_agent' in locs:
             pytopo.user_agent = locs['user_agent']

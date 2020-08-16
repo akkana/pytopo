@@ -4,14 +4,6 @@ pytopo package
 Submodules
 ----------
 
-pytopo.DownloadTileQueue module
--------------------------------
-
-.. automodule:: pytopo.DownloadTileQueue
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 pytopo.GenericMapCollection module
 ----------------------------------
 

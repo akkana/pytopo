@@ -326,12 +326,12 @@ TiledMapCollection classes must implement:
             print("")
             if os.path.exists(path) and not self.Debug:
                 os.unlink(path)
-            self.download_failures += 1
+            self.num_failed_downloads += 1
             # Usually this means OSM gave us a text file containing
             # a string like "Tile Not Available"
         except Exception as e:
             print("Error drawing tile:", e)
-            self.download_failures += 1
+            self.num_failed_downloads += 1
 
         # Redraw any trackpoints, zoom controls, and anything else that
         # has to draw over the tiles, since they might have been overwritten.

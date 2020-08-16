@@ -23,7 +23,6 @@ from .TopoMapCollection import Topo1MapCollection
 from .TopoMapCollection import Topo2MapCollection
 from .TiledMapCollection import TiledMapCollection
 from .OSMMapCollection import OSMMapCollection
-from .DownloadTileQueue import DownloadTileQueue
 from .MapWindow import MapWindow
 from .TrackPoints import TrackPoints
 from .MapViewer import MapViewer, ArgParseException

@@ -634,6 +634,10 @@ but if you want to, contact me and I'll help you figure it out.)
         """Draw overlays: tile attribution, zoom control, scale,
            plus any visible trackpoints and waypoints.
         """
+        # draw_overlays is sometimes called from outside draw_map,
+        # so make sure there's a cairo context:
+        if not self.cr:
+            self.cr = self.drawing_area.get_window().cairo_create()
         self.collection.draw_attribution(self)
         self.draw_zoom_control()
         self.draw_map_scale()
