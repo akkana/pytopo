@@ -13,4 +13,4 @@ sphinx:
 python:
   version: 3
   install:
-    - requirements: doc/sphinxdoc/requirements.txt
+    - requirements: docs/sphinxdoc/requirements.txt
