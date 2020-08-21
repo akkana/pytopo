@@ -9,7 +9,7 @@
    I'd appreciate hearing about it if you make any changes.
 '''
 
-__version__ = "1.6.1"
+__version__ = "1.6.5"
 __author__ = "Akkana Peck <akkana@shallowsky.com>"
 __license__ = "GPL v2+"
 
