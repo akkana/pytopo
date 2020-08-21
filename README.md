@@ -11,6 +11,9 @@ See the project home page at http://shallowsky.com/software/topo
 for more information, examples, screenshots, hints on creating
 custom maps, and more.
 
+Or read the official documentation here:
+https://pytopo.readthedocs.io/en/latest/
+
 By default, PyTopo uses tiles from OpenStreetMap, but you can specify
 a variety of tile sources (which may or may not require API keys);
 or you can create your own tiles.
