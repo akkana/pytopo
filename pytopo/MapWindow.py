@@ -388,7 +388,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
         return colorsys.hsv_to_rgb(h + jump, s, v)
 
-    def draw_trackpoint_segment(self, start, linecolor, linewidth=3,
+    def draw_trackpoint_segment(self, start, linecolor, linewidth=2,
                                 linestyle=None):
         """Draw a trackpoint segment, starting at the given index.
            Stop drawing if we reach another start string, and return the index
@@ -424,7 +424,7 @@ but if you want to, contact me and I'll help you figure it out.)
             # even with one or both endpoints off screen, some of
             # the line might be visible.
             if cur_x and cur_y and x and y:
-                self.draw_line(cur_x, cur_y, x, y)
+                self.draw_line(cur_x, cur_y, x, y, linewidth=linewidth)
             cur_x = x
             cur_y = y
 
@@ -1637,12 +1637,15 @@ but if you want to, contact me and I'll help you figure it out.)
         else:
             self.cr.stroke()
 
-    def draw_line(self, x, y, x2, y2, color=None):
+    def draw_line(self, x, y, x2, y2, color=None, linewidth=None):
         """Draw a line."""
         # print("draw_line", x, y, x2, y2)
 
         if color:
             self.cr.set_source_rgb(*color)
+
+        if linewidth:
+            self.cr.set_line_width(linewidth)
 
         self.cr.move_to(x, y)
         self.cr.line_to(x2, y2)
