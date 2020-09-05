@@ -37,8 +37,11 @@ or report the coordinates of a point.
 
 You can install PyTopo with ```pip install pytopo```
 
-Dependencies include GTK (and its various dependencies), numpy,
-and (optionally) matplotlib.
+Dependencies include GTK (and its various dependencies),
+requests-futures (for downloading map tiles in the background),
+simplejson (for reading GPX and KML files)
+and numpy (for analyzing track statistics like distance),
+and optionally matplotlib (for Ellie's track log visualizations).
 If you want to read from a GPS, you'll need gpsd and python-gps.
 
 The first time you run pytopo, it will create a ~/.config/pytopo
