@@ -64,22 +64,18 @@ hosted on Github </a></b> if you want the latest and greatest.
 
 <h3>Requirements</h3>
 <p>
-You'll need PyGTK2 installed.
-On Linux, you can get it through your distro: for instance, on Debian
-or Ubuntu, <code>sudo apt-get install python-gtk2</code>
-or search for python-gtk2 in your package manager.
-<br>
-On Windows, with <code>pip install pygtk</code><br>
-Mac is tricky since it has dependencies: the easiest way to get PyGTK2
-may be to install <a href="http://gimp.org">GIMP</a>.
+PyTopo uses the GTK3 toolkit.
+If you install it via pip, it requires PyGObject and pycairo,
+which pull in the rest of the GTK3 dependencies.
+It also requires requests-futures (for downloading map tiles in the
+background), simplejson (for reading GPX and KML files) and numpy
+(for analyzing track statistics like distance).
+If you want to read from a GPS, you'll need gpsd and python-gps.
 
-<!-- 
 <p>
-There's a really old experimental MeeGo package for
-anyone interested in trying it, and I'd be interested to know if it
-works on other RPM platforms as well:
-<a href="PyTopo-1.0-1-beta1.noarch.rpm">PyTopo-1.0-1-beta1.noarch.rpm</a>.
- -->
+Ellie uses matplotlib for visualizing track logs.
+If you don't have matplotlib installed, it will just print
+summary numbers.
 
 <h2>Using PyTopo</h2>
 <p>
