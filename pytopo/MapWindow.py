@@ -646,7 +646,12 @@ but if you want to, contact me and I'll help you figure it out.)
                 """
 
         # Is the point inside a polygon?
+        # This requires shapely.
         if self.trackpoints.polygons:
+            if "shapely" not in sys.modules:
+                print("Can't ID regions without the shapely module")
+                return (nearest_track, nearest_point, nearest_waypoint,
+                        enclosing_polygons)
             enclosing_polygons = []
         for poly in self.trackpoints.polygons:
             wincoords = [ self.coords2xy(*pair,

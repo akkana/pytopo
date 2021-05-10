@@ -127,34 +127,56 @@ Usage: pytopo
        pytopo known_site
        pytopo [-t trackfile] [-c collection] [-r] [site_name]
        pytopo [-t trackfile] start_lat start_lon [collection]
-       pytopo -p :     list known sites and tracks
-       pytopo -r :     re-download all map tiles
-       pytopo -h :     print this message
+       pytopo -p :   list known sites and tracks
+       pytopo -r :   re-download all map tiles that need to be shown
+       pytopo -h :   print this message
+
+Other flags:
+       -k keys   : comma-separated list of fields (keys) to look for
+                   when grouping polygonal regions.
+       -g        : follow a GPS if available
+       -d[level] : debugging mode. Defaults to 1, level 2 shows a little more.
 
 With no arguments, will display a list of known sites.
 
 Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
-track points and/or waypoints; multiple trark files are allowed.
+track points and/or waypoints; multiple track files are allowed.
+GeoJSON files may also contain polygons: use the -k option to specify
+which field in the GeoJSON feature should be used for grouping.
 
-Use decimal degrees for start_lat and start_lon.
+Use decimal degrees for coordinates.
 
 Set up favorite site names in ~/.config/pytopo.sites,
 favorite track logs in ~/Tracks
+
+Move around by dragging or using arrow keys.  q quits.
+Right-click gives a context menu.
+Shift-click in the map to print the coordinates of the clicked location.
 </pre>
 
 <h2>Screenshots</h2>
 (Click to see larger image)
 <table>
 <tr>
-<tr>
 <td>
 <a href="screenshots/bandelier-ss.jpg">
 <img align=left src="screenshots/bandelier-ssT.jpg" width=260 height=229
  border=0 alt="[Bandelier Trails PyTopo screenshot]"></a>
 <td>
+<a href="screenshots/ownership_overlay-ss.jpg">
+<img align=left src="screenshots/ownership_overlay-ssT.jpg" width=257 height=210
+ border=0 alt="[Land ownership overlay PyTopo screenshot]"></a>
+<td>
 <a href="screenshots/sf-ss.jpg">
 <img align=left src="screenshots/sf-ssT.jpg" width=259 height=204
  border=0 alt="[San Francisco/OpenStreetMap PyTopo screenshot]"></a>
+<tr>
+<td>Trais at Bandelier National Monument, with track logs and waypoints
+  (OpenStreetMap tiles from ThunderForest)
+<td>Land ownership overlay for a part of Northern New Mexico
+<td>San Francisco from the default setup (OpenStreetMap tiles).
+
+<tr>
 <td>
 <a href="screenshots/doe-ss.jpg">
 <img align=left src="screenshots/doe-ssT.jpg" width=200 height=194
@@ -164,13 +186,11 @@ favorite track logs in ~/Tracks
 <img align=left src="screenshots/lexington-ssT.jpg" width=259 height=190
  border=0 alt="[Trails above Lexington reservoir/USGS PyTopo screenshot]"></a>
 <tr>
-<td>Trais at Bandelier National Monument, with track logs and waypoints
-  (OpenStreetMap tiles from ThunderForest)
-<td>San Francisco from the default setup (OpenStreetMap tiles).
 <td>Trails and a waypoint in the DOE-owned lands near White Rock, NM,
     using OpenCycleMap tiles.
 <td>Tacklogs and waypoints from a Garmin GPS above Lexington reservoir
     near Los Gatos, CA, using USGS/Topo! topographic maps.
+
 </table>
 
 <h2>Some Additional Features</h2>
@@ -225,6 +245,19 @@ need it.
 For displaying or plotting distances and elevations,
 <a href="../ellie/">ellie</a> is now included as part of the
 PyTopo install.
+
+<h3>GeoJSON Overlays</h3>
+<p>
+PyTopo can read polygons from a GeoJSON file and use them as colored
+translucent overlays. Use the -k flag to specify which field in the
+GeoJSON you want to use for grouping polygons. For example, the
+screenshot above was generated with:
+<code>pytopo -k own Surface_Ownership_10_14_2015.geojson</code>
+using the land ownership data from NMU's RGIS as discussed
+<a href="https://shallowsky.com/blog/mapping/qgis-categorized.html">here</a>.
+<p>
+To be able to click on a region and see its class, you'll need
+the <i>shapely</i> module.
 
 <h2>Getting Map Data</h2>
 

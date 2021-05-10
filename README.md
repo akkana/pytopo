@@ -29,19 +29,24 @@ More information: http://shallowsky.com/software/ellie/
 PyTopo can read track logs in GPX, KML, KMZ or geojson format.
 It can make simple edits, like splitting a track or deleting to
 the begin or end point and can save as GPX.
+It can also read polygonal overlays from a GeoJSON file
+(for example, to colorize areas according to land ownership
+or geology).
 
 It can also measure distances and bearing angles between points,
 or report the coordinates of a point.
 
 ## Installing and Dependencies
 
-You can install PyTopo with ```pip install pytopo```
+You can install the current stable version of PyTopo with
+```pip install pytopo```
 
-Dependencies include GTK (and its various dependencies),
+Dependencies include GTK (and its various dependencies, like pango and cairo),
 requests-futures (for downloading map tiles in the background),
-simplejson (for reading GPX and KML files)
-and numpy (for analyzing track statistics like distance),
-and optionally matplotlib (for Ellie's track log visualizations).
+simplejson (for reading GPX and KML files),
+shapely (optional, used for polygonal overlays),
+numpy (optional, for analyzing track statistics like distance),
+and matplotlib (optional, for Ellie's track log visualizations).
 If you want to read from a GPS, you'll need gpsd and python-gps.
 
 The first time you run pytopo, it will create a ~/.config/pytopo

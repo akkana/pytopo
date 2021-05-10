@@ -1,3 +1,6 @@
+2021-05-09  Akkana Peck <akkana@shallowsky.com>
+	Add polygonal overlays from GeoJSON files.
+
 2020-08-16  Akkana Peck <akkana@shallowsky.com>
 	Bump version to 1.5.5 for packaging.
 
