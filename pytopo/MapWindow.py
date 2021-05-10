@@ -15,7 +15,13 @@ from pytopo.MapUtils import MapUtils
 from pytopo.TrackPoints import TrackPoints
 from . import trackstats
 
-import os
+try:
+    from shapely.geometry import Point
+    from shapely.geometry.polygon import Polygon
+except ModuleNotFoundError:
+    pass
+
+import os, sys
 import re
 
 try:
@@ -26,7 +32,7 @@ except ImportError:
     from urllib import urlretrieve
 
 import math
-import collections
+from collections import OrderedDict
 
 import gtk
 import gobject
@@ -177,6 +183,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.waypoint_color_bg = self.black_color
 
         self.font_desc = pango.FontDescription("Sans 9")
+        self.bold_font_desc = pango.FontDescription("Sans Bold 9")
         self.wpt_font_desc = pango.FontDescription("Sans Italic 10")
         self.attr_font_desc = pango.FontDescription("Sans Bold Italic 12")
         self.select_font_desc = pango.FontDescription("Sans Bold 15")
@@ -190,6 +197,13 @@ but if you want to, contact me and I'll help you figure it out.)
         self.zoom_X1 = 8
         self.zoom_in_Y1 = 10
         self.zoom_out_Y1 = self.zoom_in_Y1 + self.zoom_btn_size * 2
+
+        # Polygon drawing:
+        self.polygon_opacity = .15
+        self.polygon_colors = OrderedDict()
+
+        # Text overlays with positions: currently only used for polygons.
+        self.text_overlays = []
 
     def show_window(self, init_width, init_height):
         """Create the initial window."""
@@ -375,18 +389,21 @@ but if you want to, contact me and I'll help you figure it out.)
         self.cr = None
 
     def contrasting_color(self, color):
-        """Takes a gtk.gdk.Color (RGB values 0:65535)
+        """Takes a color triplet (values between 0 and 1)
            and converts it to a similar saturation and value but different hue
         """
         if not color:
             return self.first_track_color
 
-        h, s, v = colorsys.rgb_to_hsv(*color)
+        h, s, v = colorsys.rgb_to_hsv(*color[:3])
 
         # Hue is a floating point between 0 and 1. How much should we jump?
-        jump = .13
+        jump = .71
 
-        return colorsys.hsv_to_rgb(h + jump, s, v)
+        newcolor = colorsys.hsv_to_rgb(h + jump, s, v)
+        if len(color) == 3:
+            return newcolor
+        return (*newcolor, color[3])
 
     def draw_trackpoint_segment(self, start, linecolor, linewidth=2,
                                 linestyle=None):
@@ -543,18 +560,22 @@ but if you want to, contact me and I'll help you figure it out.)
     def find_nearest_trackpoint(self, x, y):
         """Find the nearet track, the nearest point on that track,
            and the nearest waypoint (if any) to a given x, y point.
+           Called on mouse click.
            Any of the three can be None if nothing is sufficiently close.
            Coords x, y passed in are screen coordinates;
            if None, we'll assume exact center, as if we've already
            set center_lat and center_lon after a mouse click.
+           Also check to see whether the click is inside any known polygons.
 
-           @return: (nearest_track,    Starting point of the nearest track
-                     nearest_point,    Index of nearest point on that track
-                     nearest_waypoint) Nearest waypoint
+           @return: (nearest_track,      Starting point of the nearest track
+                     nearest_point,      Index of nearest point on that track
+                     nearest_waypoint,   Nearest waypoint
+                     enclosing_polygons) Polygons containing the point, if any
         """
         nearest_track = None
         nearest_point = None
         nearest_waypoint = None
+        enclosing_polygons = None
 
         halfwidth, halfheight = \
             [s / 2 for s in self.drawing_area.get_window().get_geometry()[2:4]]
@@ -571,11 +592,6 @@ but if you want to, contact me and I'll help you figure it out.)
             """Return distance from pt to x, y --
                but only if it's smaller than sm_dist.
             """
-            # tx = int((pt.lon - self.center_lon) * self.collection.xscale
-            #          + halfwidth)
-            # ty = int((self.center_lat - pt.lat) * self.collection.yscale
-            #          + halfheight)
-
             tx, ty = self.coords2xy(pt.lon, pt.lat,
                                     self.win_width, self.win_height)
 
@@ -628,7 +644,31 @@ but if you want to, contact me and I'll help you figure it out.)
                         self.select_track(track_start)
                         return
                 """
-        return nearest_track, nearest_point, nearest_waypoint
+
+        # Is the point inside a polygon?
+        if self.trackpoints.polygons:
+            enclosing_polygons = []
+        for poly in self.trackpoints.polygons:
+            wincoords = [ self.coords2xy(*pair,
+                                         self.win_width, self.win_height)
+                          for pair in poly["coordinates"] ]
+            point = Point(x, y)
+            polygon = Polygon(wincoords)
+            if polygon.contains(point):
+                if "name" in poly:
+                    polystring = "%s (%s)" % (poly["name"], poly["class"])
+                else:
+                    polystring = poly["class"]
+
+                # Can't just call draw_label here, because
+                # the whole map is about to be redrawn.
+                # So the labels need to be persistent.
+                self.text_overlays.append((polystring,
+                                           *self.xy2coords(x, y)))
+                enclosing_polygons.append(polystring)
+
+        return (nearest_track, nearest_point, nearest_waypoint,
+                enclosing_polygons)
 
     def draw_overlays(self):
         """Draw overlays: tile attribution, zoom control, scale,
@@ -642,6 +682,70 @@ but if you want to, contact me and I'll help you figure it out.)
         self.draw_zoom_control()
         self.draw_map_scale()
         self.draw_trackpoints()
+
+        # If there's any overlaid vector data, draw that, translucently.
+        if not self.trackpoints.polygons:
+            return
+
+        def is_in_bounds(map_bounds, poly_bounds):
+            """Is any part of the polygon visible on the current map?
+               Order is minlon, maxlon, minlat, maxlat.
+            """
+            if poly_bounds[1] < map_bounds[0]:
+                return False
+            if poly_bounds[3] < map_bounds[2]:
+                return False
+            if poly_bounds[0] > map_bounds[1]:
+                return False
+            if poly_bounds[2] > map_bounds[3]:
+                return False
+            return True
+
+        map_bounds = self.map_bounds()
+
+        # Text overlays likely came from clicking on a region.
+        # They only get cleared if the region disappears off the screen,
+        # or on zoom.
+        new_overlays = []
+        for t_o in self.text_overlays:
+            if is_in_bounds((t_o[1], t_o[1], t_o[2], t_o[2]), map_bounds):
+                self.draw_label(t_o[0], *self.coords2xy(t_o[1], t_o[2]),
+                                font=self.bold_font_desc)
+                new_overlays.append(t_o)
+        self.text_overlays = new_overlays
+
+        for poly in self.trackpoints.polygons:
+            # Is it visible on the current map?
+            if not is_in_bounds(poly["bounds"], map_bounds):
+                continue
+
+            try:
+                polyclass = poly["class"]
+            except:
+                polyclass = "other"
+            try:
+                color = self.polygon_colors[polyclass]
+            except KeyError:
+                # No color yet for this polyclass. Take the last color
+                # added and make a contrasting color for it,
+                # adding a transparency member.
+                if self.polygon_colors:
+                    # Take the color of the last polygon class added,
+                    # get a contrasting color and assign that to the
+                    # new polygon class
+                    last_key = next(reversed(self.polygon_colors))
+                    self.polygon_colors[polyclass] = \
+                        self.contrasting_color(self.polygon_colors[last_key])
+                else:
+                    self.polygon_colors[polyclass] = \
+                        list(self.first_track_color) + [self.polygon_opacity]
+            self.cr.set_source_rgba(*self.polygon_colors[polyclass])
+            for coords in poly["coordinates"]:
+                pt = self.coords2xy(coords[0], coords[1],
+                                    self.win_width, self.win_height)
+                self.cr.line_to(*pt)
+            self.cr.close_path()
+            self.cr.fill()
 
     def draw_map_scale(self):
         """Draw a map scale at the bottom of the map window.
@@ -839,6 +943,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.center_lon = self.cur_lon
         self.center_lat = self.cur_lat
         self.collection.zoom(1)
+        self.text_overlays = []
         self.draw_map()
 
     def scroll_event(self, button, event):
@@ -866,6 +971,8 @@ but if you want to, contact me and I'll help you figure it out.)
         # Shift the map over so the old point will be under the mouse.
         self.center_lon += (curmouselon - newmouselon)
         self.center_lat += (curmouselat - newmouselat)
+
+        self.text_overlays = []
 
         self.draw_map()
         return True
@@ -899,7 +1006,7 @@ but if you want to, contact me and I'll help you figure it out.)
         else:
             draw_track_label = "Draw a new track"
 
-        contextmenu = collections.OrderedDict([
+        contextmenu = OrderedDict([
             (MapUtils.coord2str_dd(self.cur_lon, self.cur_lat),
              self.print_location),
             ("Zoom here...", self.zoom),
@@ -951,6 +1058,7 @@ but if you want to, contact me and I'll help you figure it out.)
                                     coll.name)
                     submenu.append(subitem)
                     subitem.show()
+
                 item.set_submenu(submenu)
 
             elif contextmenu[itemname]:
@@ -1158,7 +1266,7 @@ but if you want to, contact me and I'll help you figure it out.)
         """
 
         self.draw_map()
-        near_track, near_point, near_waypoint = \
+        near_track, near_point, near_waypoint, polygons = \
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
         if near_point is not None:
@@ -1185,7 +1293,7 @@ but if you want to, contact me and I'll help you figure it out.)
     def remove_trackpoint(self, widget):
         """Remove the point nearest the mouse from its track."""
 
-        near_track, near_point, near_waypoint = \
+        near_track, near_point, near_waypoint, polygons = \
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
         if near_point is None:
@@ -1201,7 +1309,7 @@ but if you want to, contact me and I'll help you figure it out.)
     def remove_waypoint(self, widget):
         """Remove the point nearest the mouse from its track."""
 
-        near_track, near_point, near_waypoint = \
+        near_track, near_point, near_waypoint, polygons = \
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
         if near_waypoint is None:
@@ -1346,12 +1454,7 @@ but if you want to, contact me and I'll help you figure it out.)
             return
 
         # Get default values for area and zoom levels:
-        halfwidth = self.win_width / self.collection.xscale / 2
-        halfheight = self.win_height / self.collection.yscale / 2
-        minlon = self.center_lon - halfwidth
-        maxlon = self.center_lon + halfwidth
-        minlat = self.center_lat - halfheight
-        maxlat = self.center_lat + halfheight
+        minlon, maxlon, minlat, maxlat = self.map_bounds()
         minzoom = self.collection.zoomlevel
         maxzoom = self.collection.zoomlevel + 4
 
@@ -1660,7 +1763,7 @@ but if you want to, contact me and I'll help you figure it out.)
         if fill:
             self.cr.fill()
 
-    def draw_label(self, labelstring, x, y, color=None, dropshadow=True,
+    def draw_label(self, labelstring, x, y, color=None, dropshadow=None,
                    font=None, offsets=None):
         """Draw a string at the specified point.
            offsets is an optional tuple specifying where the string will
@@ -1668,10 +1771,20 @@ but if you want to, contact me and I'll help you figure it out.)
            for instance, if offsets are (-1, -1) the string will be
            drawn with the bottom right edge at the given x, y.
         """
+        x, y = int(x), int(y)
         if not color:
             color = self.black_color
         if not font:
             font = self.select_font_desc
+
+        if dropshadow is None:
+            if color == self.black_color:
+                dropshadow = False
+            else:
+                dropshadow = True
+
+        if not self.cr:
+            self.cr = self.drawing_area.get_window().cairo_create()
 
         layout = self.drawing_area.create_pango_layout(labelstring)
         layout.set_font_description(font)
@@ -1689,9 +1802,6 @@ but if you want to, contact me and I'll help you figure it out.)
             x = self.win_width - label_width + x
         if y < 0:
             y = self.win_height - label_height + y
-
-        if not color:
-            color = self.yellow_color
 
         if dropshadow:
             self.cr.set_source_rgb(*self.black_color)
@@ -1715,6 +1825,14 @@ but if you want to, contact me and I'll help you figure it out.)
         self.cr.move_to(x, y)
         pangocairo.show_layout(self.cr, layout)
         self.cr.stroke()
+
+        # This isn't needed from draw_map(), but it is if it's
+        # called incidentally, like from a mouse click.
+        # That doesn't seem to have anything to do with what the
+        # documentation says restore() is for (to return to a saved
+        # state after an earlier save(), which we never do).
+        # Maybe pangocairo does a save() internally?
+        # self.cr.restore()
 
     @staticmethod
     def load_image_from_file(filename):
@@ -1886,6 +2004,17 @@ but if you want to, contact me and I'll help you figure it out.)
         self.draw_map()
         return True
 
+    def map_bounds(self):
+        """Return the extents of the current map in geographic coordinates:
+           minlon, maxlon, minlat, maxlat
+        """
+        halfwidth = self.win_width / self.collection.xscale / 2
+        halfheight = self.win_height / self.collection.yscale / 2
+        return (self.center_lon - halfwidth,
+                self.center_lon + halfwidth,
+                self.center_lat - halfheight,
+                self.center_lat + halfheight)
+
     def xy2coords(self, x, y, xscale=None, yscale=None):
         """Convert pixels to longitude/latitude."""
         # collection.x_scale is in pixels per degree.
@@ -1898,9 +2027,13 @@ but if you want to, contact me and I'll help you figure it out.)
                 self.center_lat +
                 float(self.win_height / 2 - y) / yscale)
 
-    def coords2xy(self, lon, lat, win_width, win_height,
+    def coords2xy(self, lon, lat, win_width=None, win_height=None,
                   xscale=None, yscale=None):
         """Convert lon/lat to pixels."""
+        if not win_width:
+            win_width = self.win_width
+        if not win_height:
+            win_height = self.win_height
         if not xscale:
             xscale = self.collection.xscale
         if not yscale:
@@ -2136,7 +2269,6 @@ but if you want to, contact me and I'll help you figure it out.)
                         print("Total distance: %.2f mi" % self.path_distance)
 
                     # Now calculate bearing.
-                    print("Calculating bearing")
                     angle = MapUtils.bearing(self.click_last_lat,
                                              self.click_last_long,
                                              cur_lat, cur_long)
@@ -2147,7 +2279,7 @@ but if you want to, contact me and I'll help you figure it out.)
             self.click_last_lat = cur_lat
 
             # Is the click near a track or waypoint we're displaying?
-            near_track, near_point, near_waypoint = \
+            near_track, near_point, near_waypoint, polygons = \
                 self.find_nearest_trackpoint(event.x, event.y)
             if near_track is not None:
                 self.select_track(near_track)

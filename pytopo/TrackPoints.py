@@ -58,8 +58,9 @@ class TrackPoints(object):
 
     """Parsing and handling of GPS track files.
        Supports GPX, KML, KMZ and GeoJSON.
-       A TrackPoints object can include a track (points[])
-       and a list of waypoints (waypoints[]).
+       A TrackPoints object can include a track (points[]),
+       a list of waypoints, and a list of polygons.
+       A MapWindow will have one TrackPoints object.
 
        Each point in a track can be either a trackpoint or the beginning
        of a new track segment.
@@ -75,11 +76,15 @@ class TrackPoints(object):
        Finally, a dictionary may be present, containing additional
        elements like time (timestamp).
 
+       polygons is a list of OrderedDicts, which have keys
+       "class" (for purposes of coloring), "coordinates" and optionally "name".
+       Polygons currently can only be read in from GeoJSON format.
     """
 
     def __init__(self):
         self.points = []
         self.waypoints = []
+        self.polygons = []
         self.minlon = 361
         self.maxlon = -361
         self.minlat = 91
@@ -91,16 +96,20 @@ class TrackPoints(object):
 
         self.saved_points = False
 
+        # fieldnames is a list of keys that can be used to indicate
+        # class (for colorizing purposes) of polygons in a geojson file.
+        self.fieldnames = None
+
         self.Debug = False
 
 
     def __repr__(self):
-        return "<TrackPoints: %d points, %s waypoints>" % (len(self.points),
-                                                           len(self.waypoints))
+        return "<TrackPoints: %d points, %s waypoints, %d polygons>" \
+            % (len(self.points), len(self.waypoints), len(self.polygons))
 
 
     def __bool__(self):
-        return bool(self.points) or bool(self.waypoints)
+        return bool(self.points) or bool(self.waypoints or bool(self.polygons))
 
 
     @staticmethod
@@ -122,7 +131,8 @@ class TrackPoints(object):
         return not isinstance(point, GeoPoint)
 
     def get_bounds(self):
-        """Get bounds encompassing all contained tracks and waypoints."""
+        """Get bounds encompassing all contained tracks, waypoints, polygons.
+        """
         return self.minlon, self.minlat, self.maxlon, self.maxlat
 
     def is_attributes(self, point):
@@ -506,8 +516,8 @@ class TrackPoints(object):
             outfp.write("</gpx>")
 
     def read_track_file_GeoJSON(self, filename):
-        """Read a GeoJSON track file.
-           Raise FileNotFoundError if the file doesn't exist,
+        """Read a GeoJSON track or polygon file.
+           Raises FileNotFoundError if the file doesn't exist,
            RuntimeError if it's not a track file,
            IOError or other exceptions as needed.
         """
@@ -530,6 +540,57 @@ class TrackPoints(object):
                 elif "description" in feature["properties"]:
                     name = feature["properties"]["description"]
                 self.handle_track_point(lat, lon, waypoint_name=name)
+
+            if featuretype == "Polygon":
+                # A feature may have more than one polygon
+                # in its coordinate list. First store the values
+                # that apply to all of them:
+                if "name" in feature["properties"]:
+                    name = feature["properties"]["name"]
+                elif "description" in feature["properties"]:
+                    name = feature["properties"]["description"]
+                else:
+                    name = None
+
+                if not self.fieldnames:
+                    self.fieldnames = ["class"]
+
+                # Loop over the polygons in this feature.
+                polyclass = ""
+                for featurepoly in feature["geometry"]["coordinates"]:
+                    for field in self.fieldnames:
+                        if field in feature["properties"]:
+                            polyclass = feature["properties"][field]
+                            break
+
+                    newpoly = {}
+                    if name:
+                        newpoly["name"] = name
+                    newpoly["class"] = polyclass
+                    newpoly["coordinates"] = featurepoly
+
+                    # Bounding box: min lon,  max lon, min lat, max lat
+                    bbox = [ 361, -361, 91, -91 ]
+                    for (lon, lat) in newpoly["coordinates"]:
+                        if lon < bbox[0]:
+                            bbox[0] = lon
+                            if lon < self.minlon:
+                                self.minlon = lon
+                        if lon > bbox[1]:
+                            bbox[1] = lon
+                            if lon > self.maxlon:
+                                self.maxlon = lon
+                        if lat < bbox[2]:
+                            bbox[2] = lat
+                            if lat < self.minlat:
+                                self.minlat = lat
+                        if lat > bbox[3]:
+                            bbox[3] = lat
+                            if lat > self.maxlat:
+                                self.maxlat = lat
+                    newpoly["bounds"] = bbox
+
+                    self.polygons.append(newpoly)
 
             if featuretype != "LineString" and featuretype != "MultiLineString":
                 continue

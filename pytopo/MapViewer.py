@@ -124,6 +124,8 @@ Usage: pytopo
        pytopo -h :   print this message
 
 Other flags:
+       -k keys   : comma-separated list of fields (keys) to look for
+                   when grouping polygonal regions.
        -g        : follow a GPS if available
        -d[level] : debugging mode. Defaults to 1, level 2 shows a little more.
 
@@ -131,6 +133,8 @@ With no arguments, will display a list of known sites.
 
 Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
 track points and/or waypoints; multiple track files are allowed.
+GeoJSON files may also contain polygons: use the -k option to specify
+which field in the GeoJSON feature should be used for grouping.
 
 Use decimal degrees for coordinates.
 
@@ -318,6 +322,7 @@ Shift-click in the map to print the coordinates of the clicked location.
 
     def use_site(self, site, mapwin):
         """Given a starting site, center the map on it and show the map.
+           Returns true for success.
         """
         if len(site) > 3 and site[3]:
             collection = self.find_collection(site[3])
@@ -347,6 +352,8 @@ Shift-click in the map to print the coordinates of the clicked location.
         """Parse runtime arguments."""
 
         args = args[1:]
+
+        mapwin.trackpoints = TrackPoints()
 
         while len(args) > 0:
             if args[0][0] == '-' and not args[0][1].isdigit():
@@ -409,6 +416,13 @@ Shift-click in the map to print the coordinates of the clicked location.
                         self.Debug = 1
                     print("Debugging level", self.Debug)
 
+                elif args[0] == "-k":
+                    if len(args) < 2:
+                        print("-k must include a comma-separated list of field names")
+                        self.Usage()
+                    mapwin.trackpoints.fieldnames = args[1].split(',')
+                    args = args[1:]
+
                 elif args[0] == "-r":
                     self.reload_tiles = time.time()
 
@@ -429,6 +443,7 @@ Shift-click in the map to print the coordinates of the clicked location.
                     except IOError:
                         print("Can't read track file", args[1])
                     args = args[1:]
+
                 else:
                     self.error_out("Unknown flag " + args[0])
 
@@ -437,9 +452,6 @@ Shift-click in the map to print the coordinates of the clicked location.
                 continue
 
             # args[0] doesn't start with '-'. Is it a track file?
-            if not mapwin.trackpoints:
-                mapwin.trackpoints = TrackPoints()
-
             try:
                 mapwin.trackpoints.read_track_file(args[0])
                 args = args[1:]
