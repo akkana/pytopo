@@ -93,12 +93,6 @@ class OSMMapCollection(TiledMapCollection):
         # Call zoom so we set all scales appropriately:
         self.zoom(0)
 
-    def draw_map(self, center_lon, center_lat, mapwin):
-        """Draw maplets at the specified coordinates, to fill the mapwin."""
-        # call parent
-        return super(OSMMapCollection, self).draw_map(center_lon, center_lat,
-                                                      mapwin)
-
     def draw_attribution(self, mapwin):
         mapwin.draw_string_scale(-10, 1, self.attribution,
                                  whichfont="attribution")
@@ -143,7 +137,6 @@ class OSMMapCollection(TiledMapCollection):
         Pass latitude for map collections (e.g. OSM) that cover
         large areas so scale will tend to vary with latitude.
         """
-
         if self.zoomlevel != newzoom:
             if newzoom > self.maxzoom:
                 print("Can't zoom past level", self.maxzoom, "in", \
@@ -218,6 +211,18 @@ class OSMMapCollection(TiledMapCollection):
 
         pixbuf = self.fetch_or_download_maplet(newpath)
         return pixbuf, newpath
+
+    def get_maplet_difference(self, path1, path2):
+        """Given two filenames, like .../10/162/395.jpg and .../10/163/396.jpg,
+           return the number of tiles different, dx and dy.
+           The first (upper leftmost) one should be first.
+        """
+        path1 = path1.split('/')[-2:]
+        path1[1] = os.path.splitext(path1[-1])[0]
+        # Now path1 is something like [162, 395] which is x, y
+        path2 = path2.split('/')[-2:]
+        path2[1] = os.path.splitext(path2[-1])[0]
+        return (int(path2[0]) - int(path1[0]), int(path2[1]) - int(path1[1]))
 
     def url_from_path(self, path, zoomlevel=None):
         """URL we need to get the given tile file.

@@ -30,8 +30,11 @@ class TiledMapCollection(MapCollection):
     """Code common to map collections that have raster tiles of a fixed size.
 TiledMapCollection classes must implement:
 
+  self.xscale, self.yscale (in pixels/degree)
   (pixbuf, x_off, y_off, pathname) = get_maplet(curlon, curlat)
   (pixbuf, newpath) = get_next_maplet(oldpath, dX, dY)
+  (dx, dy) = get_maplet_difference(self, path1, path2)
+      (number of maplets difference, which can be multipled by maplet pixel size)
   deg2num(self, lat_deg, lon_deg, zoom=None)
   num2deg(self, xtile, ytile)
   deg2num
@@ -48,6 +51,10 @@ TiledMapCollection classes must implement:
         # We need to keep a pointer to the map window for redrawing
         # when downloaded tiles come in.
         self.mapwin = None
+
+        # scale, in pixels / degree. Inherited classes must set this.
+        self.xscale = None
+        self.yscale = None
 
         self.init_downloader()
         # If it ever becomes needed to run the FuturesSession
@@ -82,17 +89,14 @@ TiledMapCollection classes must implement:
             self.reload_tiles = False
 
     def draw_map(self, center_lon, center_lat, mapwin):
-        """Draw maplets at the specified coordinates, to fill the mapwin."""
-
+        """Draw tiles at the specified coordinates, to fill the mapwin.
+           Also set some win-specific variables which can be referenced later
+           by draw_single_tile as downloaded tiles become available.
+        """
+        # In case this hasn't been initialized yet:
         self.mapwin = mapwin
 
-        # Get the current window size:
-        win_width, win_height = mapwin.get_size()
-        if (self.Debug):
-            print("Window is", win_width, "x", win_height)
-
-        # Now that we have a latitude, call zoom so we can finally
-        # set the x and y scales accurately.
+        # Call zoom to set the x and y scales accurately for this latitude.
         self.zoom(0, center_lat)
 
         # Find the coordinate boundaries for the set of maps to draw.
@@ -101,12 +105,12 @@ TiledMapCollection classes must implement:
         if (self.Debug):
             print("Calculating boundaries: min =", \
                 MapUtils.dec_deg2deg_min_str(center_lon), \
-                center_lon, "+/-", win_width, \
+                center_lon, "+/-", mapwin.win_width, \
                 "/", self.xscale, "/ 2")
-        min_lon = center_lon - win_width / self.xscale / 2
-        max_lon = center_lon + win_width / self.xscale / 2
-        min_lat = center_lat - win_height / self.yscale / 2
-        max_lat = center_lat + win_height / self.yscale / 2
+        min_lon = center_lon - mapwin.win_width / self.xscale / 2
+        max_lon = center_lon + mapwin.win_width / self.xscale / 2
+        min_lat = center_lat - mapwin.win_height / self.yscale / 2
+        max_lat = center_lat + mapwin.win_height / self.yscale / 2
 
         if (self.Debug):
             print("Map from", min_lon, MapUtils.dec_deg2deg_min_str(min_lon), \
@@ -121,12 +125,12 @@ TiledMapCollection classes must implement:
         cur_y = 0
         y_maplet_name = None
         initial_x_off = None
-        while cur_y < win_height:
+        while cur_y < mapwin.win_height:
             curlon = min_lon
             cur_x = 0
             x_maplet_name = None
-            while cur_x < win_width:
 
+            while cur_x < mapwin.win_width:
                 # Reset the expected image size:
                 w = self.img_width
                 h = self.img_height
@@ -144,6 +148,12 @@ TiledMapCollection classes must implement:
                         # Save the x offset: we'll need it for the
                         # beginning of each subsequent row.
                         initial_x_off = x_off
+
+                        # Save parameters that will help draw_single_tile later.
+                        # These will be reset on the first tile of each draw_map() call.
+                        self.initial_x_off = x_off
+                        self.initial_y_off = y_off
+                        self.upper_left_maplet_name = x_maplet_name
 
                     # Not upper left corner --
                     # must be the beginning of a new row.
@@ -245,8 +255,10 @@ TiledMapCollection classes must implement:
 
             mapwin.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
 
-            # Make sure the pixbuf goes out of scope properly:
+            # Make sure the pixbuf goes out of scope properly
+            # so it can be garbage collected:
             pixbuf = 0
+
         else:
             # if (self.Debug):
             #     print("No maplet for", curlon, curlat, end='')
@@ -292,15 +304,19 @@ TiledMapCollection classes must implement:
         except ValueError:
             print("Bad tile filename", path)
             return
+
         # Now we need to turn tilex and tiley into x, y, x_off, y_off
         # for the MapWindow's current position.
         lat_deg, lon_deg = self.num2deg(tilex, tiley)
 
-        # Where on the map window should this lat and lon appear?
-        min_lon = mapwin.center_lon - mapwin.win_width / self.xscale / 2
-        max_lat = mapwin.center_lat + mapwin.win_height / self.yscale / 2
-        mapx = int((lon_deg - min_lon) * self.xscale)
-        mapy = int((max_lat - lat_deg) * self.yscale)
+        # Upper left corner of the map window:
+        min_lon = mapwin.center_lon - mapwin.win_width / self.xscale / 2.
+        max_lat = mapwin.center_lat + mapwin.win_height / self.yscale / 2.
+
+        # Calculate position in the window relative to the upper left maplet
+        dx, dy = self.get_maplet_difference(self.upper_left_maplet_name, path)
+        mapx = dx * self.img_width - self.initial_x_off
+        mapy = dy * self.img_height - self.initial_y_off
 
         if mapx < 0:
             x_off = -mapx
