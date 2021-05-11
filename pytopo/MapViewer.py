@@ -324,13 +324,14 @@ Shift-click in the map to print the coordinates of the clicked location.
         """Given a starting site, center the map on it and show the map.
            Returns true for success.
         """
-        if len(site) > 3 and site[3]:
-            collection = self.find_collection(site[3])
-        else:
-            collection = self.find_collection(self.default_collection)
-        if not collection:
-            return False
-        mapwin.collection = collection
+        if not mapwin.collection:
+            if len(site) > 3 and site[3]:
+                collection = self.find_collection(site[3])
+            else:
+                collection = self.find_collection(self.default_collection)
+            if not collection:
+                return False
+            mapwin.collection = collection
 
         # site[1] and site[2] are the long and lat in deg.minutes
         # print(site[0], site[1], site[2])
@@ -343,8 +344,8 @@ Shift-click in the map to print the coordinates of the clicked location.
             print(site[0] + ":", \
                 MapUtils.dec_deg2deg_min_str(mapwin.center_lon), \
                 MapUtils.dec_deg2deg_min_str(mapwin.center_lat))
-        if len(site) > 4 and collection.zoom_to:
-            collection.zoom_to(site[4])
+        if len(site) > 4 and mapwin.collection.zoom_to:
+            mapwin.collection.zoom_to(site[4])
         mapwin.draw_map()
         return True
 
@@ -396,6 +397,7 @@ Shift-click in the map to print the coordinates of the clicked location.
                     if mapwin.collection is None:
                         self.error_out("Can't find a map collection called "
                                         + args[1])
+
                     # Start initially at top left, but subsequent args
                     # may change this:
                     mapwin.center_lon, mapwin.center_lat = \
@@ -487,7 +489,8 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
                         continue
                     break
 
-            if mapwin.collection and mapwin.center_lon and mapwin.center_lat:
+            if mapwin.collection and mapwin.center_lon is not None \
+               and mapwin.center_lat is not None:
                 args = args[1:]
                 continue
 
@@ -644,6 +647,8 @@ from pytopo import GenericMapCollection
 '''
 
         with open(userfile) as fp:
+            # exec is a security problem only if you let other people
+            # modify your pytopo.sites. So don't.
             execstring += fp.read()
             exec(execstring, globs, locs)
 
@@ -727,7 +732,7 @@ Collections = [
 
     # Humanitarian
     OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
-                      ".png", 256, 256, 13,
+                      ".png", 256, 256, 10,
                       "http://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
                       maxzoom=15,
                       attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
@@ -735,7 +740,7 @@ Collections = [
 
     # Wikimedia Maps: experimental
     OSMMapCollection( "Wikimedia", "~/Maps/Wikimedia",
-                      ".png", 256, 256, 13,
+                      ".png", 256, 256, 10,
                       "https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png",
                       maxzoom=15,
                       attribution="Wikimedia Maps, map data © OpenStreetMap contributors"),
@@ -746,14 +751,14 @@ Collections = [
     # but in practice they give an error after zoom level 15.
     # They're a bit flaky: sometimes they don't load, or load blank tiles.
     OSMMapCollection( "USGS", "~/Maps/USGS",
-                      ".jpg", 256, 256, 13,
+                      ".jpg", 256, 256, 10,
                        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/WMTS?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=USGSTopo&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image%2Fjpeg",
                       maxzoom=15,
                       attribution="USGS National Map"),
 
     # USGS also offers satellite tiles:
     OSMMapCollection( "USGS Imagery", "~/Maps/USGS-imagery",
-                      ".jpg", 256, 256, 13,
+                      ".jpg", 256, 256, 11,
                        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/WMTS?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=USGSImageryOnly&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image%2Fjpeg",
                       maxzoom=15,
                       attribution="USGS National Map"),
@@ -779,6 +784,8 @@ KnownSites = [
     [ "london", -0.072, 51.3098, "", 11 ],
     [ "sydney", 151.125, -33.517, "", 11 ],
     ]
+
+user_agent = "PyTopo customized by Your Name Here"
 """, file=fp)
         fp.close()
 
