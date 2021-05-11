@@ -1,3 +1,8 @@
+2021-05-11  Akkana Peck <akkana@shallowsky.com>
+	Honor -c to specify a different collection when loading known sites.
+	Fix issue #3, the off-by-one error resulting in a one-pixel
+	horizontal black stripe between rows when downloading new tiles.
+
 2021-05-09  Akkana Peck <akkana@shallowsky.com>
 	Add polygonal overlays from GeoJSON files.
 
