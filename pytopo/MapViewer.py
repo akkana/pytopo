@@ -397,17 +397,6 @@ Shift-click in the map to print the coordinates of the clicked location.
                     if mapwin.collection is None:
                         self.error_out("Can't find a map collection called "
                                         + args[1])
-
-                    # Start initially at top left, but subsequent args
-                    # may change this:
-                    mapwin.center_lon, mapwin.center_lat = \
-                        mapwin.collection.get_top_left()
-                    if (self.Debug):
-                        print("Collection", mapwin.collection.name, end=' ')
-                        print("Starting at", \
-                            MapUtils.dec_deg2deg_min_str(mapwin.center_lon), \
-                            ", ", \
-                            MapUtils.dec_deg2deg_min_str(mapwin.center_lat))
                     args = args[1:]
 
                 elif args[0].startswith("-d"):
