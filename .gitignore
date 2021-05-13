@@ -16,6 +16,9 @@ develop-eggs
 # Data directories
 data
 
+# Sphinx documentation
+_build
+
 # Installer logs
 pip-log.txt
 
