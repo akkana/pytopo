@@ -79,15 +79,12 @@ setup(name='pytopo',
       keywords=['maps', 'map viewer', 'track files', 'track logs',
                 'GPX', 'KML', "GeoJSON"],
 
-      # There aren't any appropriate classifiers for mapping apps.
       classifiers = [
-          'Programming Language :: Python :: 2',
           'Programming Language :: Python :: 3',
           'License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)',
           'Intended Audience :: End Users/Desktop',
-          'Topic :: Multimedia :: Graphics',
-          'Topic :: Multimedia :: Graphics :: Viewers',
-          'Topic :: Utilities'
+          'Intended Audience :: Science/Research',
+          'Topic :: Scientific/Engineering :: GIS',
         ],
 
       cmdclass={
