@@ -117,11 +117,11 @@ class MapViewer(object):
 Usage: pytopo
        pytopo trackfile
        pytopo known_site
-       pytopo [-t trackfile] [-c collection] [-r] [site_name]
+       pytopo [-t trackfile] [-c collection] [-o overlay] [-r] [site_name]
        pytopo [-t trackfile] start_lat start_lon [collection]
-       pytopo -p :   list known sites and tracks
-       pytopo -r :   re-download all map tiles that need to be shown
-       pytopo -h :   print this message
+       pytopo -p :  list known sites, collections and tracks
+       pytopo -r :  re-download all map tiles that need to be shown
+       pytopo -h :  print this message
 
 Other flags:
        -k keys   : comma-separated list of fields (keys) to look for
@@ -129,12 +129,17 @@ Other flags:
        -g        : follow a GPS if available
        -d[level] : debugging mode. Defaults to 1, level 2 shows a little more.
 
-With no arguments, will display a list of known sites.
+With no arguments, will display a menu of known sites
+(defined in pytopo.sites).
+
+Map collections are defined in pytopo.sites.
+Overlays are also collections, drawn translucently on top of the base map,
+ and there can be more than one.
 
 Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
 track points and/or waypoints; multiple track files are allowed.
 GeoJSON files may also contain polygons: use the -k option to specify
-which field in the GeoJSON feature should be used for grouping.
+which field in the GeoJSON feature should be used for coloring groups.
 
 Use decimal degrees for coordinates.
 
@@ -192,6 +197,12 @@ Shift-click in the map to print the coordinates of the clicked location.
         for site in self.KnownSites:
             print(" ", site[0], "(", os.path.basename(site[3]), ")")
         print()
+
+        print("Collections:")
+        for collection in self.collections:
+            print(collection)
+        print()
+
         print("Known Tracks:")
         for track in self.KnownTracks:
             print(" ", track[0])
@@ -200,19 +211,17 @@ Shift-click in the map to print the coordinates of the clicked location.
     def find_collection(self, collname):
         """Find a collection with the given name."""
 
-        # print("Looking for a collection named", collname)
         # Make sure collname is a MapCollection we know about:
-        collection = None
         for coll in self.collections:
             if collname == coll.name:
                 if not coll.exists():
                     self.error_out("Can't access location " + coll.location +
                                    " for collection " + collname)
-                collection = coll
                 if (self.Debug):
-                    print("Found the collection", collection.name)
-                return collection
-        return collection
+                    print("Found the collection", coll.name)
+                return coll
+
+        return None
 
     def track_select(self, mapwin):
         """Show a dialog giving a choice of known tracks.
@@ -337,6 +346,8 @@ Shift-click in the map to print the coordinates of the clicked location.
         # print(site[0], site[1], site[2])
         mapwin.center_lon = MapUtils.deg_min2dec_deg(site[1])
         mapwin.center_lat = MapUtils.deg_min2dec_deg(site[2])
+        mapwin.cur_lon = mapwin.center_lon
+        mapwin.cur_lat = mapwin.center_lat
         mapwin.pin_lon = mapwin.center_lon
         mapwin.pin_lat = mapwin.center_lat
         # print("Center in decimal degrees:", centerLon, centerLat)
@@ -346,7 +357,7 @@ Shift-click in the map to print the coordinates of the clicked location.
                 MapUtils.dec_deg2deg_min_str(mapwin.center_lat))
         if len(site) > 4 and mapwin.collection.zoom_to:
             mapwin.collection.zoom_to(site[4])
-        mapwin.draw_map()
+
         return True
 
     def parse_args(self, mapwin, args):
@@ -397,6 +408,18 @@ Shift-click in the map to print the coordinates of the clicked location.
                     if mapwin.collection is None:
                         self.error_out("Can't find a map collection called "
                                         + args[1])
+                    args = args[1:]
+
+                elif args[0] == "-o":
+                    # Specify an overlay collection:
+                    if len(args) < 2:
+                        print("-c must specify overlay collection")
+                        self.Usage()
+                    overlay = self.find_collection(args[1])
+                    if overlay is None:
+                        self.error_out("Can't find a map collection called "
+                                        + args[1])
+                    mapwin.add_overlay(overlay)
                     args = args[1:]
 
                 elif args[0].startswith("-d"):
@@ -550,11 +573,18 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
             mapwin.center_lon = (maxlon + minlon) / 2
             mapwin.center_lat = (maxlat + minlat) / 2
             mapwin.collection.zoom_to_bounds(minlon, minlat, maxlon, maxlat)
+            for ov in mapwin.overlays:
+                ov.zoom_to_bounds(minlon, minlat, maxlon, maxlat)
 
         if self.reload_tiles and 'set_reload_tiles' in dir(mapwin.collection):
             mapwin.collection.set_reload_tiles(self.reload_tiles)
         elif self.reload_tiles:
             print("Collection can't re-download tiles")
+
+        # use_site has set a zoomlevel on the mapwin's collection,
+        # but any overlays need to be zoomed to the same level.
+        for ov in mapwin.overlays:
+            ov.zoom_to(mapwin.collection.zoomlevel)
 
         # By now, we hope we have the mapwin positioned with a collection
         # and starting coordinates:

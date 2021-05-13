@@ -18,14 +18,16 @@ combined with knowledge about the geographic coordinates
 and scale of those tiles so they can be drawn in a map window.
 
 Child classes implementing MapCollection must define functions
-__init__, get_maplet, draw_map, and get_top_left.
-Get_top_left() is only for debugging, when you're trying to figure out
-map coordinates and need a starting place. Should probably remove it.
+__init__, get_maplet, draw_map.
 """
 
     def __init__(self, _name, _location):
         self.name = _name
         self.location = _location
+
+        # Opacity defaults to 1, but some subclasses may define
+        # ways of drawing with less than full opacity.
+        self.opacity = 1.
 
         # Set some defaults so that we can test pytopo with a null collection:
         self.img_width = 100
@@ -37,6 +39,10 @@ map coordinates and need a starting place. Should probably remove it.
         self.maxzoom = None
 
         self.Debug = False
+
+    def __repr__(self):
+        return 'MapCollection %s (%s)' % (self.name,
+                                          os.path.basename(self.location))
 
     def get_maplet(self, longitude, latitude):
         """Returns pixbuf, x_offset, y_offset:
@@ -57,12 +63,6 @@ map coordinates and need a starting place. Should probably remove it.
         """Draw attribution/copyright for the map tiles used in this collection.
         """
         return
-
-    def get_top_left(self):
-        """A way to display some part of a map collection even if we're fuzzy
-        on the coordinates -- get the coordinate of the first maplet
-        and return as longitude, latitude."""
-        return 0, 0
 
     def zoom(self, amount, latitude=45):
         """Zoom by the given number of steps (positive to zoom in,

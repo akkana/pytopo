@@ -142,7 +142,3 @@ class GenericMapCollection(TiledMapCollection):
             retstr = retstr + "-"
         retstr = retstr + MapUtils.ohstring(y_grid, self.numdigits) + self.ext
         return retstr
-
-    def get_top_left(self):
-        """Get the coordinates of the top left corner of the map."""
-        return self.left_longitude, self.top_latitude

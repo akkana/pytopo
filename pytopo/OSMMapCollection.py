@@ -310,7 +310,3 @@ class OSMMapCollection(TiledMapCollection):
     def coords_to_filename(self, longitude, latitude):
         """Given coordinates in decimal degrees, map to the closest filename"""
         return None
-
-    def get_top_left(self):
-        """Get the coordinates of the top left corner of the map."""
-        return None, None

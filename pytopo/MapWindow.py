@@ -38,7 +38,7 @@ import gtk
 import gobject
 import glib
 import pango
-import cairo    # needed only for creating a region
+import cairo
 import pangocairo
 
 from pkg_resources import resource_filename
@@ -80,6 +80,9 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # The current map collection being used:
         self.collection = None
+
+        # Any overlaid collections.
+        self.overlays = []
 
         self.center_lon = None
         self.center_lat = None
@@ -205,6 +208,10 @@ but if you want to, contact me and I'll help you figure it out.)
         # Text overlays with positions: currently only used for polygons.
         self.text_overlays = []
 
+    def add_overlay(self, overlay, opacity=.4):
+        overlay.opacity = opacity
+        self.overlays.append(overlay)
+
     def show_window(self, init_width, init_height):
         """Create the initial window."""
         win = gtk.Window()
@@ -281,6 +288,8 @@ but if you want to, contact me and I'll help you figure it out.)
         if self.gps_centered:
             self.center_lon = self.last_gpsd.fix.longitude
             self.center_lat = self.last_gpsd.fix.latitude
+            self.cur_lon = self.center_lon
+            self.cur_lat = self.center_lat
 
         self.draw_map()
 
@@ -311,13 +320,17 @@ but if you want to, contact me and I'll help you figure it out.)
                             color=self.black_color, dropshadow=False)
             return
 
-        # XXX Collection.draw_map wants center, but we only have lower right.
         if self.controller.Debug:
-            print(">>>>>>>>>>>>>>>>")
+            print("\n\n>>>>>>>>>>>>>>>>")
             print("window draw_map centered at", end=' ')
             print(MapUtils.dec_deg2deg_min_str(self.center_lon), end=' ')
             print(MapUtils.dec_deg2deg_min_str(self.center_lat))
+
         self.collection.draw_map(self.center_lon, self.center_lat, self)
+        if self.controller.Debug:
+            print("drawing overlay collections")
+        for ov in self.overlays:
+            ov.draw_map(self.center_lon, self.center_lat, self)
 
         if not self.is_dragging:
             self.draw_overlays()
@@ -943,11 +956,13 @@ but if you want to, contact me and I'll help you figure it out.)
             (MapUtils.dec_deg2deg_min_str(self.cur_lon),
              MapUtils.dec_deg2deg_min_str(self.cur_lat)))
 
-    def zoom(self, widget=None):
+    def zoom(self, widget=None, direc=1):
         """Zoom the map by 1 unit."""
         self.center_lon = self.cur_lon
         self.center_lat = self.cur_lat
-        self.collection.zoom(1)
+        self.collection.zoom(direc)
+        for ov in self.overlays:
+            ov.zoom(direc)
         self.text_overlays = []
         self.draw_map()
 
@@ -966,7 +981,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # so we can arrange for it to be under the mouse again after zoom.
         curmouselon, curmouselat = self.xy2coords(event.x, event.y)
 
-        self.collection.zoom(direc)
+        self.zoom(direc=direc)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
             print("zoomed to", self.collection.zoomlevel)
 
@@ -1445,6 +1460,8 @@ but if you want to, contact me and I'll help you figure it out.)
         minlon, minlat, maxlon, maxlat = self.trackpoints.get_bounds()
         self.center_lon = (maxlon + minlon) / 2
         self.center_lat = (maxlat + minlat) / 2
+        self.cur_lon = self.center_lon
+        self.cur_lat = self.center_lat
 
     def cancel_download(self, widget, data=None):
         """Cancel any pending downloads."""
@@ -1681,7 +1698,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # self.xgc.set_rgb_fg_color(color)
         self.cr.set_source_rgb(*color)
 
-    def draw_pixbuf(self, pixbuf, x_off, y_off, x, y, w, h):
+    def draw_pixbuf(self, pixbuf, x_off, y_off, x, y, w, h, opacity=1.):
         """Draw the pixbuf at the given position and size,
            starting at the specified offset.
            If width and height are provided, assume the offset
@@ -1703,19 +1720,33 @@ but if you want to, contact me and I'll help you figure it out.)
         if h <= 0:
             h = pixbuf.get_height() - y_off
 
+        xo = x - x_off
+        yo = y - y_off
+
         # GTK3 way: seems to be almost completely undocumented.
         # The last two args of cairo_set_source_pixbuf are the point
         # on the canvas matching the (0, 0) point of the pixmap.
-        gtk.gdk.cairo_set_source_pixbuf(self.cr, pixbuf, x-x_off, y-y_off)
+        # The coordinates have to be in pixels.
+        gtk.gdk.cairo_set_source_pixbuf(self.cr, pixbuf, xo, yo)
 
-        # Then these are the coordinates of the rectangle to draw
-        # on the canvas.
-        self.cr.rectangle(x, y, w, h)
+        # But then things get weird. Apparently, for fill(), the
+        # rectangle's coordinates should be in pixels, as you might expect:
+        # if opacity == 1:
+        #     self.cr.rectangle(x, y, w, h)
+        #     self.cr.fill()
+        #
+        # But for paint() and paint_with_alpha(), they need to be
+        # normalized to a width and height of 1.
+        # This may be what the cairo documentation refers to as
+        # "user-space coordinates", but I can't find any place
+        # they actually explain that term.
+        # If you use w, h without dividing by the window size,
+        # the maplet is still painted but you'll see black borders
+        # around each tile when panning the map.
 
-        # Some examples use paint() instead of fill();
-        # I can't find any documentation explaining the difference,
-        # but using paint() adds black borders around the images.
-        self.cr.fill()
+        # paint*() doesn't need rectangle() first,
+        # they transfer the whole source region.
+        self.cr.paint_with_alpha(opacity)
 
     def draw_rect_between(self, fill, x1, y1, x2, y2, color=None):
         """Draw a rectangle. between two sets of ordinates,
@@ -1729,8 +1760,6 @@ but if you want to, contact me and I'll help you figure it out.)
 
     def draw_rectangle(self, fill, x, y, w, h, color=None):
         """Draw a rectangle."""
-        # print("draw_rectangle", x, y, w, h, fill)
-
         if color:
             if len(color) > 3:
                 self.cr.set_source_rgba(*color)
@@ -1957,11 +1986,11 @@ but if you want to, contact me and I'll help you figure it out.)
             # before exiting.
             return True
         elif event.string == "+" or event.string == "=":
-            self.collection.zoom(1)
+            self.zoom(direc=1)
             if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
                 print("zoomed in to", self.collection.zoomlevel)
         elif event.string == "-":
-            self.collection.zoom(-1)
+            self.zoom(direc=-1)
             if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
                 print("zoomed out to", self.collection.zoomlevel)
         elif event.keyval == gtk.keysyms.Left:
@@ -2164,7 +2193,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # Zoom in if we get a double-click.
         self.center_lon, self.center_lat = self.xy2coords(event.x, event.y)
 
-        self.collection.zoom(1)
+        self.zoom(direc=1)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
             print("doubleclick: zoomed in to", self.collection.zoomlevel)
         self.draw_map()
@@ -2228,7 +2257,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
             zoom = self.was_click_in_zoom(event.x, event.y)
             if zoom:
-                self.collection.zoom(zoom)
+                self.zoom(direc=zoom)
                 if self.controller.Debug and hasattr(self.collection,
                                                      'zoomlevel'):
                     print("zoomed to", self.collection.zoomlevel)
@@ -2242,6 +2271,8 @@ but if you want to, contact me and I'll help you figure it out.)
                 if self.gps_centered and self.last_gpsd and self.last_gpsd.fix:
                     self.center_lon = self.last_gpsd.fix.longitude
                     self.center_lat = self.last_gpsd.fix.latitude
+                    self.cur_lon = self.center_lon
+                    self.cur_lat = self.center_lat
                     self.draw_map()
                 return True
 

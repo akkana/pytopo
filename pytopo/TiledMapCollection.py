@@ -68,6 +68,11 @@ TiledMapCollection classes must implement:
         self.num_failed_downloads = 0
         self.last_failed_download_time = 0
 
+        # Tiles downloading or downloaded but not yet drawn.
+        # Only used for overlay tiles (opacity < 1);
+        # fully opaque tiles will be drawn as soon as they're downloaded.
+        self.tiles_queued = []
+
     def init_downloader(self):
         self.downloader = \
             FuturesSession(executor=ThreadPoolExecutor(max_workers=3))
@@ -93,6 +98,11 @@ TiledMapCollection classes must implement:
            Also set some win-specific variables which can be referenced later
            by draw_single_tile as downloaded tiles become available.
         """
+        if self.tiles_queued:
+            if self.mapwin.controller.Debug:
+                print(self, "draw_map: tiles still queued, not drawing map")
+            return
+
         # In case this hasn't been initialized yet:
         self.mapwin = mapwin
 
@@ -102,17 +112,12 @@ TiledMapCollection classes must implement:
         # Find the coordinate boundaries for the set of maps to draw.
         # This may (indeed, usually will) include maps partly off the screen,
         # so the coordinates will span a greater area than the visible window.
-        if (self.Debug):
-            print("Calculating boundaries: min =", \
-                MapUtils.dec_deg2deg_min_str(center_lon), \
-                center_lon, "+/-", mapwin.win_width, \
-                "/", self.xscale, "/ 2")
         min_lon = center_lon - mapwin.win_width / self.xscale / 2
         max_lon = center_lon + mapwin.win_width / self.xscale / 2
         min_lat = center_lat - mapwin.win_height / self.yscale / 2
         max_lat = center_lat + mapwin.win_height / self.yscale / 2
 
-        if (self.Debug):
+        if (self.mapwin.controller.Debug):
             print("Map from", min_lon, MapUtils.dec_deg2deg_min_str(min_lon), \
                 MapUtils.dec_deg2deg_min_str(min_lat), \
                 "to", MapUtils.dec_deg2deg_min_str(max_lon), \
@@ -150,7 +155,8 @@ TiledMapCollection classes must implement:
                         initial_x_off = x_off
 
                         # Save parameters that will help draw_single_tile later.
-                        # These will be reset on the first tile of each draw_map() call.
+                        # These will be reset on the first tile of
+                        # each draw_map() call.
                         self.initial_x_off = x_off
                         self.initial_y_off = y_off
                         self.upper_left_maplet_name = x_maplet_name
@@ -177,24 +183,20 @@ TiledMapCollection classes must implement:
                                                                  1, 0)
                     x_off = 0
 
-                if self.Debug:
-                    print("    ", x_maplet_name)
-
                 x = cur_x
                 y = cur_y
-
                 w, h = self.draw_tile_at_position(pixbuf, mapwin,
                                                   x, y, x_off, y_off)
                 # You may ask, why not just do this subtraction before
                 # draw_pixbuf so we don't have to subtract w and h twice?
                 # Alas, we may not have the real w and h until we've done
                 # pixbuf.get_width(), so we'd be subtracting the wrong thing.
-                # XXX Not really true any more, since we're assuming fixed
-                # XXX tile size. Revisit this!
+                # XXX Not true in most collections, with fixed tile size.
+                # XXX Could be optimized in OSMMapCollection.
                 cur_x += w
                 curlon += float(w) / self.xscale
 
-            if (self.Debug):
+            if (self.mapwin.controller.Debug):
                 print(" ")
                 print("New row: adding y =", h, end=' ')
                 print("Subtracting lat", float(h) / self.yscale)
@@ -226,54 +228,51 @@ TiledMapCollection classes must implement:
         """Draw a single tile, perhaps after downloading it,
            at a specified location.
         """
+        if self.mapwin.controller.Debug:
+            print("draw_tile_at_position", self, x, y)
         if pixbuf is not None:
             w = pixbuf.get_width() - x_off
             h = pixbuf.get_height() - y_off
-            if (self.Debug):
-                print("img size:", pixbuf.get_width(), \
-                      pixbuf.get_height())
 
             # If the image won't completely fill the grid space,
-            # fill the whole rectangle first with black.
-            # Note: this may not guard against images with
-            # transparent areas. Don't do that.
-            if (pixbuf.get_width() < self.img_width or
-                    pixbuf.get_height() < self.img_height):
+            # fill the whole rectangle first with black
+            # (but only if this is the base layer, opacity==1).
+            # This generally shouldn't happen
+            if (self.opacity == 1. and
+                (pixbuf.get_width() < self.img_width or
+                 pixbuf.get_height() < self.img_height)):
                 mapwin.set_bg_color()
                 mapwin.draw_rectangle(1, x, y,
                                       self.img_width, self.img_height)
-                if (self.Debug):
+                if self.mapwin.controller.Debug:
                     print("Filling in background:", x, y, end=' ')
                     print(self.img_width, self.img_height)
 
-            # if (self.Debug):
-            #     print("Drawing maplet for", end='')
-            #     print(MapUtils.dec_deg2deg_min_str(curlon), end='')
-            #     print(MapUtils.dec_deg2deg_min_str(curlat), end='')
-            #     print("at", x, y, "offset", x_off, y_off, end='')
-            #     print("size", w, h)
-
-            mapwin.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h)
+            if self.mapwin.controller.Debug:
+                print(self, "draw_tile_at_position", x, y, x_off, y_off,
+                      "opacity", self.opacity)
+            mapwin.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h,
+                               self.opacity)
 
             # Make sure the pixbuf goes out of scope properly
             # so it can be garbage collected:
             pixbuf = 0
 
         else:
-            # if (self.Debug):
-            #     print("No maplet for", curlon, curlat, end='')
-            #     print("at", x, y, "offset", x_off, y_off)
-            mapwin.set_bg_color()
+            if self.mapwin.controller.Debug:
+                print("No tile for", x, y, "offset", x_off, y_off)
             w = self.img_width - x_off
             h = self.img_height - y_off
-            mapwin.draw_rectangle(1, x, y, w, h)
+            if self.opacity == 1:
+                mapwin.set_bg_color()
+                mapwin.draw_rectangle(1, x, y, w, h)
 
-        # Useful when testing:
-        if (self.Debug > 1):
-            mapwin.set_color(mapwin.grid_color)
-            mapwin.draw_rectangle(0, x, y, w, h)
-            mapwin.draw_line(x, y, x + w, y + h)
-            mapwin.set_bg_color()
+        # Sometimes useful when testing:
+        # if (self.mapwin.controller.Debug > 1):
+        #     mapwin.set_color(mapwin.grid_color)
+        #     mapwin.draw_rectangle(0, x, y, w, h)
+        #     mapwin.draw_line(x, y, x + w, y + h)
+        #     mapwin.set_bg_color()
 
         return w, h
 
@@ -335,12 +334,12 @@ TiledMapCollection classes must implement:
                                        x_off, y_off)
         except glib.GError as e:
             print("Couldn't draw tile:", e, end=' ')
-            if not self.Debug:
+            if not self.mapwin.controller.Debug:
                 print("... deleting")
             else:
                 print("")
             print("")
-            if os.path.exists(path) and not self.Debug:
+            if os.path.exists(path) and not self.mapwin.controller.Debug:
                 os.unlink(path)
             self.num_failed_downloads += 1
             # Usually this means OSM gave us a text file containing
@@ -348,12 +347,6 @@ TiledMapCollection classes must implement:
         except Exception as e:
             print("Error drawing tile:", e)
             self.num_failed_downloads += 1
-
-        # Redraw any trackpoints, zoom controls, and anything else that
-        # has to draw over the tiles, since they might have been overwritten.
-        # XXX should schedule this after a delay, so we're not constantly
-        # redrawing large sets of trackpoints each time a new tile comes in.
-        mapwin.draw_overlays()
 
     def queue_download(self, url, path):
         """Add a URL to the FuturesSession downloader queue,
@@ -372,6 +365,8 @@ TiledMapCollection classes must implement:
             self.last_failed_download_time = 0
 
         self.url_to_path[url] = path
+        if self.opacity < 1.:
+            self.tiles_queued.append(path)
         self.downloader.get(url)
 
     def response_hook(self, response, *args, **kwargs):
@@ -391,8 +386,29 @@ TiledMapCollection classes must implement:
         tilepath = self.url_to_path[response.url]
         with open(tilepath, 'wb') as tilefp:
             tilefp.write(response.content)
-            if self.Debug:
+            if self.mapwin.controller.Debug:
                 print("Wrote", response.url, "to", tilepath)
 
         # Schedule a redraw for this tile.
-        glib.idle_add(self.draw_single_tile, tilepath, self.mapwin)
+        # If this is the basemap (opacity=1), do this as soon as possible.
+        # If it's an overlay, though, drawing immediately might draw
+        # under the basemap tile. So don't redraw until all queued
+        # tiles have downloaded or at least timed out.
+        # The redraw has to be mapwin.draw_map, not just this collection's
+        # draw_map, since some of the collection's tiles may already have
+        # been drawn, and drawing over them again will double their opacity.
+        if self.opacity < 1.:
+            try:
+                self.tiles_queued.remove(tilepath)
+            except:
+                print("Yikes, downloaded a path not in the queue:", tilepath)
+                return
+            if not self.tiles_queued:
+                if self.mapwin.controller.Debug:
+                    print("All tiles downloaded for", self,
+                          ": scheduling redraw")
+                glib.idle_add(self.mapwin.draw_map)
+            # elif self.mapwin.controller.Debug:
+            #     print("downloaded", tilepath, "but still tiles to download")
+        else:
+            glib.idle_add(self.draw_single_tile, tilepath, self.mapwin)
