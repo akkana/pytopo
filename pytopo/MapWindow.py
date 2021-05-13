@@ -981,6 +981,9 @@ but if you want to, contact me and I'll help you figure it out.)
         # so we can arrange for it to be under the mouse again after zoom.
         curmouselon, curmouselat = self.xy2coords(event.x, event.y)
 
+        # self.zoom needs current location to be set
+        self.cur_lon, self.cur_lat = curmouselon, curmouselat
+
         self.zoom(direc=direc)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
             print("zoomed to", self.collection.zoomlevel)
