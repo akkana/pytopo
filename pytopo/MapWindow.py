@@ -599,7 +599,7 @@ but if you want to, contact me and I'll help you figure it out.)
         CLOSE = 12    # pixels
 
         if not self.trackpoints:
-            return None, None, None
+            return None, None, None, None
 
         def closer_dist(pt, sm_dist):
             """Return distance from pt to x, y --
