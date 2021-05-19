@@ -227,13 +227,18 @@ TiledMapCollection classes must implement:
     def draw_tile_at_position(self, pixbuf, mapwin, x, y, x_off, y_off):
         """Draw a single tile, perhaps after downloading it,
            at a specified location.
+           Return width, height of the given tile.
         """
         if self.mapwin.controller.Debug:
             print("draw_tile_at_position", self, x, y)
+
         if pixbuf is not None:
             w = pixbuf.get_width() - x_off
             h = pixbuf.get_height() - y_off
+        else:
+            w, h = 0, 0
 
+        if w and h:
             # If the image won't completely fill the grid space,
             # fill the whole rectangle first with black
             # (but only if this is the base layer, opacity==1).
@@ -290,6 +295,13 @@ TiledMapCollection classes must implement:
         """After a new tile is downloaded, fetch its pixbuf and draw it
            in the right place for our currently displayed map.
         """
+        # Finished downloading all tiles?
+        # Then don't bother to draw this one; request a
+        # full map redraw, so that overlays will also be drawn.
+        if not self.tiles_queued:
+            self.mapwin.schedule_redraw()
+            return
+
         # Calculate x, y, x_offset, y_offset from the tile name.
         # Make sure it's even still visible.
         # Tile name is /path/to/zoom/x/y.ext

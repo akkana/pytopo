@@ -94,6 +94,9 @@ but if you want to, contact me and I'll help you figure it out.)
         self.selected_track = None
         self.selected_waypoint = None
 
+        # No redraws initially scheduled
+        self.redraw_scheduled = False
+
         self.path_distance = 0
 
         self.win_width = 0
@@ -400,6 +403,18 @@ but if you want to, contact me and I'll help you figure it out.)
         # Most of the time it's better to keep self.cr unset,
         # so it will be created when necessary.
         self.cr = None
+
+        self.redraw_scheduled = False
+
+    def schedule_redraw(self):
+        """Schedule a redraw after a short timeout,
+           for when multiple tiles have been downloaded.
+           Only keep one scheduled.
+        """
+        if self.redraw_scheduled:
+            return
+        self.redraw_scheduled = True
+        gobject.timeout_add(1000, self.draw_map)
 
     def contrasting_color(self, color):
         """Takes a color triplet (values between 0 and 1)
