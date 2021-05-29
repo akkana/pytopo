@@ -8,7 +8,30 @@ sys.path.insert(0, '..')
 
 from .utils import assertCloseEnough, create_kmz
 from pytopo import MapViewer, MapWindow, ArgParseException
+from pytopo.MapUtils import MapUtils
 
+
+def create_config_file(configdir):
+    with open(os.path.join(configdir, 'pytopo', 'pytopo.sites'),
+              "w") as cfp:
+        cfp.write('''Collections = [
+    OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
+                      ".png", 256, 256, 13,
+                      "http://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+                      maxzoom=15,
+                      attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
+    ]
+
+# Default to whichever MapCollection is listed first.
+defaultCollection = Collections[0].name
+
+KnownSites = [
+    [ "san-francisco", -122.245, 37.471, "", 11 ],
+    ]''')
+        # The site file uses dd.mmss but everything else wants DD
+        return ("san-francisco",
+                MapUtils.deg_min2dec_deg(-122.245),
+                MapUtils.deg_min2dec_deg(37.471))
 
 class ArgparseTests(unittest.TestCase):
 
@@ -128,6 +151,21 @@ class ArgparseTests(unittest.TestCase):
         assertCloseEnough(mapwin.center_lat, 37.537)
 
     def test_explicit_coords_plus_gpx(self):
+        args = [ 'pytopo', '35.85', '-106.4',
+                 'test/files/otowi-mesa-arch.gpx' ]
+
+        mapwin =  MapWindow(self.viewer)
+        self.viewer.parse_args(mapwin, args)
+
+        self.assertEqual(len(mapwin.trackpoints.points), 1265)
+        self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
+        assertCloseEnough(mapwin.center_lat, 35.85)
+        assertCloseEnough(mapwin.center_lon, -106.4)
+        assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
+                               (-106.253, 35.885,
+                                -106.228, 35.8955))
+
+    def test_explicit_coords_plus_gpx_minus_t(self):
         args = [ 'pytopo', '35.85', '-106.4', '-t',
                  'test/files/otowi-mesa-arch.gpx' ]
 
@@ -163,34 +201,29 @@ class ArgparseTests(unittest.TestCase):
                 print("SystemExit, fine")
 
     def test_known_site(self):
-        args = [ 'pytopo', 'san-francisco' ]
-
-        with open(os.path.join(self.configdir, 'pytopo', 'pytopo.sites'),
-                  "w") as cfp:
-            cfp.write('''Collections = [
-    OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
-                      ".png", 256, 256, 13,
-                      "http://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-                      maxzoom=15,
-                      attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
-    ]
-
-# Default to whichever MapCollection is listed first.
-defaultCollection = Collections[0].name
-
-KnownSites = [
-    [ "san-francisco", -122.245, 37.471, "", 11 ],
-    ]''')
+        sitename, sitelon, sitelat = create_config_file(self.configdir)
+        args = [ 'pytopo', sitename ]
 
         mapwin =  MapWindow(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 0)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 0)
-        # XXX The default san-francisco coordinates are 37.471, -122.245
-        # so it's not entirely clear why that isn't the center location.
-        # That's not the case in the test_explicit_coords case,
-        # where the center is exactly the coordinates specified.
-        # Investigate this.
-        assertCloseEnough(mapwin.center_lon, -122.4083)
-        assertCloseEnough(mapwin.center_lat, 37.7850)
+
+        assertCloseEnough(mapwin.center_lon, sitelon)
+        assertCloseEnough(mapwin.center_lat, sitelat)
+
+    def test_known_site_plus_overlay(self):
+        sitename, sitelon, sitelat = create_config_file(self.configdir)
+        args = [ 'pytopo', '-k', 'own',
+                 'test/files/Surface_Ownership_10_14_2015.geojson',
+                 sitename ]
+
+        mapwin =  MapWindow(self.viewer)
+        self.viewer.parse_args(mapwin, args)
+
+        self.assertEqual(len(mapwin.trackpoints.points), 0)
+        self.assertEqual(len(mapwin.trackpoints.waypoints), 0)
+
+        assertCloseEnough(mapwin.center_lon, sitelon)
+        assertCloseEnough(mapwin.center_lat, sitelat)

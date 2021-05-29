@@ -343,7 +343,6 @@ Shift-click in the map to print the coordinates of the clicked location.
             mapwin.collection = collection
 
         # site[1] and site[2] are the long and lat in deg.minutes
-        # print(site[0], site[1], site[2])
         mapwin.center_lon = MapUtils.deg_min2dec_deg(site[1])
         mapwin.center_lat = MapUtils.deg_min2dec_deg(site[2])
         mapwin.cur_lon = mapwin.center_lon
@@ -487,9 +486,10 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
                     args = args[1:]
                     sys.exit(1)
 
-            except (RuntimeError, FileNotFoundError):
+            except (RuntimeError, FileNotFoundError) as e:
                 # It wasn't a track file; continue trying to parse it
-                # print(args[0], "is not a track file")
+                if self.Debug:
+                    print("%s didn't work as a track file: %s" % (args[0], e))
                 pass
 
             # Try to match a known site:
@@ -528,9 +528,14 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
 
                         args = args[2:]
 
+                        # The next argument after latitude, longitude
+                        # might be a collection, but it also might not.
+                        # Try it and see.
                         if args:
-                            mapwin.collection = self.find_collection(args[0])
-                            args = args[1:]
+                            coll = self.find_collection(args[0])
+                            if coll:
+                                mapwin.collection = coll
+                                args = args[1:]
 
                         continue
 
