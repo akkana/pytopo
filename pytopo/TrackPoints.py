@@ -54,6 +54,49 @@ class GeoPoint(object):
         return s
 
 
+class BoundingBox(object):
+    def __init__(self):
+        self.minlon = 361
+        self.maxlon = -361
+        self.minlat = 91
+        self.maxlat = -91
+
+    def __repr__(self):
+        return "<BoundingBox lat %.2f to %.2f, lon %.2f to %.2f>" \
+            % (self.minlat, self.maxlat, self.minlon, self.maxlon)
+
+    def as_tuple(self):
+        return (self.minlon, self.minlat, self.maxlon, self.maxlat)
+
+    def add_point(self, lat, lon):
+        """Extend the bounds if the given coords are outside.
+        """
+        if lon < self.minlon:
+            self.minlon = lon
+        if lon > self.maxlon:
+            self.maxlon = lon
+        if lat < self.minlat:
+            self.minlat = lat
+        if lat > self.maxlat:
+            self.maxlat = lat
+
+    def union(self, bbox):
+        """Set the current bbox to be the union of itself and
+           the bbox passed in.
+        """
+        self.minlon = min(self.minlon, bbox.minlon)
+        self.maxlon = max(self.maxlon, bbox.maxlon)
+        self.minlat = min(self.minlat, bbox.minlat)
+        self.maxlat = max(self.maxlat, bbox.maxlat)
+
+    def center(self):
+        """Return the center of the given bounding box as lat, lon
+        """
+        # This doesn't compensate for crossing the date line.
+        return ((self.maxlat + self.minlat) / 2.,
+                (self.maxlon + self.minlon) / 2.)
+
+
 class TrackPoints(object):
 
     """Parsing and handling of GPS track files.
@@ -85,13 +128,12 @@ class TrackPoints(object):
         self.points = []
         self.waypoints = []
         self.polygons = []
-        self.minlon = 361
-        self.maxlon = -361
-        self.minlat = 91
-        self.maxlat = -91
 
-        # Remember which files each set of points came from,
-        # as { index: filename }
+        # Bounding box containing all known points.
+        # But there are also bboxes for each file loaded:
+        self.bbox = BoundingBox()
+
+        # Remember which files each set of points came from
         self.srcfiles = {}
 
         self.saved_points = False
@@ -133,7 +175,7 @@ class TrackPoints(object):
     def get_bounds(self):
         """Get bounds encompassing all contained tracks, waypoints, polygons.
         """
-        return self.minlon, self.minlat, self.maxlon, self.maxlat
+        return self.bbox
 
     def is_attributes(self, point):
         """Is this point actually a set of attributes?"""
@@ -155,14 +197,7 @@ class TrackPoints(object):
            otherwise assume it's a track point.
            attrs is an optional dict of other attributes, like hdop or speed.
         """
-        if lon < self.minlon:
-            self.minlon = lon
-        if lon > self.maxlon:
-            self.maxlon = lon
-        if lat < self.minlat:
-            self.minlat = lat
-        if lat > self.maxlat:
-            self.maxlat = lat
+        self.bbox.add_point(lat, lon)
 
         point = GeoPoint(lat, lon, ele=ele, timestamp=timestamp,
                          name=waypoint_name, attrs=attrs)
@@ -194,6 +229,7 @@ class TrackPoints(object):
 
     def read_track_file_GPX(self, filename):
         """Read a GPX track file into the current TrackPoints object.
+           Return the BoundingBox.
            Raise FileNotFoundError if the file doesn't exist,
            RuntimeError if it's not a track file,
            IOError or other exceptions as needed.
@@ -202,6 +238,8 @@ class TrackPoints(object):
         if self.Debug:
             print("Reading track file", filename)
         dom = xml.dom.minidom.parse(filename)
+
+        bbox = BoundingBox()
 
         # Handle track(s) and routes:
         def handle_track(segname, ptname):
@@ -237,6 +275,7 @@ class TrackPoints(object):
                         "GPX_point_coords returned", lat, lon, ele, ts, attrs
                         self.handle_track_point(lat, lon, ele=ele, timestamp=ts,
                                                 attrs=attrs)
+                        bbox.add_point(lat, lon)
 
         handle_track("trkseg", "trkpt")
         handle_track("rte", "rtept")
@@ -253,8 +292,12 @@ class TrackPoints(object):
                     name = "WP"
                 self.handle_track_point(lat, lon, ele=ele, timestamp=time,
                                         waypoint_name=name, attrs=attrs)
+                bbox.add_point(lat, lon)
 
-        # GPX also allows for routing, rtept, but I don't think we need those.
+        # GPX also allows for routing, rtept, but those aren't handled
+        # mostly because I don't have any good examples handy that use them.
+
+        return bbox
 
     def filename_for_index(self, index):
         filename = ''
@@ -387,6 +430,7 @@ class TrackPoints(object):
 
     def read_track_file(self, filename):
         """Read a track file.
+           Return the BoundingBox.
            Raise FileNotFoundError if the file doesn't exist,
            RuntimeError if it's not a track file,
            IOError or other exceptions as needed.
@@ -517,6 +561,7 @@ class TrackPoints(object):
 
     def read_track_file_GeoJSON(self, filename):
         """Read a GeoJSON track or polygon file.
+           Return the BoundingBox.
            Raises FileNotFoundError if the file doesn't exist,
            RuntimeError if it's not a track file,
            IOError or other exceptions as needed.
@@ -525,10 +570,13 @@ class TrackPoints(object):
             gj = simplejson.loads(fp.read())
         if gj["type"] != "FeatureCollection":
             print(filename, "isn't a FeatureCollection")
-            return
+            return None
         if "features" not in gj:
             print("No features in geojson file", filename)
-            return
+            return None
+
+        bbox = BoundingBox()
+
         for feature in gj["features"]:
             featuretype = feature["geometry"]["type"]
 
@@ -540,6 +588,7 @@ class TrackPoints(object):
                 elif "description" in feature["properties"]:
                     name = feature["properties"]["description"]
                 self.handle_track_point(lat, lon, waypoint_name=name)
+                bbox.add_point(lat, lon)
 
             if featuretype == "Polygon":
                 # A feature may have more than one polygon
@@ -563,6 +612,8 @@ class TrackPoints(object):
                             polyclass = feature["properties"][field]
                             break
 
+                    poly_bbox = BoundingBox()
+
                     newpoly = {}
                     if name:
                         newpoly["name"] = name
@@ -570,27 +621,12 @@ class TrackPoints(object):
                     newpoly["coordinates"] = featurepoly
 
                     # Bounding box: min lon,  max lon, min lat, max lat
-                    bbox = [ 361, -361, 91, -91 ]
                     for (lon, lat) in newpoly["coordinates"]:
-                        if lon < bbox[0]:
-                            bbox[0] = lon
-                            if lon < self.minlon:
-                                self.minlon = lon
-                        if lon > bbox[1]:
-                            bbox[1] = lon
-                            if lon > self.maxlon:
-                                self.maxlon = lon
-                        if lat < bbox[2]:
-                            bbox[2] = lat
-                            if lat < self.minlat:
-                                self.minlat = lat
-                        if lat > bbox[3]:
-                            bbox[3] = lat
-                            if lat > self.maxlat:
-                                self.maxlat = lat
-                    newpoly["bounds"] = bbox
+                        poly_bbox.add_point(lat, lon)
+                    newpoly["bounds"] = poly_bbox.as_tuple()
 
                     self.polygons.append(newpoly)
+                    bbox.union(poly_bbox)
 
             if featuretype != "LineString" and featuretype != "MultiLineString":
                 continue
@@ -617,6 +653,7 @@ class TrackPoints(object):
                 for coords in feature["geometry"]["coordinates"]:
                     lon, lat, ele = coords
                     self.handle_track_point(lat, lon, ele=ele)
+                    bbox.add_point(lat, lon)
 
             elif featuretype == "MultiLineString":
                 for linestring in feature["geometry"]["coordinates"]:
@@ -626,10 +663,14 @@ class TrackPoints(object):
                     for coords in linestring:
                         lon, lat, ele = coords
                         self.handle_track_point(lat, lon, ele=ele)
+                        bbox.add_point(lat, lon)
+
+            return bbox
 
 
     def read_track_file_KML(self, filename):
         """Read a KML or KMZ track file.
+           Return the BoundingBox.
            Just read Placemarks (which cover both paths and points);
            ignore all styles.
            Raise FileNotFoundError if the file doesn't exist,
@@ -667,6 +708,8 @@ class TrackPoints(object):
             doc_kml = None
         else:
             dom = xml.dom.minidom.parse(filename)
+
+        bbox = BoundingBox()
 
         # Features we care about are <Placemark> containing either
         # <LineString> (tracks) or <Point> (waypoints).
@@ -706,6 +749,7 @@ class TrackPoints(object):
                 for triple in coord_triples:
                     self.handle_track_point(triple[1], triple[0],
                                             ele=triple[2])
+                    bbox.add_point(triple[1], triple[0])
 
             # Handle waypoints:
             if not name:
@@ -721,13 +765,16 @@ class TrackPoints(object):
                     elif len(triple) == 2:
                         self.handle_track_point(triple[1], triple[0],
                                                 waypoint_name=name)
+                    bbox.add_point(triple[1], triple[0])
+
+        return bbox
 
     def get_KML_coordinates(self, el):
         """Get the contents of the first <coordinates> triple
            inside the given element (which is inside a KML file).
            Inside a LineString, coordinate pairs or triples are separated
            by whitespace, which may include newlines.
-           Return a list of triples [[lat, lon, ele], [lat, lon, ele] ...]
+           Return a list of triple floats [[lat, lon, ele], [lat, lon, ele]]
            Not all KMLs have elevation, so use None in that case.
         """
         coords = el.getElementsByTagName("coordinates")

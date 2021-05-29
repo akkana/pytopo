@@ -96,8 +96,19 @@ __init__, get_maplet, draw_map.
                 * math.log(math.tan(math.pi / 4.0
                                     + a * (math.pi / 180.0) / 2.0)))
 
-    def zoom_to_bounds(self, minlon, minlat, maxlon, maxlat):
-        """Zoom to a reasonable level for the given bounds."""
+    def zoom_to_bounds(self, *args):
+        """Zoom to a reasonable level for the given bounds,
+           which may be either a TrackPoints.BoundingBox
+           or minlon, minlat, maxlon, maxlat.
+        """
+        if len(args) == 1:
+            minlon, minlat, maxlon, maxlat = args[0].as_tuple()
+        elif len(args) == 4:
+            minlon, minlat, maxlon, maxlat = args
+
+        else:
+            raise RuntimeError("MapCollection.zoom_to_bounds: Wrong number of arguments, %d" % len(args))
+
         # http://gis.stackexchange.com/questions/19632/how-to-calculate-the-optimal-zoom-level-to-display-two-or-more-points-on-a-map
         # Find spherical Mercator distances:
         xdist = maxlon - minlon

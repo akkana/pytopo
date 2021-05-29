@@ -569,10 +569,9 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
         # center it on the trackpoints, and set scale appropriately:
         if mapwin.trackpoints and mapwin.collection is not None \
                 and not (mapwin.center_lat and mapwin.center_lon):
-            minlon, minlat, maxlon, maxlat = mapwin.trackpoints.get_bounds()
-            mapwin.center_lon = (maxlon + minlon) / 2
-            mapwin.center_lat = (maxlat + minlat) / 2
-            mapwin.collection.zoom_to_bounds(minlon, minlat, maxlon, maxlat)
+            bounds = mapwin.trackpoints.get_bounds()
+            mapwin.center_lat, mapwin.center_lon = bounds.center()
+            mapwin.collection.zoom_to_bounds(bounds)
             for ov in mapwin.overlays:
                 ov.zoom_to_bounds(minlon, minlat, maxlon, maxlat)
 

@@ -2,7 +2,7 @@
 <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
   <Document>
     <name>GPS device</name>
-    <snippet>Created Fri Dec 6 09:14:48 2019</snippet>
+    <snippet>Created Sat May 29 00:54:37 2021 GMT</snippet>
     <LookAt>
       <gx:TimeSpan>
         <begin>2016-03-02T17:28:45Z</begin>
@@ -114,7 +114,7 @@
           <end>2016-03-02T21:11:44Z</end>
         </TimeSpan>
         <Placemark>
-          <name>Otowi Mesa Trail</name>
+          <name>Path</name>
           <styleUrl>#lineStyle</styleUrl>
           <LineString>
             <tessellate>1</tessellate>
