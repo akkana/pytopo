@@ -35,6 +35,9 @@ __init__, get_maplet, draw_map.
         self.xscale = 100.
         self.yscale = 100.
 
+        # Default zoom level
+        self.zoomlevel = 12
+
         # Child classes must set maxzoom:
         self.maxzoom = None
 

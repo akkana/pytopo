@@ -12,7 +12,7 @@ from __future__ import print_function
 
 from pytopo.MapWindow import MapWindow
 from pytopo.MapUtils import MapUtils
-from pytopo.TrackPoints import TrackPoints
+from pytopo.TrackPoints import TrackPoints, BoundingBox
 
 # For version and user_agent, so the downloader can access them.
 import pytopo
@@ -350,13 +350,11 @@ Shift-click in the map to print the coordinates of the clicked location.
         mapwin.cur_lat = mapwin.center_lat
         mapwin.pin_lon = mapwin.center_lon
         mapwin.pin_lat = mapwin.center_lat
-        # print("Center in decimal degrees:", centerLon, centerLat)
+
         if (self.Debug):
             print(site[0] + ":", \
                 MapUtils.dec_deg2deg_min_str(mapwin.center_lon), \
                 MapUtils.dec_deg2deg_min_str(mapwin.center_lat))
-        if len(site) > 4 and mapwin.collection.zoom_to:
-            mapwin.collection.zoom_to(site[4])
 
         return True
 
@@ -525,17 +523,14 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
                         mapwin.center_lon = lon
 
                         # Set a pin on the specified point.
-                        mapwin.pin_lat = mapwin.center_lat
-                        mapwin.pin_lon = mapwin.center_lon
+                        mapwin.pin_lat = lat
+                        mapwin.pin_lon = lon
 
                         args = args[2:]
 
                         if args:
                             mapwin.collection = self.find_collection(args[0])
                             args = args[1:]
-                        else:
-                            mapwin.collection = \
-                                self.find_collection(self.default_collection)
 
                         continue
 
@@ -565,25 +560,55 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
 
         mapwin.collection.Debug = self.Debug
 
-        # If we have a collection and a track but no center point,
-        # center it on the trackpoints, and set scale appropriately:
-        if mapwin.trackpoints and mapwin.collection is not None \
-                and not (mapwin.center_lat and mapwin.center_lon):
-            bounds = mapwin.trackpoints.get_bounds()
-            mapwin.center_lat, mapwin.center_lon = bounds.center()
-            mapwin.collection.zoom_to_bounds(bounds)
+        # Decide on an appropriate center and zoom level for the content,
+        # starting with the bounding box for any loaded files.
+        bbox = mapwin.trackpoints.get_bounds()
+        if bbox:
+            # If there's a pin, use it
+            if mapwin.pin_lat and mapwin.pin_lon:
+                mapwin.center_lat = mapwin.pin_lat
+                mapwin.center_lon = mapwin.pin_lon
+
+                # Compute a bounding box that keeps the pin centered
+                # while also including the full bounding box.
+                # XXX Fudgy math, doesn't account for things like
+                # the dateline or crossing over the pole.
+                max_dlat = max(abs(mapwin.pin_lat - bbox.minlat),
+                               abs(mapwin.pin_lat - bbox.maxlat))
+                max_dlon = max(abs(mapwin.pin_lon - bbox.minlon),
+                               abs(mapwin.pin_lon - bbox.maxlon))
+
+                bbox = BoundingBox()
+                bbox.add_point(mapwin.center_lat - max_dlat,
+                               mapwin.center_lon - max_dlon)
+                bbox.add_point(mapwin.center_lat + max_dlat,
+                               mapwin.center_lon + max_dlon)
+
+            # else use the bbox
+            else:
+                mapwin.center_lat, mapwin.center_lon = bbox.center()
+
+            mapwin.collection.zoom_to_bounds(bbox)
             for ov in mapwin.overlays:
-                ov.zoom_to_bounds(minlon, minlat, maxlon, maxlat)
+                ov.zoom_to_bounds(bbox)
+
+        else:
+            # No bounding box from the trackpoints.
+            # Hopefully the center has already been set from use_site,
+            # otherwise we're in trouble:
+            if not (mapwin.center_lat and mapwin.center_lon):
+                print("""No center coordinates!
+Please specify either a site or a file containing geographic data.""")
+                self.Usage()
+
+            # There's a center but no zoom level.
+            # Zoom to the collection's default zoom level, if any
+            mapwin.zoom_to(mapwin.collection.zoomlevel)
 
         if self.reload_tiles and 'set_reload_tiles' in dir(mapwin.collection):
             mapwin.collection.set_reload_tiles(self.reload_tiles)
         elif self.reload_tiles:
             print("Collection can't re-download tiles")
-
-        # use_site has set a zoomlevel on the mapwin's collection,
-        # but any overlays need to be zoomed to the same level.
-        for ov in mapwin.overlays:
-            ov.zoom_to(mapwin.collection.zoomlevel)
 
         # By now, we hope we have the mapwin positioned with a collection
         # and starting coordinates:

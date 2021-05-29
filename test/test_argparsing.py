@@ -3,10 +3,10 @@
 import unittest
 import sys, os
 import shutil
-import math
 
 sys.path.insert(0, '..')
 
+from .utils import assertCloseEnough, create_kmz
 from pytopo import MapViewer, MapWindow, ArgParseException
 
 
@@ -55,25 +55,6 @@ class ArgparseTests(unittest.TestCase):
         self.configdir = None
         self.configparent = None
 
-    # unittest almostEqual requires more closeness than there is between
-    # gpx and kml.
-    def assertCloseEnough(self, a, b, tolerance=1e-5):
-        """Assert if two values aren't close enough within a tolerance.
-           Can accept two scalars or two iterables.
-        """
-        if hasattr(a, "__getitem__") and hasattr(b, "__getitem__"):
-            if len(a) != len(b):
-                raise AssertionError('Different lengths, %d vs %d'
-                                     % (len(a), len(b)))
-            for i, (aval, bval) in enumerate(zip(a, b)):
-                if not math.isclose(aval, bval, rel_tol=tolerance):
-                    raise AssertionError("%dth elements differ: %f != %f"
-                                         % (i, aval, bval))
-            return
-
-        if not math.isclose(a, b, rel_tol=tolerance):
-            raise AssertionError('%f not close enough to %f' % (a, b))
-
     def test_gpx_arg(self):
         args = [ 'pytopo', 'test/files/otowi-mesa-arch.gpx' ]
 
@@ -82,11 +63,11 @@ class ArgparseTests(unittest.TestCase):
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
-        self.assertCloseEnough(mapwin.center_lon, -106.24089075)
-        self.assertCloseEnough(mapwin.center_lat, 35.890244)
-        self.assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
-                               (-106.2534204, 35.8849806,
-                                -106.2283611, 35.895508))
+        assertCloseEnough(mapwin.center_lon, -106.24089075)
+        assertCloseEnough(mapwin.center_lat, 35.890244)
+        assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
+                          (-106.2534204, 35.8849806,
+                           -106.2283611, 35.895508))
 
     def test_kml_arg(self):
         args = [ 'pytopo', 'test/files/otowi-mesa-arch.kml' ]
@@ -96,25 +77,29 @@ class ArgparseTests(unittest.TestCase):
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
-        self.assertCloseEnough(mapwin.center_lon, -106.24089075)
-        self.assertCloseEnough(mapwin.center_lat, 35.890244)
-        self.assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
+        assertCloseEnough(mapwin.center_lon, -106.24089075)
+        assertCloseEnough(mapwin.center_lat, 35.890244)
+        assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
                                (-106.2534204, 35.8849806,
                                 -106.2283611, 35.895508))
 
     def test_kmz_arg(self):
-        args = [ 'pytopo', 'test/files/otowi-mesa-arch.kmz' ]
+        kmzfile = create_kmz('test/files/otowi-mesa-arch')
+
+        args = [ 'pytopo', kmzfile ]
 
         mapwin =  MapWindow(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
-        self.assertCloseEnough(mapwin.center_lon, -106.24089075)
-        self.assertCloseEnough(mapwin.center_lat, 35.890244)
-        self.assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
+        assertCloseEnough(mapwin.center_lon, -106.24089075)
+        assertCloseEnough(mapwin.center_lat, 35.890244)
+        assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
                                (-106.2534204, 35.8849806,
                                 -106.2283611, 35.895508))
+
+        os.unlink(kmzfile)
 
     def test_gpx_plus_overlay(self):
         args = [ 'pytopo', '-k', 'own',
@@ -127,20 +112,20 @@ class ArgparseTests(unittest.TestCase):
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
         self.assertEqual(len(mapwin.trackpoints.polygons), 21878)
-        self.assertCloseEnough(mapwin.center_lon, -106.24089075)
-        self.assertCloseEnough(mapwin.center_lat, 35.890244)
-        self.assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
+        assertCloseEnough(mapwin.center_lon, -106.24089075)
+        assertCloseEnough(mapwin.center_lat, 35.890244)
+        assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
                                (-106.2534204, 35.8849806,
                                 -106.2283611, 35.895508))
 
     def test_explicit_coords(self):
-        args = [ 'pytopo', '37.471', '-122.245' ]
+        args = [ 'pytopo', '37.537', '-122.37' ]
 
         mapwin =  MapWindow(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
-        self.assertCloseEnough(mapwin.center_lon, -122.245)
-        self.assertCloseEnough(mapwin.center_lat, 37.471)
+        assertCloseEnough(mapwin.center_lon, -122.37)
+        assertCloseEnough(mapwin.center_lat, 37.537)
 
     def test_explicit_coords_plus_gpx(self):
         args = [ 'pytopo', '35.85', '-106.4', '-t',
@@ -151,11 +136,11 @@ class ArgparseTests(unittest.TestCase):
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
-        self.assertCloseEnough(mapwin.center_lon, -106.4)
-        self.assertCloseEnough(mapwin.center_lat, 35.85)
-        self.assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
-                               (-106.2534204, 35.8849806,
-                                -106.2283611, 35.895508))
+        assertCloseEnough(mapwin.center_lat, 35.85)
+        assertCloseEnough(mapwin.center_lon, -106.4)
+        assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
+                               (-106.253, 35.885,
+                                -106.228, 35.8955))
 
     def test_bogus_args(self):
         arglists = [ [ 'pytopo', 'test/test_argparsing.py' ],
@@ -207,5 +192,5 @@ KnownSites = [
         # That's not the case in the test_explicit_coords case,
         # where the center is exactly the coordinates specified.
         # Investigate this.
-        self.assertCloseEnough(mapwin.center_lon, -122.4083)
-        self.assertCloseEnough(mapwin.center_lat, 37.7850)
+        assertCloseEnough(mapwin.center_lon, -122.4083)
+        assertCloseEnough(mapwin.center_lat, 37.7850)

@@ -130,13 +130,11 @@ class MapUtils:
         return fmt % num
 
     @classmethod
-    def haversine_distance(cls, latitude_1, longitude_1,
-                           latitude_2, longitude_2, metric=False):
+    def haversine_angle(cls, latitude_1, longitude_1, latitude_2, longitude_2):
         """
-        Haversine distance between two points.
+        Haversine angle between two points.
         From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
         Implemented from http://www.movable-type.co.uk/scripts/latlong.html
-        Returns distance in miles or meters.
         """
         d_lat = math.radians(latitude_1 - latitude_2)
         d_lon = math.radians(longitude_1 - longitude_2)
@@ -146,8 +144,18 @@ class MapUtils:
         a = math.sin(d_lat / 2) * math.sin(d_lat / 2) + \
             math.sin(d_lon / 2) * math.sin(d_lon / 2) * \
             math.cos(lat1) * math.cos(lat2)
-        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+        return 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
+    @classmethod
+    def haversine_distance(cls,
+                           latitude_1, longitude_1,
+                           latitude_2, longitude_2, metric=False):
+        """
+        Haversine distance between two points.
+        Returns distance in miles or meters.
+        """
+        c = MapUtils.haversine_angle(latitude_1, longitude_1,
+                                     latitude_2, longitude_2)
         if metric:
             return EARTH_RADIUS_KM * c
         else:

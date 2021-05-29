@@ -971,15 +971,29 @@ but if you want to, contact me and I'll help you figure it out.)
             (MapUtils.dec_deg2deg_min_str(self.cur_lon),
              MapUtils.dec_deg2deg_min_str(self.cur_lat)))
 
-    def zoom(self, widget=None, direc=1):
-        """Zoom the map by 1 unit."""
-        self.center_lon = self.cur_lon
-        self.center_lat = self.cur_lat
-        self.collection.zoom(direc)
+    def zoom_to(self, zoomlevel):
+        if self.cur_lon:
+            self.center_lon = self.cur_lon
+        else:
+            self.cur_lon = self.center_lon
+        if self.cur_lat:
+            self.center_lat = self.cur_lat
+        else:
+            self.cur_lat = self.center_lat
+
+        self.collection.zoom_to(zoomlevel)
         for ov in self.overlays:
-            ov.zoom(direc)
+            ov.zoom_to(zoomlevel)
+
         self.text_overlays = []
         self.draw_map()
+
+    def zoom(self, widget=None, amount=1):
+        """Zoom the map by the given amount: positive to zoom in, negative out.
+           Be sure to pass amount as a named argument, amount=X
+           otherwise it will be taken as the (unused) widget argument.
+        """
+        self.zoom_to(self.collection.zoomlevel + amount)
 
     def scroll_event(self, button, event):
         """Zoom in or out in response to mousewheel events."""
@@ -988,9 +1002,9 @@ but if you want to, contact me and I'll help you figure it out.)
             return False
 
         if event.direction == gtk.gdk.SCROLL_UP:
-            direc = 1
+            zoom_amount = 1
         else:
-            direc = -1
+            zoom_amount = -1
 
         # Save off the coordinates currently under the mouse,
         # so we can arrange for it to be under the mouse again after zoom.
@@ -999,7 +1013,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # self.zoom needs current location to be set
         self.cur_lon, self.cur_lat = curmouselon, curmouselat
 
-        self.zoom(direc=direc)
+        self.zoom(amount=zoom_amount)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
             print("zoomed to", self.collection.zoomlevel)
 
@@ -2004,11 +2018,11 @@ but if you want to, contact me and I'll help you figure it out.)
             # before exiting.
             return True
         elif event.string == "+" or event.string == "=":
-            self.zoom(direc=1)
+            self.zoom(amount=1)
             if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
                 print("zoomed in to", self.collection.zoomlevel)
         elif event.string == "-":
-            self.zoom(direc=-1)
+            self.zoom(amount=-1)
             if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
                 print("zoomed out to", self.collection.zoomlevel)
         elif event.keyval == gtk.keysyms.Left:
@@ -2211,7 +2225,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # Zoom in if we get a double-click.
         self.center_lon, self.center_lat = self.xy2coords(event.x, event.y)
 
-        self.zoom(direc=1)
+        self.zoom(amount=1)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
             print("doubleclick: zoomed in to", self.collection.zoomlevel)
         self.draw_map()
@@ -2275,7 +2289,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
             zoom = self.was_click_in_zoom(event.x, event.y)
             if zoom:
-                self.zoom(direc=zoom)
+                self.zoom(amount=zoom)
                 if self.controller.Debug and hasattr(self.collection,
                                                      'zoomlevel'):
                     print("zoomed to", self.collection.zoomlevel)

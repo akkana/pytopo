@@ -54,19 +54,39 @@ class GeoPoint(object):
         return s
 
 
+# Impossible values:
+TOOBIGLON = 361
+TOOSMALLLON = -361
+TOOBIGLAT = 91
+TOOSMALLLAT = -91
+
 class BoundingBox(object):
+
     def __init__(self):
-        self.minlon = 361
-        self.maxlon = -361
-        self.minlat = 91
-        self.maxlat = -91
+        self.minlon = TOOBIGLON
+        self.maxlon = TOOSMALLLON
+        self.minlat = TOOBIGLAT
+        self.maxlat = TOOSMALLLAT
 
     def __repr__(self):
-        return "<BoundingBox lat %.2f to %.2f, lon %.2f to %.2f>" \
+        return "<BoundingBox lat %.3f to %.3f, lon %.3f to %.3f>" \
             % (self.minlat, self.maxlat, self.minlon, self.maxlon)
 
     def as_tuple(self):
+        """Return a tuple of minlon, minlat, maxlon, maxlat
+        """
         return (self.minlon, self.minlat, self.maxlon, self.maxlat)
+
+    def uninitialized(self):
+        if self.minlon == TOOBIGLON:
+            return True
+        if self.maxlon == TOOSMALLLON:
+            return True
+        if self.minlat == TOOBIGLAT:
+            return True
+        if self.maxlat == TOOSMALLLAT:
+            return True
+        return False
 
     def add_point(self, lat, lon):
         """Extend the bounds if the given coords are outside.
@@ -129,9 +149,15 @@ class TrackPoints(object):
         self.waypoints = []
         self.polygons = []
 
-        # Bounding box containing all known points.
-        # But there are also bboxes for each file loaded:
+        # Bounding boxes.
+        # self.bbox contains all trackpoints and waypoints,
+        # but not polygons, because they might be an overlay
+        # covering a wide area.
         self.bbox = BoundingBox()
+
+        # self.outer_bbox contains the polygons too,
+        # in case there are no track- or waypoints
+        self.outer_bbox = BoundingBox()
 
         # Remember which files each set of points came from
         self.srcfiles = {}
@@ -144,15 +170,12 @@ class TrackPoints(object):
 
         self.Debug = False
 
-
     def __repr__(self):
         return "<TrackPoints: %d points, %s waypoints, %d polygons>" \
             % (len(self.points), len(self.waypoints), len(self.polygons))
 
-
     def __bool__(self):
         return bool(self.points) or bool(self.waypoints or bool(self.polygons))
-
 
     @staticmethod
     def get_version():
@@ -173,9 +196,16 @@ class TrackPoints(object):
         return not isinstance(point, GeoPoint)
 
     def get_bounds(self):
-        """Get bounds encompassing all contained tracks, waypoints, polygons.
+        """Return a bounding box:
+           - for all track- and waypoints, if any
+           - for all polygons, if any
+           - if no points or polygons, return None.
         """
-        return self.bbox
+        if not self.bbox.uninitialized():
+            return self.bbox
+        if not self.outer_bbox.uninitialized():
+            return self.outer_bbox
+        return None
 
     def is_attributes(self, point):
         """Is this point actually a set of attributes?"""
