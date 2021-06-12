@@ -161,61 +161,6 @@ class MapUtils:
         else:
             return EARTH_RADIUS_MI * c
 
-    @classmethod
-    def distance_on_unit_sphere(cls, lat1, long1, lat2, long2):
-        """Linear distance between two points on a globe, in km.
-           Divide by 1.609 to get miles.
-        """
-        # Thanks http://www.johndcook.com/blog/python_longitude_latitude/
-
-        # Convert latitude and longitude to
-        # spherical coordinates in radians.
-        degrees_to_radians = math.pi / 180.0
-
-        # phi = 90 - latitude
-        phi1 = (90.0 - lat1) * degrees_to_radians
-        phi2 = (90.0 - lat2) * degrees_to_radians
-
-        # theta = longitude
-        theta1 = long1 * degrees_to_radians
-        theta2 = long2 * degrees_to_radians
-
-        # Compute spherical distance from spherical coordinates.
-
-        # For two locations in spherical coordinates
-        # (1, theta, phi) and (1, theta', phi')
-        # cosine( arc length ) =
-        #    sin phi sin phi' cos(theta-theta') + cos phi cos phi'
-        # distance = rho * arc length
-
-        cos = (math.sin(phi1) * math.sin(phi2) * math.cos(theta1 - theta2) +
-               math.cos(phi1) * math.cos(phi2))
-        arc = math.acos(cos)
-
-        # Remember to multiply arc by the radius of the earth
-        # in your favorite set of units to get length.
-        return arc * 6373
-
 
 # End of "MapUtils" pseudo-class.
 
-if __name__ == '__main__':
-
-    def close_enough(d1, d2):
-        return (abs(d2 - d1) < .001)
-
-    # test difference between haversine_distance and distance_on_unit_sphere
-    # First, some randomly chosen coordinate pairs:
-    coords = [ (35.1, -102.3), (36.2, -103.7), (36.1, -103.8), (35.9, -103.5),
-               (45.0, -12) ]
-    lastlat, lastlon = None, None
-    for lat, lon in coords:
-        if lastlat and lastlon:
-            h = MapUtils.haversine_distance(lastlat, lastlon, lat, lon, True)
-            u = MapUtils.distance_on_unit_sphere(lastlat, lastlon, lat, lon)
-            if not close_enough(h, u):
-                print("Too far! %.03f != %.03f" % (h, u))
-            else:
-                print("OK")
-        lastlat = lat
-        lastlon = lon

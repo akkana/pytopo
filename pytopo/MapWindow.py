@@ -2325,19 +2325,16 @@ but if you want to, contact me and I'll help you figure it out.)
             if self.controller.Debug or event.state & gtk.gdk.SHIFT_MASK:
                 print("Shift click")
                 if self.click_last_long != 0 and self.click_last_lat != 0:
-                    dist = MapUtils.distance_on_unit_sphere(self.click_last_lat,
-                                                           self.click_last_long,
-                                                            cur_lat, cur_long)
-                    dist2 = MapUtils.haversine_distance(self.click_last_lat,
-                                                        self.click_last_long,
-                                                        cur_lat, cur_long)
+                    dist = MapUtils.haversine_distance(self.click_last_lat,
+                                                       self.click_last_long,
+                                                       cur_lat, cur_long,
+                                                       metric=self.use_metric)
                     self.path_distance += dist
                     if self.use_metric:
                         print("Distance: %.2f km" % dist)
                         print("Total distance: %.2f km" % self.path_distance)
                     else:
-                        print("Distance: %.2f mi" % (dist / 1.609))
-                        print("Haversine Distance: %.2f mi" % dist2)
+                        print("Distance: %.2f mi" % dist)
                         print("Total distance: %.2f mi" % self.path_distance)
 
                     # Now calculate bearing.

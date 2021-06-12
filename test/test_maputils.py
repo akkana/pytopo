@@ -24,14 +24,8 @@ class MapUtilsTests(unittest.TestCase):
         los_alamos = [ 35.531, -106.184 ]
         sydney = [ -33.517, 151.125 ]
 
-
-        def test_between_two_points(p1, p2, spheredist, havdist,
+        def test_between_two_points(p1, p2, havdist,
                                     bearing1, bearing2):
-            dist1 = MapUtils.distance_on_unit_sphere(*p1, *p2)
-            dist2 = MapUtils.distance_on_unit_sphere(*p2, *p1)
-            self.assertEqual(dist1, dist2)
-            self.assertEqual(round(dist1, 1), spheredist)
-
             dist1 = MapUtils.haversine_distance(*p1, *p2)
             dist2 = MapUtils.haversine_distance(*p2, *p1)
             self.assertEqual(dist1, dist2)
@@ -42,7 +36,7 @@ class MapUtilsTests(unittest.TestCase):
 
 
         test_between_two_points(san_francisco, los_alamos,
-                                1450.3, 901.0, 93.7, 283.3)
+                                901.0, 93.7, 283.3)
         test_between_two_points(san_francisco, sydney,
-                                11932.7, 7412.7, 240.6, 56.1)
+                                7412.7, 240.6, 56.1)
 
