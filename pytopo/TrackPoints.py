@@ -267,7 +267,12 @@ class TrackPoints(object):
 
         if self.Debug:
             print("Reading track file", filename)
-        dom = xml.dom.minidom.parse(filename)
+        try:
+            dom = xml.dom.minidom.parse(filename)
+        except xml.parsers.expat.ExpatError as e:
+            print("Expat error parsing", filename, ":", e)
+            import sys
+            sys.exit(1)
 
         bbox = BoundingBox()
 
@@ -308,6 +313,8 @@ class TrackPoints(object):
                         bbox.add_point(lat, lon)
 
         handle_track("trkseg", "trkpt")
+
+        # Treat routepoints the same as trackpoints.
         handle_track("rte", "rtept")
 
         # Handle waypoints
@@ -323,9 +330,6 @@ class TrackPoints(object):
                 self.handle_track_point(lat, lon, ele=ele, timestamp=time,
                                         waypoint_name=name, attrs=attrs)
                 bbox.add_point(lat, lon)
-
-        # GPX also allows for routing, rtept, but those aren't handled
-        # mostly because I don't have any good examples handy that use them.
 
         return bbox
 

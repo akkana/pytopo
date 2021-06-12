@@ -99,7 +99,7 @@ TiledMapCollection classes must implement:
            by draw_single_tile as downloaded tiles become available.
         """
         if self.tiles_queued:
-            if self.mapwin.controller.Debug:
+            if self.mapwin.controller.Debug >= 2:
                 print(self, "draw_map: tiles still queued, not drawing map")
             return
 
@@ -196,7 +196,7 @@ TiledMapCollection classes must implement:
                 cur_x += w
                 curlon += float(w) / self.xscale
 
-            if (self.mapwin.controller.Debug):
+            if self.mapwin.controller.Debug >= 2:
                 print(" ")
                 print("New row: adding y =", h, end=' ')
                 print("Subtracting lat", float(h) / self.yscale)
@@ -229,7 +229,7 @@ TiledMapCollection classes must implement:
            at a specified location.
            Return width, height of the given tile.
         """
-        if self.mapwin.controller.Debug:
+        if self.mapwin.controller.Debug >= 2:
             print("draw_tile_at_position", self, x, y)
 
         if pixbuf is not None:
@@ -253,7 +253,7 @@ TiledMapCollection classes must implement:
                     print("Filling in background:", x, y, end=' ')
                     print(self.img_width, self.img_height)
 
-            if self.mapwin.controller.Debug:
+            if self.mapwin.controller.Debug >= 2:
                 print(self, "draw_tile_at_position", x, y, x_off, y_off,
                       "opacity", self.opacity)
             mapwin.draw_pixbuf(pixbuf, x_off, y_off, x, y, w, h,

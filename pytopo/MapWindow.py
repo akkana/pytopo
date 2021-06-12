@@ -1136,12 +1136,16 @@ but if you want to, contact me and I'll help you figure it out.)
         menu.popup(None, None, None, None, button, t)
 
     def change_collection(self, widget, name):
+        if self.collection:
+            savezoom = self.collection.zoomlevel
         newcoll = self.controller.find_collection(name)
+        if newcoll.maxzoom and newcoll.maxzoom < savezoom:
+            savezoom = newcoll.maxzoom
         if newcoll:
-            newcoll.zoom_to(self.collection.zoomlevel, self.cur_lat)
             self.collection = newcoll
             self.collection.Debug = self.controller.Debug
-            self.draw_map()
+            self.zoom_to(savezoom)
+            # self.draw_map()
         else:
             print("Couldn't find a collection named '%s'" % name)
 
