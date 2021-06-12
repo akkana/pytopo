@@ -196,4 +196,26 @@ class MapUtils:
         # in your favorite set of units to get length.
         return arc * 6373
 
+
 # End of "MapUtils" pseudo-class.
+
+if __name__ == '__main__':
+
+    def close_enough(d1, d2):
+        return (abs(d2 - d1) < .001)
+
+    # test difference between haversine_distance and distance_on_unit_sphere
+    # First, some randomly chosen coordinate pairs:
+    coords = [ (35.1, -102.3), (36.2, -103.7), (36.1, -103.8), (35.9, -103.5),
+               (45.0, -12) ]
+    lastlat, lastlon = None, None
+    for lat, lon in coords:
+        if lastlat and lastlon:
+            h = MapUtils.haversine_distance(lastlat, lastlon, lat, lon, True)
+            u = MapUtils.distance_on_unit_sphere(lastlat, lastlon, lat, lon)
+            if not close_enough(h, u):
+                print("Too far! %.03f != %.03f" % (h, u))
+            else:
+                print("OK")
+        lastlat = lat
+        lastlon = lon
