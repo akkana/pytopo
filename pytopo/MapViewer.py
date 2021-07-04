@@ -146,9 +146,17 @@ Use decimal degrees for coordinates.
 Set up favorite site names in ~/.config/pytopo.sites,
 favorite track logs in ~/Tracks
 
-Move around by dragging or using arrow keys.  q quits.
+Move around by dragging and zoom with the mousewheel, or use the keyboard:
+  Left/right/up/down:  move in that direction
+               +/=/-:  zoom in/out
+            spacebar:  go back to last pinned location
+                   m:  bring up the site selection dialog
+                   q:  quit
+
 Right-click gives a context menu.
-Shift-click in the map to print the coordinates of the clicked location.
+Shift-click in the map to print the coordinates of the clicked location,
+as well as distance and bearing from the last shift-clicked point,
+to standard output.
 """)
         sys.exit(1)
 
