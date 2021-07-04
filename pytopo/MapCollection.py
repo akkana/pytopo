@@ -125,8 +125,8 @@ __init__, get_maplet, draw_map.
 
         # Handle the case of a single point
         if xdist == 0 or ydist == 0:
-            print("Single point! Zooming to maxzoom", self.maxzoom)
-            self.zoom_to(self.maxzoom)
+            print("Single point! Defaulting to zoom level 12")
+            self.zoom_to(12)
             return
 
         while z <= self.maxzoom:
