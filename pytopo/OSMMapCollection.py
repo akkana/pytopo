@@ -292,18 +292,26 @@ class OSMMapCollection(TiledMapCollection):
         try:
             pixbuf = MapWindow.load_image_from_file(path)
         except:
+            if self.Debug:
+                print("load_image_from_file(%s) failed", path)
             pixbuf = None
             # return None
 
         # In case something went wrong, don't keep a bad file around:
         if not pixbuf or pixbuf.get_width() <= 0 or pixbuf.get_height() <= 0:
-            print("Couldn't open pixbuf from", path)
+            # This happens periodically even when a tile does eventually
+            # get downloaded and shown. I'm not sure why, but the message
+            # can be misleading, so restrict it to Debug:
+            if self.Debug:
+                print("Couldn't open pixbuf from", path)
             os.rename(path, path + ".bad")
             pixbuf = None
         # XXX Sometimes despite that check, we mysteriously get
         # GtkWarning: gdk_drawable_real_draw_pixbuf:
         #    assertion 'width >= 0 && height >= 0' failed
         # Not clear what we can do about that since we're already checking.
+        # This seems to be happening a lot less often;
+        # maybe a GTK bug got fixed.
 
         return pixbuf
 
