@@ -1,3 +1,17 @@
+2021-07-05  Akkana Peck <akkana@shallowsky.com>
+	Release 1.6.6.
+	Numpy is now optional.
+
+2021-05-29  Akkana Peck <akkana@shallowsky.com>
+	Smart argument parsing.
+
+2021-05-28  Akkana Peck <akkana@shallowsky.com>
+	Smarter about bounding boxes, especially when loading overlays.
+
+2021-05-28  Akkana Peck <akkana@shallowsky.com>
+	Fix the bug where things sometimes weren't redrawn
+	after fetching tiles.
+
 2021-05-13  Akkana Peck <akkana@shallowsky.com>
 	Allow overlaying one tiled map collection over another.
 	Particularly useful for tiled BLM land use or geology maps.
@@ -11,7 +25,7 @@
 	Add polygonal overlays from GeoJSON files.
 
 2020-08-16  Akkana Peck <akkana@shallowsky.com>
-	Bump version to 1.5.5 for packaging.
+	Bump version to 1.6.5 for packaging.
 
 2020-08-16  Akkana Peck <akkana@shallowsky.com>
 	Major improvement in speed and redraw when downloading tiles.

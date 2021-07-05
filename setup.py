@@ -39,7 +39,7 @@ class CleanCommand(Command):
 setup(name='pytopo',
       packages=['pytopo'],
       version=get_version(),
-      description='Tiled map viewer and track editor, using cached offline map tiles and track files',
+      description='Tiled map viewer and track editor',
       long_description=long_description,
       long_description_content_type="text/markdown",
       author='Akkana Peck',
@@ -66,7 +66,11 @@ setup(name='pytopo',
               'ellie=pytopo.trackstats:main'
           ],
       },
-      download_url='https://github.com/akkana/pytopo/tarball/1.6.1',
+      project_urls={
+          'Source Code': 'https://github.com/akkana/pytopo/',
+          'Documentation': 'https://pytopo.readthedocs.io/',
+          'Bug Tracker': 'https://github.com/akkana/pytopo/issues',
+      },
 
       install_requires=["PyGObject", "pycairo",
                         "requests-futures",

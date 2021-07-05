@@ -130,11 +130,11 @@ Right-clicking pops up a menu of other options.
 Usage: pytopo
        pytopo trackfile
        pytopo known_site
-       pytopo [-t trackfile] [-c collection] [-r] [site_name]
+       pytopo [-t trackfile] [-c collection] [-o overlay] [-r] [site_name]
        pytopo [-t trackfile] start_lat start_lon [collection]
-       pytopo -p :   list known sites and tracks
-       pytopo -r :   re-download all map tiles that need to be shown
-       pytopo -h :   print this message
+       pytopo -p :  list known sites, collections and tracks
+       pytopo -r :  re-download all map tiles that need to be shown
+       pytopo -h :  print this message
 
 Other flags:
        -k keys   : comma-separated list of fields (keys) to look for
@@ -142,21 +142,34 @@ Other flags:
        -g        : follow a GPS if available
        -d[level] : debugging mode. Defaults to 1, level 2 shows a little more.
 
-With no arguments, will display a list of known sites.
+With no arguments, will display a menu of known sites
+(defined in pytopo.sites).
+
+Map collections are defined in pytopo.sites.
+Overlays are also collections, drawn translucently on top of the base map,
+ and there can be more than one.
 
 Track files may be in GPX, KML, KMZ or GeoJSON format, and may contain
 track points and/or waypoints; multiple track files are allowed.
 GeoJSON files may also contain polygons: use the -k option to specify
-which field in the GeoJSON feature should be used for grouping.
+which field in the GeoJSON feature should be used for coloring groups.
 
 Use decimal degrees for coordinates.
 
 Set up favorite site names in ~/.config/pytopo.sites,
 favorite track logs in ~/Tracks
 
-Move around by dragging or using arrow keys.  q quits.
+Move around by dragging and zoom with the mousewheel, or use the keyboard:
+  Left/right/up/down:  move in that direction
+               +/=/-:  zoom in/out
+            spacebar:  go back to last pinned location
+                   m:  bring up the site selection dialog
+                   q:  quit
+
 Right-click gives a context menu.
-Shift-click in the map to print the coordinates of the clicked location.
+Shift-click in the map to print the coordinates of the clicked location,
+as well as distance and bearing from the last shift-clicked point,
+to standard output.
 </pre>
 
 <h2>Screenshots</h2>
@@ -200,19 +213,33 @@ Shift-click in the map to print the coordinates of the clicked location.
 
 <h2>Some Additional Features</h2>
 
-<h3>Track and Waypoint Files</h3>
+<h3>Track, Waypoint and Overlay Files</h3>
 <p>
-Pytopo can read tracks and waypoints from GPX, KML, KMZ, and GeoJSON files,
-and you can load multiple track files at once.
+PyTopo can read track logs in GPX, KML, KMZ or geojson format,
+and polygon overlay files in geojson.
 It shows each track in a different color.
 You can toggle waypoint visibility with the right-click context menu
 (for when there are too many waypoints and they get in the way of
 reading the map).
 <p>
-You can select a track by left-clicking on it,
+Select a track by left-clicking on it;
 split a track or delete everything before or after the mouse
 (right-click context menu again),
 and save a track as GPX after you've changed it.
+<p>
+You can also provide polygonal overlays from a GeoJSON file:
+for example, to colorize areas according to land ownership
+or geology.
+<p>
+PyTopo can also measure distances and bearing angles between points
+(shift-click and watch standard output), or report the coordinates at
+any point (right-click gives the coordinates at the top of the context
+menu; if you want to copy/paste, choose that menu item to print it to
+standard output).
+<p>
+For displaying or plotting distances and elevations,
+<a href="../ellie/">ellie</a> is now included as part of the
+PyTopo install.
 
 <h3>Pinning</h3>
 <p>
@@ -239,17 +266,6 @@ to add your own sites by their latitude or longitude.
 The <i>pytopo.sites</i> file is also the place to add new MapCollections,
 and for this you do have to edit the file (see below).
 
-<h3>Mileage and Elevation</h3>
-<p>
-If you need distance between two points, you can shift-click and PyTopo
-will print distance and bearing from there to the previous place you
-clicked. I know that's not an optimal user interface, but not many
-people seem to need that feature and I find it useful enough when I
-need it.
-<p>
-For displaying or plotting distances and elevations,
-<a href="../ellie/">ellie</a> is now included as part of the
-PyTopo install.
 
 <h3>GeoJSON Overlays</h3>
 <p>
@@ -307,6 +323,7 @@ Please tell me if you know of an alternate server.
 Note that the Google Maps terms of service do not allow using their tiles
 with non-Google mapping apps, so Google isn't an option.
 
+<!-- -
 <h3>Download Area</h3>
 <p>
 <i>Download Area</i> is intended to make it easy to download a
@@ -315,7 +332,8 @@ so you can have the tiles ready when you travel and will be offline.
 In practice, it doesn't work as well as intended, partly because most
 map tile servers will throttle connections that request too many tiles,
 so it takes forever to download an area. I stopped using it and
-therefore it isn't very well maintained.
+haven't tested it in a while.
+ -->
 
 <h3>Commercial Map Data</h3>
 <p>
@@ -344,7 +362,20 @@ I haven't seen the need to buy any more Topo! datasets myself.
 
 <h3>Making Your Own Map Collections</h3>
 <p>
-For some areas, you can download USGS topo maps free.
+PyTopo can use standard
+<a href="https://en.wikipedia.org/wiki/Web_Map_Service">WMS</a> tiles,
+so any way you generate such tiles will work. For instance,
+OpenStreetMap has a page on
+<a href="https://wiki.openstreetmap.org/wiki/Creating_your_own_tiles">Creating
+Your Own Tiles</a>, but unfortunately the process is fairly involved and
+poorly documented.
+<p>
+You can also make a tile set from GIS data using tools such as
+<i>gdal_translate</i>; see my blog post on
+<a href="https://shallowsky.com/blog/mapping/osmand-making-overlay-maps.html">Making Overlay Maps for OsmAnd on Linux</a>.
+<p>
+Or you can split a large map image into tiles.
+For instance, for some areas, you can download USGS topo maps free.
 For instance, for California you can get maps in TIFF format from the
 <a href="http://casil.ucdavis.edu/casil/gis.ca.gov/drg/">California
 Spatial Information Library</a>. You also may need to use specialized
@@ -360,22 +391,14 @@ Note: previously I included <i>-trim</i> as part of that line, and
 a lot of pages you'll find googling for image splitting will tell you
 to use -trim. Don't: it will give you maps of inconsistent sizes,
 and pytopo will have no way to tell where the origin of the map should be.
-<p>
-Maps downloaded as PDF (such as USGS geologic maps) might work
-in imagemagick, but if not, try converting them
-to a raster format before splitting, using a program like GIMP
-or a command like
-<pre wrap>
-gs -sDEVICE=jpeg -r300 -sOutputFile=output-map.jpg input-map.pdf
-</pre>
 
 <h2>API Documentation</h2>
 <p>
 If you want to contribute to PyTopo, or use the code for something else,
-you'll probably want to know more about the classes it uses, in the
-<a href="pytopo-api/">PyTopo API Documentation</a>.
-(This is generated with <code>epydoc --no-frames pytopo</code>
-and is not guaranteed to be up to date.)
+you'll probably want to know more about the classes it uses; see the
+<a href="https://pytopo.readthedocs.io/en/latest/#api-documentation">PyTopo
+API Documentation</a>
+(automatically generated with Sphinx).
 
 <h2>Non-interactive mapping scripts</h2>
 <p>
