@@ -361,6 +361,16 @@ but if you want to, contact me and I'll help you figure it out.)
                    stats['Smoothed total climb']:
                     label += "\nClimb: %d%s" % (stats['Smoothed total climb'],
                                                 climb_units)
+                # If numpy isn't installed, we won't have smoothed climb,
+                # but still have Raw total climb. But that's so
+                # crazily inaccurate it's not even worth showing.
+
+                # High and low points.
+                if 'High' in stats:
+                    label += '\nHigh: %d%s' % (stats['High'], climb_units)
+                if 'Low' in stats:
+                    label += '  Low: %d%s' % (stats['Low'], climb_units)
+
             trackfilename = self.trackpoints.filename_for_index(
                 self.selected_track)
             if trackfilename:
@@ -370,7 +380,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
         if self.selected_waypoint is not None and self.show_waypoints:
             self.draw_label("Waypoint: " +
-                                self.trackpoints.waypoints[self.selected_waypoint].name,
+                      self.trackpoints.waypoints[self.selected_waypoint].name,
                             15, 40, color=self.yellow_color)
 
         # Copyright info or other attribution

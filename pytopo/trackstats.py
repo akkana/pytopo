@@ -12,8 +12,13 @@ from __future__ import print_function
 
 import math
 import datetime
-import numpy
 import argparse
+import sys
+
+try:
+    import numpy
+except ImportError:
+    pass
 
 from pytopo.MapUtils import MapUtils
 
@@ -175,20 +180,29 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
 
     out = {}
     out['Total distance'] = total_dist
-    # numpy can't just consider an array to be truthy:
-    # "The truth value of an array with more than one element is ambiguous".
-    if len(eles) and len(smoothed_eles):
+    if len(eles):
         out['Raw total climb'] = total_climb
-        out['Smoothed total climb'], out['Lowest'], out['Highest'] \
-            = tot_climb(smoothed_eles)
+
+        # Display smoothed climb if available.
+        # numpy (used for smoothing) can't just consider an array to be truthy:
+        # "The truth value of an array with more than one element is ambiguous".
+        if (smoothed_eles is not None) and len(smoothed_eles):
+            out['Smoothed total climb'], out['Lowest'], out['Highest'] \
+                = tot_climb(smoothed_eles)
+            out['High'] = smoothed_eles.max()
+            out['Low'] = smoothed_eles.min()
+        else:
+            out['High'] = max(eles)
+            out['Low'] = min(eles)
     out['Moving time'] = moving_time.seconds
     out['Stopped time'] = stopped_time.seconds
     if moving_time:
         out['Average moving speed'] = total_dist * 60 * 60 / moving_time.seconds
     out['Distances'] = distances
-    if len(eles) and len(smoothed_eles):
+    if eles:
         out['Elevations'] = eles
-        out['Smoothed elevations'] = smoothed_eles
+        if smoothed_eles is not None and len(smoothed_eles):
+            out['Smoothed elevations'] = smoothed_eles
 
     return out
 
@@ -229,6 +243,10 @@ def tot_climb(arr):
 def smooth(vals, halfwin, beta):
     """ Kaiser window smoothing."""
 
+    # Smoothing requires numpy
+    if 'numpy' not in sys.modules:
+        return None
+
     window_len = 2 * halfwin + 1
     # extending the data at beginning and at the end
     # to apply the window at the borders
@@ -253,6 +271,10 @@ def main():
         have_plt = False
         print("plt (matplotlib) isn't installed; "
               "will print stats only, no plotting")
+
+    if 'numpy' not in sys.modules:
+        print("Ellie requires the numpy module")
+        sys.exit(1)
 
     progname = os.path.basename(sys.argv[0])
 

@@ -61,19 +61,21 @@ setup(name='pytopo',
           # bring up a terminal, gui_scripts don't.
           'gui_scripts': [
               'pytopo=pytopo.MapViewer:main',
+          ],
+          'console_scripts': [
               'ellie=pytopo.trackstats:main'
-          ]
+          ],
       },
       download_url='https://github.com/akkana/pytopo/tarball/1.6.1',
 
       install_requires=["PyGObject", "pycairo",
                         "requests-futures",
-                        "simplejson", "numpy"],
+                        "simplejson"],
 
-      # matplotlib is an optional dependency for ellie,
+      # numpy and matplotlib are optional dependencies for ellie,
       # but there doesn't seem to be any way for a user to see this.
       extras_require={
-          'elliplots':  ["matplotlib"],
+          'elliplots':  ["numpy", "matplotlib"],
       },
 
       keywords=['maps', 'map viewer', 'track files', 'track logs',

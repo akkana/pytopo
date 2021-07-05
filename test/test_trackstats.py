@@ -24,6 +24,11 @@ class ParseTests(unittest.TestCase):
         trackpoints = pytopo.TrackPoints()
         trackpoints.read_track_file('test/files/otowi-mesa-arch.gpx')
 
+        # Require numpy for unit tests, to ensure complete testing coverage.
+        # This will raise ModuleNotFoundError: No module named 'numpy'
+        # if it's not there.
+        import numpy
+
         halfwin = 0
         beta = 2
         metric = False
