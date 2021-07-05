@@ -4,7 +4,8 @@ PyTopo is a tiled map viewer and a track log viewer/editor.
 
 
 ## Screenshots:
-[![PyTopo screenshot](http://shallowsky.com/software/topo/screenshots/bandelier-ssT.jpg)](http://shallowsky.com/software/topo/screenshots/bandelier-ss.jpg)
+
+[![PyTopo screenshot](docs/screenshots/bandelier-ssT.jpg)](http://shallowsky.com/software/topo/screenshots/bandelier-ss.jpg)
 [![PyTopo screenshot](https://shallowsky.com/software/topo/screenshots/ownership_overlay-ssT.jpg)](https://shallowsky.com/software/topo/screenshots/ownership_overlay-ss.jpg)
 
 PyTopo can use tiles from a variety of sources, such as OpenStreetMap,
