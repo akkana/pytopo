@@ -26,4 +26,7 @@ untested because there's a fatal matplotlib bug getting in the way.
 Build the API documentation with:
   cd docs/sphinxdoc/
   make html
+or
+  python setup.py build_sphinx
+
 Requires python-sphinx (or python3-sphinx) and m2r.

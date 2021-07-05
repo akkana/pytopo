@@ -2,7 +2,14 @@
 
 PyTopo is a tiled map viewer and a track log viewer/editor.
 
-![PyTopo screenshot, Bandelier National Monument](http://shallowsky.com/software/topo/screenshots/bandelier-ssT.jpg "PyTopo Screenshot")
+
+## Screenshots:
+
+[![PyTopo screenshot](http://shallowsky.com/software/topo/screenshots/bandelier-ssT.jpg)](http://shallowsky.com/software/topo/screenshots/bandelier-ss.jpg)
+[![PyTopo screenshot](https://shallowsky.com/software/topo/screenshots/ownership_overlay-ssT.jpg)](https://shallowsky.com/software/topo/screenshots/ownership_overlay-ss.jpg)
+
+PyTopo can use tiles from a variety of sources, such as OpenStreetMap,
+and can read track or waypoint files in most common formats.
 
 Downloaded map tiles are cached locally, so you can use PyTopo offline
 if you've already cached the tiles for an area.
@@ -15,50 +22,62 @@ Or read the official documentation here:
 https://pytopo.readthedocs.io/en/latest/
 
 By default, PyTopo uses tiles from OpenStreetMap, but you can specify
-a variety of tile sources (for some you'll have to set up an API key).
+a variety of tile sources. For some you'll have to set up an API key;
+some, like Google, don't allow their tiles to be used by other programs.
 Or you can create your own tiles.
 It can also use tiles from a few commercial programs like the old
-*National Geographic Topo!*
+*National Geographic Topo!* CDROM sets.
 
 The package also includes ellie, a simple script for reporting and
 plotting distance and elevation change statistics from a GPX track log.
 More information: http://shallowsky.com/software/ellie/
 
-## Track Logs and Waypoints
+## Track Logs, Waypoints and Overlays
 
 PyTopo can read track logs in GPX, KML, KMZ or geojson format,
 and polygon overlay files in geojson.
-It can make simple edits to tracks, like splitting a track into parts
-or deleting to the beginning or end point, and can save the resulting
-tracks as GPX.
 
-You can also provide polygonal overlays from a GeoJSON file --
+You can make simple edits to tracks, like splitting a track into parts
+or deleting to the beginning or end point, and can save the resulting
+tracks as a GPX file.
+
+Select a track by left-clicking on it.
+The right-click context menu lets you split a track or delete
+everything before or after the mouse position,
+and save a track as GPX after you've changed it.
+
+You can also provide polygonal overlays from a GeoJSON file:
 for example, to colorize areas according to land ownership
 or geology.
 
 PyTopo can also measure distances and bearing angles between points
-(shift-click and watch standard output), or report the coordinates at
-any point (right-click gives the coordinates at the top of the context
-menu; if you want to copy/paste, choose that menu item to print it to
-standard output).
+(shift-click and watch standard output).
+The right-click context menu reports the coordinates at the mouse position;
+if you want to copy/paste, choose that menu item to print it to
+standard output.
+
+You can "Pin" a spot on the map and save it as a pinned location
+in your PyTopo configuration.
 
 ## Installing and Dependencies
 
 You can install the current stable version of PyTopo with
 ```pip install pytopo```
 
+Or get the latest and greatest from https://github.com/akkana/pytopo
+
 Dependencies include
 
-* GTK (and its various dependencies, like pango and cairo)
+* GTK3 (and its various dependencies, like pangocairo)
 * requests-futures (for downloading map tiles in the background)
 * simplejson (for reading XML-based formats like GPX and KML)
 
 Optional dependencies include
 
-* shapely (optional, used for polygonal overlays)
-* numpy (optional, for analyzing track statistics like distance)
-* matplotlib (optional, for Ellie's track log visualizations)
-* gpsd and python-gps (to read from a GPS device)
+* numpy (for analyzing track statistics like distance)
+* matplotlib ( for Ellie's track log visualizations)
+* shapely (used for polygonal overlays)
+* The programs gpsd and python-gps (to read from a GPS device)
 
 The first time you run pytopo, it will create a \~/.config/pytopo
 directory for its configuration files, and a \~/Maps directory for
@@ -76,13 +95,11 @@ Code contributions appreciated!
 
 ## Tests and Documentation
 
-There are some unit tests in the test/ directory;
-run them with
-    python -m unittest discover
-from the top-level directory.
+The official documentation is at
+https://pytopo.readthedocs.io/en/latest/
+(automatically generated from the docs/sphinx directory).
 
-The docs directory contains documentation on the two apps and the API.
-To build the documentation:
+To build the documentation locally:
 
 ```
 python setup.py build_sphinx
@@ -94,5 +111,10 @@ or
 cd sphinxdoc
 make html
 ```
+
+There are some unit tests in the test/ directory;
+run them with
+    python -m unittest discover
+from the top-level directory.
 
 Happy mapping!
