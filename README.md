@@ -60,16 +60,16 @@ Optional dependencies include
 * matplotlib (optional, for Ellie's track log visualizations)
 * gpsd and python-gps (to read from a GPS device)
 
-The first time you run pytopo, it will create a ~/.config/pytopo
-directory for its configuration files, and a ~/Maps directory for
+The first time you run pytopo, it will create a \~/.config/pytopo
+directory for its configuration files, and a \~/Maps directory for
 cached map tiles. (To change the location of cached tiles,
-edit *~/.config/pytopo/pytopo.sites*. Sorry, there's no GUI for that.)
+edit *\~/.config/pytopo/pytopo.sites*. Sorry, there's no GUI for that.)
 
 ## Other Info
 
 pytopo -h gives usage examples.
 
-If you need custom maps., edit ~/.config/pytopo/pytopo.sites to add new
+If you need custom maps., edit *\~/.config/pytopo/pytopo.sites* to add new
 map Collections: see examples in that file or on the project home page.
 
 Code contributions appreciated!
