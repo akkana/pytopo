@@ -1,12 +1,8 @@
+<img align=right src="images/pytopoicon.jpg">
+
 # PyTopo
 
 PyTopo is a tiled map viewer and a track log viewer/editor.
-
-
-## Screenshots:
-
-[![PyTopo screenshot: GPS tracks](images/bandelier-ssT.jpg)](https://github.com/akkana/pytopo/blob/master/images/bandelier-ss.jpg)
-[![PyTopo screenshot: land use overlay](images/ownership_overlay-ssT.jpg)](https://github.com/akkana/pytopo/blob/master/images/ownership_overlay-ss.jpg)
 
 PyTopo can use tiles from a variety of sources, such as OpenStreetMap,
 and can read track or waypoint files in most common formats.
@@ -20,6 +16,11 @@ custom maps, and more.
 
 Or read the official documentation here:
 https://pytopo.readthedocs.io/en/latest/
+
+## Screenshots:
+
+[![PyTopo screenshot: GPS tracks](images/bandelier-ssT.jpg)](https://github.com/akkana/pytopo/blob/master/images/bandelier-ss.jpg)
+[![PyTopo screenshot: land use overlay](images/ownership_overlay-ssT.jpg)](https://github.com/akkana/pytopo/blob/master/images/ownership_overlay-ss.jpg)
 
 By default, PyTopo uses tiles from OpenStreetMap, but you can specify
 a variety of tile sources. For some you'll have to set up an API key;
