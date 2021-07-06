@@ -793,14 +793,6 @@ Collections = [
                       maxzoom=15,
                       attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
 
-
-    # Wikimedia Maps: experimental
-    OSMMapCollection( "Wikimedia", "~/Maps/Wikimedia",
-                      ".png", 256, 256, 10,
-                      "https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}.png",
-                      maxzoom=15,
-                      attribution="Wikimedia Maps, map data © OpenStreetMap contributors"),
-
     # The USGS National Map provides various kinds of tiles.
     # Here's their basic Topo tile.
     # Their documentation says they support zooms to 19,

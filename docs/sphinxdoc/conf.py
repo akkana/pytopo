@@ -33,8 +33,7 @@ sys.path.insert(0, os.path.abspath('../../'))
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.inheritance_diagram',
-    'm2r'
+    'sphinx.ext.inheritance_diagram'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -209,7 +208,7 @@ html_static_path = ['_static']
 
 # Custom sidebar templates, maps document names to template names.
 #
-# html_sidebars = {}
+html_sidebars = {'**': ['localtoc.html']}
 
 # Additional templates that should be rendered to pages, maps page names to
 # template names.

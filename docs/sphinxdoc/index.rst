@@ -3,13 +3,10 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-PyTopo: View and edit tiled maps, track and waypoint files.
-===========================================================================
-
 .. toctree::
    :maxdepth: 2
 
-.. mdinclude:: ../../README.md
+.. include:: ../../README.rst
 
 
 API Documentation
