@@ -199,9 +199,8 @@ a program like ImageMagick, where you'd use a command like::
 
     convert source-map.jpg -rotate 90 -crop 300x300 -repage +0+0 out-map%02d.jpg
 
-(Don't use *-trim* as part of that command; it will give you maps of
-inconsistent sizes, and pytopo will have no way to tell where the
-origin of the map should be.
+(Don't use *-trim*; it will give you maps of inconsistent sizes, and
+pytopo will have no way to tell where the origin of the map should be.)
 
 PyTopo can also use tiles from a few commercial programs like the old
 *National Geographic Topo!* CDROM sets.
@@ -227,9 +226,6 @@ track log statistics. If you have matplotlib installed and your track log
 has elevations, ellie can plot them, showing how much you climbed and
 descended.
 
-Some of PyTopo's requirements may require a C compiler and
-Python development headers.
-
 `PyTopo's source is hosted on Github <https://github.com/akkana/pytopo>`_
 if you want the latest and greatest.
 
@@ -247,12 +243,12 @@ Optional dependencies include
 -  The programs gpsd and python-gps (to read from a GPS device)
 
 I've only tested PyTopo on Linux, but in theory it should run on any
-platform.
+platform. If not, let me know.
 
 Other Info
 ----------
 
-pytopo -h gives usage examples.
+*pytopo -h* gives usage examples.
 
 If you need custom maps., edit *~/.config/pytopo/pytopo.sites* to add
 new map Collections: see examples in that file or on the project home
@@ -264,8 +260,7 @@ Tests and Documentation
 -----------------------
 
 The official documentation is at
-https://pytopo.readthedocs.io/en/latest/ (automatically generated from
-the docs/sphinx directory).
+https://pytopo.readthedocs.io/en/latest/
 
 To build the documentation locally:
 

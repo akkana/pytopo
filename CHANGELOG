@@ -1,6 +1,8 @@
-2021-07-05  Akkana Peck <akkana@shallowsky.com>
-	Release 1.6.6.
+2021-07-06  Akkana Peck <akkana@shallowsky.com>
+	Release 1.7.
 	Numpy is now optional.
+	pytopo.html is now obsolete: all the important docs there
+	have been moved to README.rst.
 
 2021-05-29  Akkana Peck <akkana@shallowsky.com>
 	Smart argument parsing.

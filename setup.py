@@ -6,8 +6,13 @@ import os
 
 # Utility function to read the README file.
 # Used for the long_description.
-def read(fname):
-    return open(os.path.join(os.path.dirname(__file__), fname)).read()
+# Github and readthedocs can both handle relative image links,
+# but the images don't get copied up to pypi, so instead,
+# replace them with images from the latest readthedocs run.
+def file_contents(fname):
+    with open(os.path.join(os.path.dirname(__file__), fname)) as fp:
+        return fp.read().replace(" images/",
+                           " https://pytopo.readthedocs.io/en/latest/_images/")
 
 def get_version():
     '''Read the pytopo module versions from pytopo/__init__.py'''
@@ -23,8 +28,7 @@ def get_version():
                     versionpart = versionpart[:-1]
                 return versionpart
 
-with open("README.rst", "r") as fh:
-    long_description = fh.read()
+long_description = file_contents("README.rst")
 
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
