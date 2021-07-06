@@ -612,7 +612,7 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
             if not (mapwin.center_lat and mapwin.center_lon):
                 print("""No center coordinates!
 Please specify either a site or a file containing geographic data.""")
-                self.Usage()
+                raise(ArgParseException)
 
             # There's a center but no zoom level.
             # Zoom to the collection's default zoom level, if any
