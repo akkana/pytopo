@@ -726,7 +726,9 @@ but if you want to, contact me and I'll help you figure it out.)
         self.draw_map_scale()
         self.draw_trackpoints()
 
-        # If there's any overlaid vector data, draw that, translucently.
+        # The rest is drawing trackpoints and polygons.
+        if not self.trackpoints:
+            return
         if not self.trackpoints.polygons:
             return
 

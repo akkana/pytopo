@@ -370,6 +370,9 @@ to standard output.
 
         args = args[1:]
 
+        if not args:
+            raise(ArgParseException)
+
         mapwin.trackpoints = TrackPoints()
 
         while len(args) > 0:
