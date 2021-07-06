@@ -31,12 +31,12 @@ that supports Python and GTK3.
 The official documentation lives at:
 https://pytopo.readthedocs.io/en/latest/
 
-.. contents:: Quick Links:
+.. contents:: **Quick Links:**
     :local:
 
 
-Screenshots:
-------------
+Screenshots
+-----------
 
 +--------------------------------------------------------+------------------------------------------+
 | |bandelier|                                            | |landuse|                                |
@@ -127,7 +127,8 @@ Usage (command-line arguments)
    to standard output.
 
 
-Key bindings
+Key and Mouse bindings
+----------------------
 
 ============   ===========================================
 Arrow keys     Scroll the map in the indicated direction.
@@ -138,8 +139,9 @@ m              Switch to a different known site
 q              Quit
 ============   ===========================================
 
- Dragging and mousewheel move and scroll the map, as you'd expect.
- Right-clicking pops up a menu of other options.
+
+Dragging and mousewheel move and scroll the map, as you'd expect.
+Right-clicking pops up a menu of other options.
 
 Track Logs, Waypoints and Overlays
 ----------------------------------
@@ -181,7 +183,7 @@ you'll find it in *~/.config/pytopo*, but it may be elsewhere on other
 platforms. You can edit that file to add new tile sources.
 
 There are quite a few sources of
-`WMS <https://en.wikipedia.org/wiki/Web_Map_Service>`
+`WMS <https://en.wikipedia.org/wiki/Web_Map_Service>`_
 map data available, but many of them require that you register for
 an API key. You'll find an example in *pytopo.sites*
 of how to set up tiles from ThunderForest using an API key.
@@ -190,7 +192,7 @@ by other programs, so please respect that and use sources that
 don't have such restrictions.
 
 Or you can create your own tiles. OpenStreetMap has a page on
-`Creating Your Own Tiles <https://wiki.openstreetmap.org/wiki/Creating_your_own_tiles>`
+`Creating Your Own Tiles <https://wiki.openstreetmap.org/wiki/Creating_your_own_tiles>`_
 from OpenStreetMap data, but the process is fairly elaborate and poorly
 documented. You can also use a large map and split it into tiles with
 a program like ImageMagick, where you'd use a command like::
@@ -208,7 +210,7 @@ The PyTopo classes that read tiles are called *MapCollections*. There are
 several different types, but for most online WMS tile servers you'll
 generally want an *OSMMapCollection*, and copying the examples in
 *pytopo.sites* is the easiest way to make a new one. See the
-`API documentation <https://pytopo.readthedocs.io/en/latest/#api-documentation>`
+`API documentation <https://pytopo.readthedocs.io/en/latest/#api-documentation>`_
 for other types of MapCollections.
 
 
