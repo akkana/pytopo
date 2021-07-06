@@ -280,8 +280,11 @@ or
    cd sphinxdoc
    make html
 
-There are some unit tests in the test/ directory; run them with python
--m unittest discover from the top-level directory.
+There are some unit tests in the test/ directory; run them with::
+
+    python -m unittest discover
+
+from the top-level directory.
 
 Happy mapping!
 
