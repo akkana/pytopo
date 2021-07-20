@@ -87,6 +87,7 @@ Usage (command-line arguments)
           pytopo known_site
           pytopo [-t trackfile] [-c collection] [-o overlay] [-r] [site_name]
           pytopo [-t trackfile] start_lat start_lon [collection]
+          pytopo -m :  show a menu of known sites
           pytopo -p :  list known sites, collections and tracks
           pytopo -r :  re-download all map tiles that need to be shown
           pytopo -h :  print this message

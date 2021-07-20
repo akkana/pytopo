@@ -1,3 +1,5 @@
+2021-07-20  Akkana Peck <akkana@shallowsky.com>
+	Add -m argument to show the known sites dialog.
 2021-07-06  Akkana Peck <akkana@shallowsky.com>
 	Release 1.7.
 	Numpy is now optional.
