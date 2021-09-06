@@ -64,8 +64,6 @@ class OSMMapCollection(TiledMapCollection):
         self.download_url = _download_url
         self.maxzoom = maxzoom
 
-        self.Debug = False
-
         # If reload_tiles is set, it should be set to a Unix datestamp,
         # e.g. from when the program was started.
         # Any file older than that will be re-downloaded.
@@ -156,7 +154,10 @@ class OSMMapCollection(TiledMapCollection):
         (lat2, lon2) = self.num2deg(xtile + 1, ytile - 1)
         self.xscale = 256. / (lon2 - lon1)
         self.yscale = 256. / (lat2 - lat1)
-        if self.Debug:
+
+        # zoom_to(0) is called at the beginning, before the mapwin
+        # has been set. So check for it.
+        if self.mapwin and self.mapwin.controller.Debug:
             print("Zoom to %d: Calculated scales: %f, %f" \
                 % (self.zoomlevel, self.xscale, self.yscale))
         return
@@ -256,35 +257,35 @@ class OSMMapCollection(TiledMapCollection):
         # we're statting the file twice? Might be a performance issue.
         try:
             on_disk = os.access(path, os.R_OK)
-            needs_download = (not on_disk) or \
-                             (self.reload_tiles and
-                              os.stat(path).st_mtime < self.reload_tiles)
+            needs_download = (self.download_url and
+                              (not on_disk or
+                               (self.reload_tiles and
+                                os.stat(path).st_mtime < self.reload_tiles)))
         except OSError:
             on_disk = False
             needs_download = True
 
+        if not on_disk and not needs_download:
+            print("Eek: Not on disk but can't download: %s" % path)
+            return
+
         if needs_download:
-            if self.download_url:
-                # path is a full path on the local filesystem, OS independent.
-                # We need to turn it into a url (Unix path) with slashes.
-                thedir = os.path.dirname(path)
-                if not os.access(thedir, os.W_OK):
-                    os.makedirs(thedir)
+            if self.mapwin.controller.Debug:
+                if on_disk:
+                    print("Need to download", path, ": too old")
+                    print(os.stat(path).st_mtime, "<", self.reload_tiles)
+                else:
+                    print("Need to download", path, ": not on disk")
 
-                if self.Debug:
-                    print("Need to download", path)
-                    if not on_disk:
-                        print("Wasn't on disk")
-                    else:
-                        print(os.stat(path).st_mtime, "<", self.reload_tiles)
+            # path is a full path on the local filesystem, OS independent.
+            # We need to turn it into a url (Unix path) with slashes.
+            thedir = os.path.dirname(path)
+            if not os.access(thedir, os.W_OK):
+                os.makedirs(thedir)
 
-                self.queue_download(self.url_from_path(path), path)
+            self.queue_download(self.url_from_path(path), path)
 
-            else:
-                if self.Debug:
-                    print("Downloads not enabled; skipping", path)
-
-        # We've queued any needed downloads.
+        # Any needed downloads are queued.
         # Now return the current pixbuf, if any.
         if not on_disk:
             return None
@@ -292,8 +293,8 @@ class OSMMapCollection(TiledMapCollection):
         try:
             pixbuf = MapWindow.load_image_from_file(path)
         except:
-            if self.Debug:
-                print("load_image_from_file(%s) failed", path)
+            if self.mapwin.controller.Debug:
+                print("load_image_from_file(%s) failed" % path)
             pixbuf = None
             # return None
 
@@ -302,7 +303,7 @@ class OSMMapCollection(TiledMapCollection):
             # This happens periodically even when a tile does eventually
             # get downloaded and shown. I'm not sure why, but the message
             # can be misleading, so restrict it to Debug:
-            if self.Debug:
+            if self.mapwin.controller.Debug:
                 print("Couldn't open pixbuf from", path)
             os.rename(path, path + ".bad")
             pixbuf = None
@@ -310,7 +311,7 @@ class OSMMapCollection(TiledMapCollection):
         # GtkWarning: gdk_drawable_real_draw_pixbuf:
         #    assertion 'width >= 0 && height >= 0' failed
         # Not clear what we can do about that since we're already checking.
-        # This seems to be happening a lot less often;
+        # Later: This seems to be happening a lot less often;
         # maybe a GTK bug got fixed.
 
         return pixbuf

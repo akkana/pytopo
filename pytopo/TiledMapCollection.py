@@ -69,9 +69,11 @@ TiledMapCollection classes must implement:
         self.last_failed_download_time = 0
 
         # Tiles downloading or downloaded but not yet drawn.
-        # Only used for overlay tiles (opacity < 1);
-        # fully opaque tiles will be drawn as soon as they're downloaded.
-        self.tiles_queued = []
+        self.urls_queued = []
+
+        # Downloads that have failed, with the time they failed,
+        # so they can be retried after a while.
+        self.failed_download_urls = {}
 
     def init_downloader(self):
         self.downloader = \
@@ -98,11 +100,6 @@ TiledMapCollection classes must implement:
            Also set some win-specific variables which can be referenced later
            by draw_single_tile as downloaded tiles become available.
         """
-        if self.tiles_queued:
-            if self.mapwin.controller.Debug >= 2:
-                print(self, "draw_map: tiles still queued, not drawing map")
-            return
-
         # In case this hasn't been initialized yet:
         self.mapwin = mapwin
 
@@ -242,7 +239,7 @@ TiledMapCollection classes must implement:
             # If the image won't completely fill the grid space,
             # fill the whole rectangle first with black
             # (but only if this is the base layer, opacity==1).
-            # This generally shouldn't happen
+            # This generally shouldn't happen.
             if (self.opacity == 1. and
                 (pixbuf.get_width() < self.img_width or
                  pixbuf.get_height() < self.img_height)):
@@ -298,7 +295,7 @@ TiledMapCollection classes must implement:
         # Finished downloading all tiles?
         # Then don't bother to draw this one; request a
         # full map redraw, so that overlays will also be drawn.
-        if not self.tiles_queued:
+        if not self.urls_queued:
             self.mapwin.schedule_redraw()
             return
 
@@ -345,17 +342,24 @@ TiledMapCollection classes must implement:
             self.draw_tile_at_position(pixbuf, mapwin, mapx, mapy,
                                        x_off, y_off)
         except glib.GError as e:
-            print("Couldn't draw tile:", e, end=' ')
-            if not self.mapwin.controller.Debug:
-                print("... deleting")
+            url = url_from_path(path)
+            if url in self.urls_queued:
+                if self.mapwin.controller.Debug:
+                    print("draw_single_tile with", url, "still queued")
+                return
+
+            print("GError loading tile: ", e, path, end="")
+            if os.path.exists(path):
+                # The file exists, but loading the pixbuf failed.
+                # Usually this means OSM gave a text file containing
+                # a string like "Tile Not Available"
+                # os.unlink(path)
+                os.rename(path, path + ".bad")
+                print("RENAMING")
             else:
                 print("")
-            print("")
-            if os.path.exists(path) and not self.mapwin.controller.Debug:
-                os.unlink(path)
             self.num_failed_downloads += 1
-            # Usually this means OSM gave us a text file containing
-            # a string like "Tile Not Available"
+
         except Exception as e:
             print("Error drawing tile:", e)
             self.num_failed_downloads += 1
@@ -364,9 +368,10 @@ TiledMapCollection classes must implement:
         """Add a URL to the FuturesSession downloader queue,
            and keep a record of what file path it should use.
         """
+        now = time.time()
         if self.num_failed_downloads > self.MAX_FAILED_DOWNLOADS:
             if self.last_failed_download_time \
-               and time.time() - self.last_failed_download_time \
+               and now - self.last_failed_download_time \
                     < self.RETRY_DOWNLOADS_AFTER:
                 # too many failed downloads, too recently
                 return
@@ -376,9 +381,34 @@ TiledMapCollection classes must implement:
             self.num_failed_downloads = 0
             self.last_failed_download_time = 0
 
+        # Already tried to download this tile in this session?
+        if url in self.urls_queued:
+            if self.mapwin.controller.Debug:
+                print(path, "already queued: avoiding double downloading")
+            return
+        try:
+            # Did it fail earlier? If so, it the timespan to short to retry?
+            if (now - self.failed_download_urls[url]
+                < self.RETRY_DOWNLOADS_AFTER):
+                if self.mapwin.controller.Debug:
+                    print("Too early to retry", url)
+                return
+            if self.mapwin.controller.Debug:
+                print("Retrying download on", url)
+            del self.failed_download_urls[url]
+        except KeyError:
+            # Not in the list of failed tiles, go ahead and download
+            pass
+
         self.url_to_path[url] = path
-        if self.opacity < 1.:
-            self.tiles_queued.append(path)
+
+        # At one time, non-opaque tiles weren't kept on the download queue,
+        # because downloading all the overlay tiles shouldn't trigger a
+        # map redraw if the basemap tiles aren't all there yet.
+        # But it's better to handle that in response_hook.
+        # if self.opacity < 1.:
+        self.urls_queued.append(url)
+
         self.downloader.get(url)
 
     def response_hook(self, response, *args, **kwargs):
@@ -386,20 +416,55 @@ TiledMapCollection classes must implement:
            draw it on the map as soon as possible.
         """
         if response.status_code != 200:
-            print("Error", response.status_code, "on", response.url)
+            print("Error: status", response.status_code, "on", response.url)
             # XXX should check response, and maybe retry
-
+            # in which case it shouldn't go on failed_download_urls
             self.num_failed_downloads += 1
             self.last_failed_download_time = time.time()
+            self.failed_download_urls[response.url] = \
+                self.last_failed_download_time
+            self.urls_queued.remove(response.url)
             return
 
+        # Is the response an image?
+        try:
+            if not response.headers['Content-Type'].startswith('image/'):
+                if self.mapwin.controller.Debug:
+                    print("%s not an image: Content-Type %s"
+                          % (response.url,
+                             response.headers['Content-Type']))
+                self.num_failed_downloads += 1
+                self.last_failed_download_time = time.time()
+                return
+        except:
+            print("No Content-Type in headers for", response.url)
+            # Perhaps that's not a problem and it's okay to continue
+
+        # Write to disk
         self.num_failed_downloads = 0
         self.last_failed_download_time = 0
         tilepath = self.url_to_path[response.url]
         with open(tilepath, 'wb') as tilefp:
-            tilefp.write(response.content)
-            if self.mapwin.controller.Debug:
-                print("Wrote", response.url, "to", tilepath)
+            content = response.content
+            tilefp.write(content)
+            if self.mapwin.controller.Debug > 1:
+                debugname = '/'.join(tilepath.split('/')[-3:])
+                print(debugname, "Wrote", response.url, "to", tilepath)
+                # we're getting to this point, but then later finding
+                # that the file isn't there.
+                print(debugname, "Wrote", len(content), "bytes")
+
+        # Remove from the download queue.
+        # Don't do this until finished writing the file --
+        # otherwise, another thread could see an empty queue,
+        # figure it's ready to redraw, find a partially-written
+        # tile that doesn't load as a pixbuf, and end up removing
+        # the tile just downloaded.
+        try:
+            self.urls_queued.remove(response.url)
+        except:
+            print("Yikes, downloaded a URL not in the queue:", response.url)
+            return
 
         # Schedule a redraw for this tile.
         # If this is the basemap (opacity=1), do this as soon as possible.
@@ -410,12 +475,7 @@ TiledMapCollection classes must implement:
         # draw_map, since some of the collection's tiles may already have
         # been drawn, and drawing over them again will double their opacity.
         if self.opacity < 1.:
-            try:
-                self.tiles_queued.remove(tilepath)
-            except:
-                print("Yikes, downloaded a path not in the queue:", tilepath)
-                return
-            if not self.tiles_queued:
+            if not self.urls_queued:
                 if self.mapwin.controller.Debug:
                     print("All tiles downloaded for", self,
                           ": scheduling redraw")

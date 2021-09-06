@@ -2128,16 +2128,6 @@ but if you want to, contact me and I'll help you figure it out.)
     def drag_event(self, widget, event):
         """Move the map as the user drags."""
 
-        if self.press_timeout:
-            gobject.source_remove(self.press_timeout)
-            self.press_timeout = None
-
-        # On a tablet (at least the ExoPC), almost every click registers
-        # as a drag. So if a drag starts in the zoom control area,
-        # it was probably really meant to be a single click.
-        if self.was_click_in_zoom(event.x, event.y):
-            return False
-
         # The GTK documentation @ 24.2.1
         # http://www.pygtk.org/pygtk2tutorial/sec-EventHandling.html
         # says the first event is a real motion event and subsequent
@@ -2150,7 +2140,19 @@ but if you want to, contact me and I'll help you figure it out.)
             y = event.y
             state = event.state
 
+        # motion_notify events happen on every mouse move.
+        # Ignore any where no button is pressed.
         if not state & gtk.gdk.BUTTON1_MASK:
+            return False
+
+        if self.press_timeout:
+            gobject.source_remove(self.press_timeout)
+            self.press_timeout = None
+
+        # On a tablet (at least the ExoPC), almost every click registers
+        # as a drag. So if a drag starts in the zoom control area,
+        # it was probably really meant to be a single click.
+        if self.was_click_in_zoom(event.x, event.y):
             return False
 
         if not self.is_dragging:
