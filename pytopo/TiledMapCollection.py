@@ -75,11 +75,16 @@ TiledMapCollection classes must implement:
         # so they can be retried after a while.
         self.failed_download_urls = {}
 
+        # Mapping between paths and URLs. Derived classes may have
+        # rules for this, but TiledMapCollection only finds out when
+        # queueing tile downloads.
+        self.url_to_path = {}
+        self.path_to_url = {}
+
     def init_downloader(self):
         self.downloader = \
             FuturesSession(executor=ThreadPoolExecutor(max_workers=3))
         self.downloader.hooks['response'] = self.response_hook
-        self.url_to_path = {}
 
     def set_reload_tiles(self, p):
         """Set a flag indicating that all map tiles need to be re-downloaded,
@@ -293,8 +298,8 @@ TiledMapCollection classes must implement:
            in the right place for our currently displayed map.
         """
         # Finished downloading all tiles?
-        # Then don't bother to draw this one; request a
-        # full map redraw, so that overlays will also be drawn.
+        # Then don't bother to draw this one; request a full
+        # map redraw, so that overlays will also be drawn.
         if not self.urls_queued:
             self.mapwin.schedule_redraw()
             return
@@ -339,30 +344,46 @@ TiledMapCollection classes must implement:
 
         try:
             pixbuf = MapWindow.load_image_from_file(path)
-            self.draw_tile_at_position(pixbuf, mapwin, mapx, mapy,
-                                       x_off, y_off)
+
         except glib.GError as e:
-            url = url_from_path(path)
+            url = self.path_to_url[path]
             if url in self.urls_queued:
                 if self.mapwin.controller.Debug:
+                    # I've never actually seen this message,
+                    # but if it ever happens, I'd like to know.
                     print("draw_single_tile with", url, "still queued")
                 return
 
-            print("GError loading tile: ", e, path, end="")
+            # XXX When the load fails with No such file or directory,
+            # it seems like it could be a race condition where the
+            # file got added to the queue between the load_image and
+            # the urls_queued check; but it isn't, because it doesn't
+            # help to check urls_queued first, and it doesn't help to
+            # retry immediately. Yet when we get to the os.rename,
+            # the rename works and the .bad tile is a perfectly good pixmap.
+            # the tile does show up, probably in the next redraw.
+            # I'm not sure what's going on.
+
             if os.path.exists(path):
                 # The file exists, but loading the pixbuf failed.
-                # Usually this means OSM gave a text file containing
-                # a string like "Tile Not Available"
+                # Sometimes this means OSM served a text file containing
+                # a string like "Tile Not Available" instead of just failing.
+                # But it can also mean a partially-written file.
                 # os.unlink(path)
                 os.rename(path, path + ".bad")
-                print("RENAMING")
+                print("RENAMING", path)
             else:
                 print("")
             self.num_failed_downloads += 1
+            return
 
         except Exception as e:
             print("Error drawing tile:", e)
             self.num_failed_downloads += 1
+            return
+
+        self.draw_tile_at_position(pixbuf, mapwin, mapx, mapy,
+                                   x_off, y_off)
 
     def queue_download(self, url, path):
         """Add a URL to the FuturesSession downloader queue,
@@ -401,6 +422,7 @@ TiledMapCollection classes must implement:
             pass
 
         self.url_to_path[url] = path
+        self.path_to_url[path] = url
 
         # At one time, non-opaque tiles weren't kept on the download queue,
         # because downloading all the overlay tiles shouldn't trigger a
@@ -454,17 +476,17 @@ TiledMapCollection classes must implement:
                 # that the file isn't there.
                 print(debugname, "Wrote", len(content), "bytes")
 
-        # Remove from the download queue.
-        # Don't do this until finished writing the file --
-        # otherwise, another thread could see an empty queue,
-        # figure it's ready to redraw, find a partially-written
-        # tile that doesn't load as a pixbuf, and end up removing
-        # the tile just downloaded.
-        try:
-            self.urls_queued.remove(response.url)
-        except:
-            print("Yikes, downloaded a URL not in the queue:", response.url)
-            return
+            # Remove from the download queue.
+            # Don't do this until finished writing the file --
+            # otherwise, another thread could see an empty queue,
+            # figure it's ready to redraw, find a partially-written
+            # tile that doesn't load as a pixbuf, and end up removing
+            # the tile just downloaded.
+            try:
+                self.urls_queued.remove(response.url)
+            except:
+                print("Yikes, downloaded a URL not in the queue:", response.url)
+                return
 
         # Schedule a redraw for this tile.
         # If this is the basemap (opacity=1), do this as soon as possible.
