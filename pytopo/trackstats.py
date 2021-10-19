@@ -47,8 +47,9 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     global total_climb, this_climb, this_climb_start, lastele
 
     # The variables we're going to plot:
-    eles = [ ]
-    distances = [ ]
+    eles = []
+    sparse_eles = []
+    distances = []
 
     missing_times = False
 
@@ -162,6 +163,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
 
         distances.append(total_dist)
         eles.append(ele)
+        if ele:
+            sparse_eles.append(ele)
 
     # If halfwin wasn't supplied, try to guess a good value.
     # XXX TO DO: figure out a way to guess.
@@ -186,14 +189,16 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         # Display smoothed climb if available.
         # numpy (used for smoothing) can't just consider an array to be truthy:
         # "The truth value of an array with more than one element is ambiguous".
-        if (smoothed_eles is not None) and len(smoothed_eles):
-            out['Smoothed total climb'], out['Lowest'], out['Highest'] \
-                = tot_climb(smoothed_eles)
-            out['High'] = smoothed_eles.max()
-            out['Low'] = smoothed_eles.min()
-        else:
-            out['High'] = max(eles)
-            out['Low'] = min(eles)
+        if sparse_eles:
+            if (smoothed_eles is not None) and len(smoothed_eles):
+                out['Smoothed total climb'], out['Lowest'], out['Highest'] \
+                    = tot_climb(smoothed_eles)
+                out['High'] = smoothed_eles.max()
+                out['Low'] = smoothed_eles.min()
+            else:
+                out['High'] = max(sparse_eles)
+                out['Low'] = min(sparse_eles)
+
     out['Moving time'] = moving_time.seconds
     out['Stopped time'] = stopped_time.seconds
     if moving_time:
