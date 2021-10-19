@@ -524,6 +524,18 @@ class TrackPoints(object):
             outfp.write('''<?xml version='1.0' encoding='UTF-8' standalone='yes' ?>
 <gpx version="1.1" creator="PyTopo %s~" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
 ''' % __version__)
+
+            for pt in self.waypoints:
+                # If it doesn't have lat, lon then it's not a GeoPoint
+                # and can't be added to the track.
+                if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
+                    continue
+                if not boundingbox or self.inside_box(pt, boundingbox):
+                    outfp.write('''  <wpt lat="%f" lon="%f">
+    <time>2015-12-02T16:50:34Z</time>
+    <name>%s</name>
+  </wpt>\n''' % (pt.lat, pt.lon, pt.name))
+
             if self.points:
                 outfp.write("  <trk>\n")
                 segstr = ''
@@ -579,17 +591,6 @@ class TrackPoints(object):
                     segstr += "    </trkseg>\n"
                 segstr += "  </trk>\n"
                 outfp.write(segstr)
-
-            for pt in self.waypoints:
-                # If it doesn't have lat, lon then it's not a GeoPoint
-                # and can't be added to the track.
-                if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
-                    continue
-                if not boundingbox or self.inside_box(pt, boundingbox):
-                    outfp.write('''  <wpt lat="%f" lon="%f">
-    <time>2015-12-02T16:50:34Z</time>
-    <name>%s</name>
-  </wpt>\n''' % (pt.lat, pt.lon, pt.name))
 
             outfp.write("</gpx>")
 
