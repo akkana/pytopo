@@ -603,6 +603,7 @@ class TrackPoints(object):
         """
         with open(filename) as fp:
             gj = simplejson.loads(fp.read())
+
         if gj["type"] != "FeatureCollection":
             print(filename, "isn't a FeatureCollection")
             return None
@@ -686,7 +687,11 @@ class TrackPoints(object):
                 # if "properties" in feature and feature["properties"]:
                 #     self.points.append(feature["properties"])
                 for coords in feature["geometry"]["coordinates"]:
-                    lon, lat, ele = coords
+                    try:
+                        lon, lat, ele = coords
+                    except ValueError:
+                        lon, lat = coords
+                        ele = None
                     self.handle_track_point(lat, lon, ele=ele)
                     bbox.add_point(lat, lon)
 
@@ -696,11 +701,15 @@ class TrackPoints(object):
                     # if "properties" in feature:
                     #     self.points.append(feature["properties"])
                     for coords in linestring:
-                        lon, lat, ele = coords
+                        try:
+                            lon, lat, ele = coords
+                        except ValueError:
+                            lon, lat = coords
+                            ele = None
                         self.handle_track_point(lat, lon, ele=ele)
                         bbox.add_point(lat, lon)
 
-            return bbox
+        return bbox
 
 
     def read_track_file_KML(self, filename):

@@ -621,37 +621,50 @@ but if you want to, contact me and I'll help you figure it out.)
             x = halfwidth
         if y is None:
             y = halfheight
-        CLOSE = 12    # pixels
+        CLOSE = 7    # pixels
 
         if not self.trackpoints:
             return None, None, None, None
 
-        def closer_dist(pt, sm_dist):
+        def closer_dist(pt, sm_dist, lastpt=None):
             """Return distance from pt to x, y --
                but only if it's smaller than sm_dist.
             """
             tx, ty = self.coords2xy(pt.lon, pt.lat,
                                     self.win_width, self.win_height)
 
-            if abs(x - tx) > CLOSE or abs(y - ty) > CLOSE:
-                return None
+            # if abs(x - tx) > CLOSE or abs(y - ty) > CLOSE:
+            #     return None
 
             dist = math.sqrt((x - tx)**2 + (y - ty)**2)
             if dist < sm_dist:
                 return dist
+
+            # # Okay, it's not that close to a point. How about to a
+            # # line between the point and the last point?
+            # if lastpt and self.trackpoints.is_start(lastpt) and \
+            #    not self.trackpoints.is_attributes(lastpt):
+            #     ltx, lty = self.coords2xy(lastpt.lon, lastpt.lat,
+            #                               self.win_width, self.win_height)
+            #     m = float(y-lty) / float(x-ltx)
+            #     y1 = m * x + lty  # Predicted position
+
             return None
 
         # Find closest waypoint
         if self.trackpoints.waypoints:
             smallest_dist = CLOSE * 8
+            lastpt = None
             for i, pt in enumerate(self.trackpoints.waypoints):
                 if self.trackpoints.is_start(pt) or \
                    self.trackpoints.is_attributes(pt):
+                    lastpt = None
                     continue
-                d = closer_dist(pt, smallest_dist)
+                d = closer_dist(pt, smallest_dist, lastpt)
                 if d:
                     smallest_dist = d
                     nearest_waypoint = i
+                lastpt = pt
 
         # Find closest track and index of the closest point on the track
         if len(self.trackpoints.points) > 0:
@@ -671,17 +684,6 @@ but if you want to, contact me and I'll help you figure it out.)
                     smallest_dist = d
                     nearest_point = i
                     nearest_track = track_start
-
-                """
-                # Okay, the click wasn't on a point. Is it on
-                # a line between this point and the last one?
-                if lastx and lasty:
-                    m = float(y-lasty) / float(x-lastx)
-                    y1 = m * x + lasty  # Predicted position
-                    if abs(y - y1) < CLOSE:
-                        self.select_track(track_start)
-                        return
-                """
 
         # Is the point inside a polygon?
         # This requires shapely.

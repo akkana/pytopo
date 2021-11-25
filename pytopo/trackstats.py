@@ -178,8 +178,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     except TypeError:
         smoothed_eles = []
 
-    if missing_times:
-        print("Some points don't have times! Can't calculate speed")
+    # if missing_times:
+    #     print("Some points don't have times! Can't calculate speed")
 
     out = {}
     out['Total distance'] = total_dist
