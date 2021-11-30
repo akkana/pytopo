@@ -1090,7 +1090,7 @@ but if you want to, contact me and I'll help you figure it out.)
             ("Remove points after this", self.remove_after_mouse),
             ("Remove point from track", self.remove_trackpoint),
             ("Undo", self.undo),
-            ("Save GPX...", self.save_all_tracks_as),
+            ("Save GPX or GeoJSON...", self.save_all_tracks_as),
             # ("Save Area as GPX...", self.save_area_tracks_as),
 
             ("View", SEPARATOR),
@@ -1260,9 +1260,37 @@ but if you want to, contact me and I'll help you figure it out.)
                                                 gtk.STOCK_SAVE,
                                                 gtk.RESPONSE_OK))
         # dialog.set_current_folder(self.controller.config_dir)
+
+        def ignorecasefilter(filter_info, data):
+            """A GTK GtkFileFilter function that filters for
+               a given set of extensions IGNORING CASE,
+               which GTK, incredibly, does not offer in gtk.FileFilter.
+               The closest to documentation I could find is at
+               http://www.manpagez.com/html/pygtk/pygtk-2.22.0/class-gtkfilefilter.php#method-gtkfilefilter--add-custom
+
+               Arguments:
+               data is a list of LOWERCASE file extensions,
+                   e.g. [".jpg", ".png"].
+                   Pass it in as the third argument of filter.add_custom.
+               filter_info is a Gtk.FileFilterInfo object passed by the
+                   FileFilter -- not the 4-tuple described on the manpagez link.
+                   It has four parts, typically
+                       filter_info.filename      full pathname of the file
+                       filter_info.url           None
+                       filter_info.display_name  basename of the file
+                       filter_info.mime_type
+                   I don't know when url and mime_type might get set;
+                   they never have been in my tests.
+            """
+            for file_ext in data:
+                if filter_info.display_name.lower().endswith(file_ext):
+                    return True
+            return False
+
         filt = gtk.FileFilter()
         filt.set_name("GPX Files")
-        filt.add_pattern("*.gpx")
+        filt.add_custom(gtk.FILE_FILTER_FILENAME, ignorecasefilter,
+                        [".gpx", ".json", ".geojson"])
         dialog.add_filter(filt)
 
         while True:
@@ -1299,7 +1327,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # Now save all our tracks and waypoints as a GPX file in outfile.
         dialog.destroy()
         if self.controller.Debug:
-            print("Saving GPX to", outfile)
+            print("Saving tracks/waypoints to", outfile)
 
         if select_area:
             self.draw_label("Drag out the area you want to save...", 150, 50)
@@ -1307,7 +1335,17 @@ but if you want to, contact me and I'll help you figure it out.)
                                      outfile)
             return
 
-        self.trackpoints.save_GPX(outfile)
+        try:
+            loutfile = outfile.lower()
+            if loutfile.endswith(".gpx"):
+                self.trackpoints.save_GPX(outfile)
+            elif loutfile.endswith("json"):
+                self.trackpoints.save_geojson(outfile)
+            else:
+                print("Unknown format to save:", outfile, file=sys.stderr)
+        except Exception as e:
+            print("Couldn't save to", outfile, ":", e)
+            print(traceback.format_exc())
 
     def undo(self, widget=None):
         """Undo the last change to trackpoints: for instance,

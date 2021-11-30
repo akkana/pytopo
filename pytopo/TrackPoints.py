@@ -10,7 +10,7 @@ from __future__ import print_function
 import os
 import xml.dom.minidom
 import zipfile
-import simplejson
+import json
 import time
 
 from pytopo import __version__
@@ -594,6 +594,7 @@ class TrackPoints(object):
 
             outfp.write("</gpx>")
 
+
     def read_track_file_GeoJSON(self, filename):
         """Read a GeoJSON track or polygon file.
            Return the BoundingBox.
@@ -602,7 +603,7 @@ class TrackPoints(object):
            IOError or other exceptions as needed.
         """
         with open(filename) as fp:
-            gj = simplejson.loads(fp.read())
+            gj = json.loads(fp.read())
 
         if gj["type"] != "FeatureCollection":
             print(filename, "isn't a FeatureCollection")
@@ -710,6 +711,82 @@ class TrackPoints(object):
                         bbox.add_point(lat, lon)
 
         return bbox
+
+
+    def save_geojson(self, filename, boundingbox=None):
+        """Save known tracks and waypoints as a GeoJSON file,
+           with each track segment a different feature
+           (rather than using MultiLineStrings).
+        """
+        if boundingbox:
+            # Make sure it's ordered right
+            boundingbox = (min(boundingbox[0], boundingbox[2]),
+                           min(boundingbox[1], boundingbox[3]),
+                           max(boundingbox[0], boundingbox[2]),
+                           max(boundingbox[1], boundingbox[3]))
+
+        with open(filename, "w") as outfp:
+            jsonout = {
+                "type": "FeatureCollection",
+                "features": []
+            }
+
+            # Convert waypoints
+            for pt in self.waypoints:
+                # If it doesn't have lat, lon then it's not a GeoPoint
+                # and can't be added to the track.
+                if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
+                    continue
+                if not boundingbox or self.inside_box(pt, boundingbox):
+                    jsonout["features"].append({
+                        "type": "Feature",
+                        "properties": {
+                            "name": pt.name,
+                        },
+                        "geometry": {
+                            "type": "Point",
+                            "coordinates": [ pt.lon, pt.lat ]
+                        }
+                    })
+                    if pt.ele:
+                        jsonout["features"][-1]["geometry"]["coordinates"] \
+                            .append(pt.ele)
+
+            # Convert tracks:
+            if self.points:
+                for pt in self.points:
+                    if self.is_start(pt):
+                        jsonout["features"].append({
+                            "properties": {
+                                "name": pt
+                            },
+                            "type": "Feature",
+                            "geometry": {
+                                "type": "LineString",
+                                "coordinates": []
+                            }
+                        })
+                        continue
+
+                    # If it doesn't have lat, lon then it's not a GeoPoint
+                    # and can't be added to the track.
+                    # It might be a dict of attributes from a GeoJSON.
+                    if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
+                        continue
+
+                    # Else it's presumably a coordinate pair or triple
+                    if boundingbox:
+                        if not self.inside_box(pt, boundingbox):
+                            continue
+
+                    if pt.ele:
+                        jsonout["features"][-1]["geometry"]["coordinates"] \
+                            .append((pt.lon, pt.lat, pt.ele))
+                    else:
+                        jsonout["features"][-1]["geometry"]["coordinates"] \
+                            .append((pt.lon, pt.lat))
+
+            print(json.dumps(jsonout, indent=2), file=outfp)
 
 
     def read_track_file_KML(self, filename):
