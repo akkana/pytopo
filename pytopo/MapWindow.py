@@ -78,6 +78,9 @@ but if you want to, contact me and I'll help you figure it out.)
         # We'll need it to change locations, collections etc.
         self.controller = _controller
 
+        # Default title, can be changed later.
+        self.title = "PyTopo "
+
         # The current map collection being used:
         self.collection = None
 
@@ -211,6 +214,9 @@ but if you want to, contact me and I'll help you figure it out.)
         # Text overlays with positions: currently only used for polygons.
         self.text_overlays = []
 
+    def add_title(self, moretitle):
+        self.title = "%s %s" % (self.title, os.path.basename(moretitle))
+
     def add_overlay(self, overlay, opacity=.4):
         overlay.opacity = opacity
         self.overlays.append(overlay)
@@ -218,7 +224,8 @@ but if you want to, contact me and I'll help you figure it out.)
     def show_window(self, init_width, init_height):
         """Create the initial window."""
         win = gtk.Window()
-        win.set_name("PyTopo")
+        win.set_name(self.title)
+        win.set_title(self.title)
         win.connect("destroy", self.graceful_exit)
         win.set_border_width(5)
 
@@ -1927,7 +1934,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
         if dropshadow:
             self.cr.set_source_rgb(*self.black_color)
-            if (label_height < 15):
+            if True or label_height < 15:
                 self.draw_rectangle(True, x, y, label_width, label_height)
             else:
                 self.cr.move_to(x, y+2)

@@ -416,6 +416,7 @@ to standard output.
                     if len(args) < 2:
                         print("-c must specify collection")
                         self.Usage()
+                    window.add_title(args[1])
                     mapwin.collection = self.find_collection(args[1])
                     if mapwin.collection is None:
                         self.error_out("Can't find a map collection called "
@@ -427,6 +428,7 @@ to standard output.
                     if len(args) < 2:
                         print("-c must specify overlay collection")
                         self.Usage()
+                    window.add_title("(%s)" % args[1])
                     overlay = self.find_collection(args[1])
                     if overlay is None:
                         self.error_out("Can't find a map collection called "
@@ -466,6 +468,7 @@ to standard output.
 
                     try:
                         mapwin.trackpoints.read_track_file(args[1])
+                        mapwin.add_title(args[1])
                     except IOError:
                         print("Can't read track file", args[1])
                     args = args[1:]
@@ -480,6 +483,7 @@ to standard output.
             # args[0] doesn't start with '-'. Is it a track file?
             try:
                 mapwin.trackpoints.read_track_file(args[0])
+                mapwin.add_title(args[0])
                 args = args[1:]
                 continue
 
@@ -510,6 +514,7 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
             # Try to match a known site:
             for site in self.KnownSites:
                 if args[0] == site[0]:
+                    mapwin.add_title(args[0])
                     if not self.use_site(site, mapwin):
                         continue
                     break
@@ -873,6 +878,11 @@ You can add new sites and collections there; see the instructions at
             # start in selector mode to choose a location:
             if not mapwin.selection_window():
                 sys.exit(0)
+
+        # Fork and run in the background.
+        rc = os.fork()
+        if rc:
+            sys.exit(0)
 
         # For cProfile testing, run with a dummy collection (no data needed):
         # mapwin.collection = MapCollection("dummy", "/tmp")
