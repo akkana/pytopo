@@ -9,6 +9,7 @@ from __future__ import print_function
 
 import os
 import xml.dom.minidom
+import re
 import zipfile
 import json
 import time
@@ -854,14 +855,16 @@ class TrackPoints(object):
             # Try to get a trail name.
             name = None
             try:
-                name = placemark.getElementsByTagName("name")[0].childNodes[0].data.strip()
+                name = placemark.getElementsByTagName("name")[0] \
+                                .childNodes[0].data.strip()
             except:
                 # no <name> tag, try for more esoteric schemes.
                 # Lynn's USFS trail data has a scheme like
                 # <ExtendedData><SchemaData ...><<SimpleData name="TrailName">
                 # where the name might be TrailName or TrailNam_1
                 try:
-                    sdata = placemark.getElementsByTagName("ExtendedData")[0].getElementsByTagName("SimpleData")
+                    sdata = placemark.getElementsByTagName("ExtendedData")[0] \
+                                     .getElementsByTagName("SimpleData")
                     for tag in sdata:
                         if tag.getAttribute("name").startswith("TrailNam"):
                             name = tag.childNodes[0].data.strip()
@@ -902,24 +905,40 @@ class TrackPoints(object):
         return bbox
 
     def get_KML_coordinates(self, el):
-        """Get the contents of the first <coordinates> triple
+        """Get the contents of the first <coordinates> tuple
            inside the given element (which is inside a KML file).
            Inside a LineString, coordinate pairs or triples are separated
            by whitespace, which may include newlines.
-           Return a list of triple floats [[lat, lon, ele], [lat, lon, ele]]
+           Return a list of tuple floats [[lat, lon, ele], [lat, lon, ele]]
            Not all KMLs have elevation, so use None in that case.
+           coords may look like
+              <coordinates> -70.35432000,  18.93176000</coordinates>
+           or like
+              <coordinates>
+                -106.222544642583,35.81443097698173,0 -1 06.2213118192909,35.81387726967753,0 ...
+              </coordinates>
         """
         coords = el.getElementsByTagName("coordinates")
         if not coords or len(coords) < 1:
             return None
-        coord_triples = coords[0].childNodes[0].data.strip().split()
+        # coord_tuples = coords[0].childNodes[0].data.strip().split()
+        coord_tuples = re.findall(
+            '\s*([0-9.-]+)\s*,\s*([0-9.-]+)(\s*,\s*[0-9.-]+)?',
+            coords[0].childNodes[0].data)
+        # This gives a list of things like
+        # ('-106.222544642583', '35.81443097698173', ',0')
         ret = []
-        for s in coord_triples:
-            triple = s.split(',')
-            triple = list(map(float, triple))
-            if len(triple) == 2:
-                triple.append(None)
-            ret.append(triple)
+        for ctuple in coord_tuples:
+            if len(ctuple) > 2 and ctuple[2]:
+                ele = ctuple[2]
+                if ele.startswith(','):
+                    ele = ele[1:]
+                ele = float(ele)
+            else:
+                ele = None
+            ctuple = [float(ctuple[0]), float(ctuple[1])]
+            ctuple.append(ele)
+            ret.append(ctuple)
 
         return ret
 
