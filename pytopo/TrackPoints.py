@@ -72,6 +72,9 @@ class BoundingBox(object):
         return "<BoundingBox lat %.3f to %.3f, lon %.3f to %.3f>" \
             % (self.minlat, self.maxlat, self.minlon, self.maxlon)
 
+    def __bool__(self):
+        return not self.uninitialized()
+
     def as_tuple(self):
         """Return a tuple of minlon, minlat, maxlon, maxlat
         """
@@ -627,7 +630,28 @@ class TrackPoints(object):
                 self.handle_track_point(lat, lon, waypoint_name=name)
                 bbox.add_point(lat, lon)
 
-            if featuretype == "Polygon":
+            def add_polygon(polycoords, polyname, properties):
+                polyclasses = []
+                for field in self.fieldnames:
+                    if field in properties:
+                        polyclasses.append(properties[field])
+                        break
+                newpoly = {}
+                if name:
+                    newpoly["name"] = polyname
+                newpoly["class"] = ", ".join(polyclasses)
+                newpoly["coordinates"] = featurepoly
+
+                # Bounding box: min lon,  max lon, min lat, max lat
+                poly_bbox = BoundingBox()
+                for (lon, lat) in newpoly["coordinates"]:
+                    poly_bbox.add_point(lat, lon)
+                newpoly["bounds"] = poly_bbox.as_tuple()
+
+                self.polygons.append(newpoly)
+                bbox.union(poly_bbox)
+
+            if featuretype == "Polygon" or featuretype == "MultiPolygon":
                 # A feature may have more than one polygon
                 # in its coordinate list. First store the values
                 # that apply to all of them:
@@ -642,28 +666,15 @@ class TrackPoints(object):
                     self.fieldnames = ["class"]
 
                 # Loop over the polygons in this feature.
-                polyclass = ""
-                for featurepoly in feature["geometry"]["coordinates"]:
-                    for field in self.fieldnames:
-                        if field in feature["properties"]:
-                            polyclass = feature["properties"][field]
-                            break
+                if featuretype == "Polygon":
+                    for featurepoly in feature["geometry"]["coordinates"]:
+                        add_polygon(featurepoly, name, feature["properties"])
 
-                    poly_bbox = BoundingBox()
-
-                    newpoly = {}
-                    if name:
-                        newpoly["name"] = name
-                    newpoly["class"] = polyclass
-                    newpoly["coordinates"] = featurepoly
-
-                    # Bounding box: min lon,  max lon, min lat, max lat
-                    for (lon, lat) in newpoly["coordinates"]:
-                        poly_bbox.add_point(lat, lon)
-                    newpoly["bounds"] = poly_bbox.as_tuple()
-
-                    self.polygons.append(newpoly)
-                    bbox.union(poly_bbox)
+                elif featuretype == "MultiPolygon":
+                    for container in feature["geometry"]["coordinates"]:
+                        for featurepoly in container:
+                            add_polygon(featurepoly, name,
+                                        feature["properties"])
 
             if featuretype != "LineString" and featuretype != "MultiLineString":
                 continue

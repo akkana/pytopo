@@ -1915,7 +1915,7 @@ but if you want to, contact me and I'll help you figure it out.)
         if not self.cr:
             self.cr = self.drawing_area.get_window().cairo_create()
 
-        layout = self.drawing_area.create_pango_layout(labelstring)
+        layout = self.drawing_area.create_pango_layout(str(labelstring))
         layout.set_font_description(font)
         label_width, label_height = layout.get_pixel_size()
 

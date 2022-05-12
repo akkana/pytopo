@@ -375,6 +375,7 @@ to standard output.
             raise(ArgParseException)
 
         mapwin.trackpoints = TrackPoints()
+        files_bbox = BoundingBox()
 
         while len(args) > 0:
             if args[0][0] == '-' and not args[0][1].isdigit():
@@ -466,8 +467,10 @@ to standard output.
                             args[1] = tr[1]
                             break
 
+                    # Is it the name of a track file?
                     try:
-                        mapwin.trackpoints.read_track_file(args[1])
+                        bbox = mapwin.trackpoints.read_track_file(args[1])
+                        files_bbox.union(bbox)
                         mapwin.add_title(args[1])
                     except IOError:
                         print("Can't read track file", args[1])
@@ -482,7 +485,8 @@ to standard output.
 
             # args[0] doesn't start with '-'. Is it a track file?
             try:
-                mapwin.trackpoints.read_track_file(args[0])
+                bbox = mapwin.trackpoints.read_track_file(args[0])
+                files_bbox.union(bbox)
                 mapwin.add_title(args[0])
                 args = args[1:]
                 continue
@@ -586,18 +590,16 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
         mapwin.collection.Debug = self.Debug
 
         # Decide on an appropriate center and zoom level for the content,
-        # starting with the bounding box for any loaded files.
+        # starting with any bounding box that comes from the trackpoints.
         bbox = mapwin.trackpoints.get_bounds()
-        if bbox:
-            # If there's a pin, use it
-            if mapwin.pin_lat and mapwin.pin_lon:
-                mapwin.center_lat = mapwin.pin_lat
-                mapwin.center_lon = mapwin.pin_lon
 
-                # Compute a bounding box that keeps the pin centered
-                # while also including the full bounding box.
-                # XXX Fudgy math, doesn't account for things like
-                # the dateline or crossing over the pole.
+        # Is there a pin?
+        if mapwin.pin_lat and mapwin.pin_lon:
+            # If there's both a pin and a bbox, compute a bounding box
+            # that keeps the pin centered while also including the full bbox.
+            # XXX Fudgy math, doesn't account for things like
+            # the dateline or crossing over the pole.
+            if bbox:
                 max_dlat = max(abs(mapwin.pin_lat - bbox.minlat),
                                abs(mapwin.pin_lat - bbox.maxlat))
                 max_dlon = max(abs(mapwin.pin_lon - bbox.minlon),
@@ -609,16 +611,33 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
                 bbox.add_point(mapwin.center_lat + max_dlat,
                                mapwin.center_lon + max_dlon)
 
-            # else use the bbox
+            # If there's no bbox, center on the pin
             else:
-                mapwin.center_lat, mapwin.center_lon = bbox.center()
+                mapwin.center_lat = mapwin.pin_lat
+                mapwin.center_lon = mapwin.pin_lon
 
+        # If there's no center yet, but there is a bbox, center on it.
+        # The current bbox is for "normal" track/waypoint files read in;
+        # files_bbox includes those but also includes GeoJSON overlays,
+        # which are only used as a last resort since they're likely
+        # to cover a wide area, like a whole state.
+        if not bbox:
+            bbox = files_bbox
+
+        if not mapwin.center_lat or not mapwin.center_lon:
+            if not bbox:
+                print("""No center coordinates!
+Please specify either a site or a file containing geographic data.""")
+                raise(ArgParseException)
+
+            mapwin.center_lat, mapwin.center_lon = bbox.center()
+
+        if bbox:
             mapwin.collection.zoom_to_bounds(bbox)
             for ov in mapwin.overlays:
                 ov.zoom_to_bounds(bbox)
 
         else:
-            # No bounding box from the trackpoints.
             # Hopefully the center has already been set from use_site,
             # otherwise we're in trouble:
             if not (mapwin.center_lat and mapwin.center_lon):
