@@ -17,6 +17,11 @@ import time
 from pytopo import __version__
 
 
+# Waypoints must have a name, to distinguish them from trackpoints.
+# This is a way to flag waypoints that should have no displayed name.
+NULL_WP_NAME = "__WP__"
+
+
 class GeoPoint(object):
     """A single track point or waypoint."""
     # Note: GPX files imported from KML may have no timestamps.
@@ -330,7 +335,7 @@ class TrackPoints(object):
                 lat, lon, ele, time, attrs = self.GPX_point_coords(pt)
                 name = self.get_DOM_text(pt, "name")
                 if not name:
-                    name = "WP"
+                    name = NULL_WP_NAME
                 self.handle_track_point(lat, lon, ele=ele, timestamp=time,
                                         waypoint_name=name, attrs=attrs)
                 bbox.add_point(lat, lon)
@@ -888,7 +893,7 @@ class TrackPoints(object):
 
             # Handle waypoints:
             if not name:
-                name = "WP"
+                name = NULL_WP_NAME
             points = placemark.getElementsByTagName("Point")
             for point in points:
                 coord_triples = self.get_KML_coordinates(point)

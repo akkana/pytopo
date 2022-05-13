@@ -12,7 +12,7 @@ pygtkcompat.enable()
 pygtkcompat.enable_gtk(version='3.0')
 
 from pytopo.MapUtils import MapUtils
-from pytopo.TrackPoints import TrackPoints
+from pytopo.TrackPoints import TrackPoints, NULL_WP_NAME
 from . import trackstats
 
 try:
@@ -560,7 +560,6 @@ but if you want to, contact me and I'll help you figure it out.)
         # so we can try to use that color for the matching waypoints.
         track_colors = {}
 
-        # win_width, win_height = self.drawing_area.get_window().get_geometry()[2:4]
         if len(self.trackpoints.points) > 0:
             cur_x = None
             cur_y = None
@@ -591,11 +590,12 @@ but if you want to, contact me and I'll help you figure it out.)
 
                 if x >= 0 and x < self.win_width and \
                    y >= 0 and y < self.win_height:
-                    self.draw_label(pt.name, x, y,
-                                    color=self.waypoint_color,
-                                    dropshadow=True,
-                                    font=self.font_desc,
-                                    offsets=(1, 1))
+                    if pt.name and pt.name != NULL_WP_NAME:
+                        self.draw_label(pt.name, x, y,
+                                        color=self.waypoint_color,
+                                        dropshadow=True,
+                                        font=self.font_desc,
+                                        offsets=(1, 1))
 
                     self.draw_pixbuf(self.pin, 0, 0,
                                      x + self.pin_xoff,
