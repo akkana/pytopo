@@ -214,6 +214,11 @@ but if you want to, contact me and I'll help you figure it out.)
         # Text overlays with positions: currently only used for polygons.
         self.text_overlays = []
 
+        # Remember the last folder used in GTK file chooser dialogs,
+        # separately for reading and saving.
+        self.file_read_folder = None
+        self.file_save_folder = None
+
     def add_title(self, moretitle):
         self.title = "%s %s" % (self.title, os.path.basename(moretitle))
 
@@ -1082,9 +1087,9 @@ but if you want to, contact me and I'll help you figure it out.)
         contextmenu = OrderedDict([
             (MapUtils.coord2str_dd(self.cur_lon, self.cur_lat),
              self.print_location),
-            ("Zoom here...", self.zoom),
-            ("Add waypoint...", self.add_waypoint_by_mouse),
-            ("Remove waypoint", self.remove_waypoint),
+            ("Open track file...", self.prompt_for_track_file),
+            ("My Locations...", self.mylocations),
+            ("My Tracks...", self.mytracks),
 
             ("Pins", SEPARATOR),
             ("Go to pin...", self.set_center_to_pin),
@@ -1092,6 +1097,8 @@ but if you want to, contact me and I'll help you figure it out.)
             ("Save pin location...", self.save_location),
 
             ("Track Editing", SEPARATOR),
+            ("Add waypoint...", self.add_waypoint_by_mouse),
+            ("Remove waypoint", self.remove_waypoint),
             ("Split track here", self.split_track_by_mouse),
             ("Remove points before this", self.remove_before_mouse),
             ("Remove points after this", self.remove_after_mouse),
@@ -1101,10 +1108,9 @@ but if you want to, contact me and I'll help you figure it out.)
             # ("Save Area as GPX...", self.save_area_tracks_as),
 
             ("View", SEPARATOR),
+            ("Zoom here...", self.zoom),
             (draw_track_label, self.toggle_track_drawing),
             (show_waypoint_label, self.toggle_show_waypoints),
-            ("My Locations...", self.mylocations),
-            ("My Tracks...", self.mytracks),
 
             ("Rest", SEPARATOR),
             ("Download Area...", self.download_area),
@@ -1243,6 +1249,61 @@ but if you want to, contact me and I'll help you figure it out.)
             dialog.destroy()
         return False
 
+    @staticmethod
+    def ignorecasefilter(filter_info, data):
+        """A GTK GtkFileFilter function that filters for
+           a given set of extensions IGNORING CASE,
+           which GTK, incredibly, does not offer in gtk.FileFilter.
+           The closest to documentation I could find is at
+           http://www.manpagez.com/html/pygtk/pygtk-2.22.0/class-gtkfilefilter.php#method-gtkfilefilter--add-custom
+
+           Arguments:
+           data is a list of LOWERCASE file extensions,
+               e.g. [".jpg", ".png"].
+               Pass it in as the third argument of filter.add_custom.
+           filter_info is a Gtk.FileFilterInfo object passed by the
+               FileFilter -- not the 4-tuple described on the manpagez link.
+               It has four parts, typically
+                   filter_info.filename      full pathname of the file
+                   filter_info.url           None
+                   filter_info.display_name  basename of the file
+                   filter_info.mime_type
+               I don't know when url and mime_type might get set;
+               they never have been in my tests.
+        """
+        for file_ext in data:
+            if filter_info.display_name.lower().endswith(file_ext):
+                return True
+        return False
+
+    def prompt_for_track_file(self, widget):
+        dialog = gtk.FileChooserDialog(title="Open track file",
+                               action=gtk.FILE_CHOOSER_ACTION_SAVE,
+                               buttons=(gtk.STOCK_CANCEL,
+                                        gtk.RESPONSE_CANCEL,
+                                        gtk.STOCK_SAVE,
+                                        gtk.RESPONSE_OK))
+        if self.file_read_folder:
+            dialog.set_current_folder(self.file_read_folder)
+
+        filt = gtk.FileFilter()
+        filt.set_name("GPX, KML/KMX or GeoJSON Files")
+        filt.add_custom(gtk.FILE_FILTER_FILENAME, MapWindow.ignorecasefilter,
+                        [".gpx", ".json", ".geojson", ".kml", ".kmz"])
+        dialog.add_filter(filt)
+
+        response = dialog.run()
+
+        if response != gtk.RESPONSE_OK:
+                dialog.destroy()
+                return
+
+        self.file_read_folder = dialog.get_current_folder()
+        infile = dialog.get_filename()
+        self.trackpoints.read_track_file(infile)
+
+        dialog.destroy()
+
     def save_all_tracks_as(self, widget):
         """Prompt for a filename to save all tracks and waypoints."""
         return self.save_tracks_as(widget, False)
@@ -1266,37 +1327,13 @@ but if you want to, contact me and I'll help you figure it out.)
                                                 gtk.RESPONSE_CANCEL,
                                                 gtk.STOCK_SAVE,
                                                 gtk.RESPONSE_OK))
-        # dialog.set_current_folder(self.controller.config_dir)
 
-        def ignorecasefilter(filter_info, data):
-            """A GTK GtkFileFilter function that filters for
-               a given set of extensions IGNORING CASE,
-               which GTK, incredibly, does not offer in gtk.FileFilter.
-               The closest to documentation I could find is at
-               http://www.manpagez.com/html/pygtk/pygtk-2.22.0/class-gtkfilefilter.php#method-gtkfilefilter--add-custom
-
-               Arguments:
-               data is a list of LOWERCASE file extensions,
-                   e.g. [".jpg", ".png"].
-                   Pass it in as the third argument of filter.add_custom.
-               filter_info is a Gtk.FileFilterInfo object passed by the
-                   FileFilter -- not the 4-tuple described on the manpagez link.
-                   It has four parts, typically
-                       filter_info.filename      full pathname of the file
-                       filter_info.url           None
-                       filter_info.display_name  basename of the file
-                       filter_info.mime_type
-                   I don't know when url and mime_type might get set;
-                   they never have been in my tests.
-            """
-            for file_ext in data:
-                if filter_info.display_name.lower().endswith(file_ext):
-                    return True
-            return False
+        if self.file_save_folder:
+            dialog.set_current_folder(self.file_save_folder)
 
         filt = gtk.FileFilter()
-        filt.set_name("GPX Files")
-        filt.add_custom(gtk.FILE_FILTER_FILENAME, ignorecasefilter,
+        filt.set_name("GPX/GeoJSON Files")
+        filt.add_custom(gtk.FILE_FILTER_FILENAME, MapWindow.ignorecasefilter,
                         [".gpx", ".json", ".geojson"])
         dialog.add_filter(filt)
 
@@ -1308,6 +1345,7 @@ but if you want to, contact me and I'll help you figure it out.)
                 return
 
             outfile = dialog.get_filename()
+            self.file_save_folder = dialog.get_current_folder()
             if os.path.exists(outfile):
                 d = gtk.MessageDialog(None, gtk.DIALOG_MODAL,
                                       gtk.MESSAGE_QUESTION,
