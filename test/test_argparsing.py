@@ -134,7 +134,7 @@ class ArgparseTests(unittest.TestCase):
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
         self.assertEqual(len(mapwin.trackpoints.waypoints), 2)
-        self.assertEqual(len(mapwin.trackpoints.polygons), 21878)
+        self.assertEqual(len(mapwin.trackpoints.polygons), 27711)
         assertCloseEnough(mapwin.center_lon, -106.24089075)
         assertCloseEnough(mapwin.center_lat, 35.890244)
         assertCloseEnough(mapwin.trackpoints.bbox.as_tuple(),
