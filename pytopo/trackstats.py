@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2009-2018 by Akkana Peck.
+# Copyright (C) 2009-2022 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -50,6 +50,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     eles = []
     sparse_eles = []
     distances = []
+    speeds = []
+    calcspeeds = []
 
     missing_times = False
 
@@ -118,29 +120,39 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         else:
             delta_t = datetime.timedelta(0)
 
-        speed = 0
-        dist = 0
-
         # This speed and distance calculation isn't terribly accurate.
         # If there's a GPS speed recorded, use that and the
-        # time interval for distance calculations.
+        # time interval for distance calculations,
+        # but also try calculating the speed, to see how close they are.
+        if delta_t:
+            calcdist = MapUtils.haversine_distance(lat, lon,
+                                                   lastlat, lastlon, metric)
+            calcspeed = calcdist * 3600 / delta_t.total_seconds()
+            calcspeeds.append(calcspeed)
+        else:
+            calcspeeds.append(0)
+
         if pt.attrs and 'speed' in pt.attrs:
             speed = float(pt.attrs['speed'])    # in m/s
+
+            # This is in meters/s. Convert to mi/hr or km/hr
+            if metric:
+                dist /= 1000.
+                speed *= 3.6
+            else:
+                dist /= 1609.344
+                speed *= 2.2369363
+
             if delta_t:
                 dist = speed * delta_t.seconds
-                # This is in meters/s. Convert to mi/hr or km/hr.
-                if metric:
-                    dist /= 1000.
-                    speed *= 3.6
-                else:
-                    dist /= 1609.344
-                    speed *= 2.2369363
-
-        if dist == 0:
-            dist = MapUtils.haversine_distance(lat, lon,
-                                               lastlat, lastlon, metric)
+        else:
+            dist = calcdist
             if delta_t:
                 speed = dist / delta_t.seconds * 60 * 60   # miles (or km) / hr
+            else:
+                speed = 0
+
+        speeds.append(speed)
 
         if speed > SPEED_THRESHOLD or not delta_t:
             total_dist += dist
@@ -156,12 +168,12 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
             # If we're considered stopped, don't update lastlat/lastlon.
             # We'll calculate distance from the first stopped point.
             stopped_time += delta_t
-            #print("stopped\t")
 
         # print(total_dist, ele, "\t", time, lat, lon, "\t", total_climb)
         # print(total_dist, ele, "\t", time, total_climb)
 
         distances.append(total_dist)
+
         eles.append(ele)
         if ele:
             sparse_eles.append(ele)
@@ -208,6 +220,10 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         out['Elevations'] = eles
         if smoothed_eles is not None and len(smoothed_eles):
             out['Smoothed elevations'] = smoothed_eles
+    if sum(speeds):
+        out['Speeds'] = speeds
+    if sum(calcspeeds):
+        out['Calculated Speeds'] = calcspeeds
 
     return out
 
@@ -267,7 +283,7 @@ def smooth(vals, halfwin, beta):
 def main():
     import sys
     import os
-    import pytopo.TrackPoints
+    from pytopo import TrackPoints, __version__
 
     try:
         import pylab as plt
@@ -285,7 +301,7 @@ def main():
 
     parser = argparse.ArgumentParser(description='This parses track log files, in gpx format, and gives you a graph and a few statistics. ')
     parser.add_argument('--version', action='version',
-                        version=pytopo.__version__)
+                        version=__version__)
     parser.add_argument('-m', action="store_true", default=False,
                         dest="metric",
                         help='Use metric rather than US units')
@@ -304,7 +320,7 @@ def main():
     #
     # Read the trackpoints file:
     #
-    trackpoints = pytopo.TrackPoints()
+    trackpoints = TrackPoints()
     try:
         trackpoints.read_track_file(track_files[0])
         # XXX Read more than one file
@@ -335,40 +351,68 @@ def main():
     if 'Average moving speed' in out:
         print("Average speed moving: %.1f %s/h" % (out['Average moving speed'],
                                                    dist_units))
-    if not have_plt:
-        return 0
 
     # print("======= Distances", type(out['Distances']))
     # print(out['Distances'])
     # print("\n\n======= Elevations", type(out['Elevations']))
     # print(out['Elevations'])
 
-    plt.plot(out['Distances'], out['Elevations'],
+    if not have_plt:
+        return 0
+
+    # Set up the plots. First, will there be a speed plot, or just elevations?
+    if "Speeds" in out or "Calculated Speeds" in out:
+        numplots = 2
+    else:
+        numplots = 1
+
+    fig, axes = plt.subplots(nrows=numplots, ncols=1,
+                             figsize=(8, 3.5 * numplots))
+                             # figsize is  width, height in inches
+
+    # First plot: elevation profile
+    ax = axes[0]
+    ax.plot(out['Distances'], out['Elevations'],
                label="GPS elevation data", color="gray")
-    plt.plot(out['Distances'], out['Smoothed elevations'],
+    ax.plot(out['Distances'], out['Smoothed elevations'],
                color="red", label="smoothed (b=%.1f, hw=%d)" % (beta, halfwin))
 
-    title_string = "Elevation profile (%.1f %s, %d%s climb)" \
-                   % (out['Distances'][-1], dist_units,
-                      out['Smoothed total climb'], climb_units)
-    plt.title(title_string)
+    if metric:
+        ax.set_xlabel("kilometers")
+        ax.set_ylabel("meters")
+    else:
+        ax.set_xlabel("miles")
+        ax.set_ylabel("feet")
+    ax.grid(True)
+    ax.legend()
+    ax.title.set_text("Elevation profile (%d%s climb in %.1f %s)"
+                      % (out['Smoothed total climb'], climb_units,
+                         out['Distances'][-1], dist_units))
+
+    # Now for the second plot: speeds
+    if len(axes) == 2 and ("Speeds" in out or "Calculated Speeds" in out):
+        ax = axes[1]
+        if "Speeds" in out:
+            ax.plot(out['Speeds'], color="red", label="Speed (from GPX)")
+        if "Calculated Speeds" in out:
+            ax.plot(out['Calculated Speeds'], color="blue",
+                    label="Speed (calculated)")
+        ax.set_xlabel("time (no units)")
+        if metric:
+            ax.set_ylabel("km/hour")
+        else:
+            ax.set_ylabel("mi/hour")
+        ax.grid(True)
+        ax.legend()
+        ax.title.set_text("Speed (average %.1f moving)"
+                          % out["Average moving speed"])
 
     # Set the window titlebar to something other than "Figure 1"
     plt.gcf().canvas.set_window_title("%s: %s" % (progname, track_files[0]))
 
-    plt.xlabel("miles")
-#    plt.get_current_fig_manager().get_window().set_title(os.path.basename(args[0] + ": " + title_string))
-    plt.ylabel("feet")
-    plt.grid(True)
-    plt.legend()
-
-    # Exit on key q
-    plt.figure(1).canvas.mpl_connect('key_press_event',
-                                     lambda e:
-                                         sys.exit(0) if e.key == 'ctrl+q'
-                                         else None)
-
+    fig.tight_layout()        # Or equivalently,  "plt.tight_layout()"
     plt.show()
+
 
 if __name__ == '__main__':
     main()

@@ -1,3 +1,12 @@
+2022-09-17  Akkana Peck <akkana@shallowsky.com>
+	Display a speed plot in ellie.
+
+2022-05-15  Akkana Peck <akkana@shallowsky.com>
+	Improvements in reading in track logs.
+
+2022-05-12  Akkana Peck <akkana@shallowsky.com>
+	Add MultiPolygon reading for GeoJSON files.
+
 2021-11-29  Akkana Peck <akkana@shallowsky.com>
 	Add the ability to save tracks and waypoints to GeoJSON
 	as well as GPX. Also some improvements in reading GeoJSON.

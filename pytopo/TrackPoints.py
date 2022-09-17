@@ -31,11 +31,12 @@ class GeoPoint(object):
     # timestamp is an string like 2014-08-07T01:19:24Z.
     # If you need to add timestamps, see add_bogus_timestamps.
     # attrs is an optional list of other attributes like hdop and speed.
-    def __init__(self, lat, lon, ele=None,
+    def __init__(self, lat, lon, ele=None, speed=None,
                  name=False, timestamp=None, attrs=None):
         self.lat = lat
         self.lon = lon
         self.ele = ele
+        self.speed = speed
         self.name = name
         self.timestamp = timestamp
         self.attrs = attrs
@@ -229,7 +230,7 @@ class TrackPoints(object):
             return self.points[trackindex + 1]
         return None
 
-    def handle_track_point(self, lat, lon, ele=None,
+    def handle_track_point(self, lat, lon, ele=None, speed=None,
                            timestamp=None, waypoint_name=False, attrs=None):
         """Add a new trackpoint or waypoint after some basic sanity checks.
            If waypoint_name, we assume this is a waypoint,
@@ -238,7 +239,7 @@ class TrackPoints(object):
         """
         self.bbox.add_point(lat, lon)
 
-        point = GeoPoint(lat, lon, ele=ele, timestamp=timestamp,
+        point = GeoPoint(lat, lon, ele=ele, speed=speed, timestamp=timestamp,
                          name=waypoint_name, attrs=attrs)
 
         if waypoint_name:
@@ -315,9 +316,11 @@ class TrackPoints(object):
                         first_segment_name = self.points[-1]
 
                     for pt in trkpts:
-                        lat, lon, ele, ts, attrs = self.GPX_point_coords(pt)
-                        "GPX_point_coords returned", lat, lon, ele, ts, attrs
-                        self.handle_track_point(lat, lon, ele=ele, timestamp=ts,
+                        lat, lon, ele, speed, ts, attrs = \
+                            self.GPX_point_coords(pt)
+                        self.handle_track_point(lat, lon,
+                                                ele=ele, speed=speed,
+                                                timestamp=ts,
                                                 attrs=attrs)
                         bbox.add_point(lat, lon)
 
@@ -332,7 +335,7 @@ class TrackPoints(object):
         if waypts:
             # self.waypoints.append(os.path.basename(filename))
             for pt in waypts:
-                lat, lon, ele, time, attrs = self.GPX_point_coords(pt)
+                lat, lon, ele, speed, time, attrs = self.GPX_point_coords(pt)
                 name = self.get_DOM_text(pt, "name")
                 if not name:
                     name = NULL_WP_NAME
@@ -373,7 +376,8 @@ class TrackPoints(object):
 
     def GPX_point_coords(self, pointnode):
         """Parse a new trackpoint or waypoint from a GPX node.
-           Returns lat (float), lon (float), ele (string or NOne),
+           Returns lat (float), lon (float), ele (string or None),
+           speed (string or None),
            time (string or None), attrs (dict or None).
         """
         lat = float(pointnode.getAttribute("lat"))
@@ -390,16 +394,21 @@ class TrackPoints(object):
         hdop = self.get_DOM_text(pointnode, "hdop")
         if hdop:
             attrs['hdop'] = hdop
+
+        # Old versions of osmand used a <speed> node, but now it's inside
+        # <extensions><osmand:speed>.
         speed = self.get_DOM_text(pointnode, "speed")
         if speed:
             attrs['speed'] = speed
+        else:
+            speed = self.get_DOM_text(pointnode, "osmand:speed")
 
         # If we had no extra attributes, pass None, not an empty dict.
         if not attrs:
             attrs = None
 
         # For now, keep elevation and time as unchanged strings.
-        return lat, lon, ele, time, attrs
+        return lat, lon, ele, speed, time, attrs
 
     def add_bogus_timestamps(self):
         """Add made-up timestamps to every track point."""
