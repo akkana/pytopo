@@ -1230,6 +1230,13 @@ but if you want to, contact me and I'll help you figure it out.)
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         sw.add(treeview)
 
+        def submit(self, value, widget):
+            # Tell the dialog to give an OK response
+            dialog.response(gtk.RESPONSE_OK)
+
+        treeview.connect("row-activated", submit)
+        # treeview.connect("key-pressed", submit)
+
         dialog.vbox.pack_start(sw, expand=True)
 
         dialog.show_all()

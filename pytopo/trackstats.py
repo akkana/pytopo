@@ -124,9 +124,9 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         # If there's a GPS speed recorded, use that and the
         # time interval for distance calculations,
         # but also try calculating the speed, to see how close they are.
+        calcdist = MapUtils.haversine_distance(lat, lon,
+                                               lastlat, lastlon, metric)
         if delta_t:
-            calcdist = MapUtils.haversine_distance(lat, lon,
-                                                   lastlat, lastlon, metric)
             calcspeed = calcdist * 3600 / delta_t.total_seconds()
             calcspeeds.append(calcspeed)
         else:
