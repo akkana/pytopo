@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2009-2022 by Akkana Peck.
+# Copyright (C) 2009-2023 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -120,12 +120,14 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         else:
             delta_t = datetime.timedelta(0)
 
-        # This speed and distance calculation isn't terribly accurate.
+        # This speed and distance calculation isn't terribly accurate,
+        # since small position errors accumulate.
         # If there's a GPS speed recorded, use that and the
         # time interval for distance calculations,
         # but also try calculating the speed, to see how close they are.
         calcdist = MapUtils.haversine_distance(lat, lon,
                                                lastlat, lastlon, metric)
+        dist = 0
         if delta_t:
             calcspeed = calcdist * 3600 / delta_t.total_seconds()
             calcspeeds.append(calcspeed)
@@ -137,11 +139,11 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
 
             # This is in meters/s. Convert to mi/hr or km/hr
             if metric:
-                dist /= 1000.
                 speed *= 3.6
+                # dist /= 1000.
             else:
-                dist /= 1609.344
                 speed *= 2.2369363
+                # dist /= 1609.344
 
             if delta_t:
                 dist = speed * delta_t.seconds
@@ -151,6 +153,9 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
                 speed = dist / delta_t.seconds * 60 * 60   # miles (or km) / hr
             else:
                 speed = 0
+
+        if not dist:
+            dist = calcdist
 
         speeds.append(speed)
 
@@ -408,7 +413,14 @@ def main():
                           % out["Average moving speed"])
 
     # Set the window titlebar to something other than "Figure 1"
-    plt.gcf().canvas.set_window_title("%s: %s" % (progname, track_files[0]))
+    title = "%s: %s" % (progname, track_files[0])
+    try:
+        # gcf stands for "get current figure"
+        # Old way:
+        plt.gcf().canvas.set_window_title(title)
+    except AttributeError:
+        # New (2022-3) way:
+        plt.gcf().canvas.manager.set_window_title(title)
 
     fig.tight_layout()        # Or equivalently,  "plt.tight_layout()"
     plt.show()

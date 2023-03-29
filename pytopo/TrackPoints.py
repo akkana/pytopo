@@ -22,6 +22,30 @@ from pytopo import __version__
 NULL_WP_NAME = "__WP__"
 
 
+# Regular expression matching extensions like osmand:speed in GPX files.
+SPEEDRE = re.compile(".*:speed")
+
+
+# for debugging: print an xml.dom.minidom node.
+# def serializeXML(elem):
+#     if not elem:
+#         print("None")
+#         return
+#     out = "<" + elem.nodeName + ">"
+#     for c in elem.childNodes:
+#         if c.nodeType == xml.dom.minidom.Node.TEXT_NODE:
+#             out += c.nodeValue
+#         else:
+#             if c.nodeType == xml.dom.minidom.Node.ELEMENT_NODE:
+#                 if c.childNodes.length == 0:
+#                     out += "<" + c.nodeName + "/>"
+#                 else:
+#                     cs = serializeXML(c)
+#                     out += cs
+#                     out += "</" + c.nodeName + ">"
+#     return out
+
+
 class GeoPoint(object):
     """A single track point or waypoint."""
     # Note: GPX files imported from KML may have no timestamps.
@@ -352,18 +376,41 @@ class TrackPoints(object):
                 return filename
             filename = self.srcfiles[i]
 
+    def find_matching_child(self, node, childname):
+        """Find a child node with a name matching childname,
+           which may be a regexp.
+        """
+        nodes = node.getElementsByTagName(childname)
+        if nodes:
+            return nodes[0]
+
+        if type(childname) is not re.Pattern:
+            return None
+
+        matchnode = None
+        for child in node.childNodes:
+            if childname.match(child.nodeName):
+                return child
+
+            if child.nodeName == "extensions":
+                matchnode = self.find_matching_child(child,
+                                                     childname=childname)
+                if matchnode:
+                    return matchnode
+
+        return None
+
     def get_DOM_text(self, node, childname=None):
-        """Get the text out of a DOM node.
-           Or, if childname is specified, get the text out of a child
-           node with node name childname.
+        """Return the text out of a DOM node.
+           Or, if childname is specified,
+           find a matching child (see previous function)
+           and return the text inside.
         """
         if childname:
-            nodes = node.getElementsByTagName(childname)
-            if not nodes:
-                return None
-            node = nodes[0]
+            node = self.find_matching_child(node, childname)
         if not node:
             return None
+
         n = node.childNodes
         if len(n) < 1:
             return None
@@ -395,15 +442,13 @@ class TrackPoints(object):
         if hdop:
             attrs['hdop'] = hdop
 
+        # print("pointnode:", serializeXML(pointnode))
+
         # Old versions of osmand used a <speed> node, but now it's inside
         # <extensions><osmand:speed>.
-        speed = self.get_DOM_text(pointnode, "speed")
-        if speed:
-            attrs['speed'] = speed
-        else:
-            speed = self.get_DOM_text(pointnode, "osmand:speed")
+        speed = self.get_DOM_text(pointnode, SPEEDRE)
 
-        # If we had no extra attributes, pass None, not an empty dict.
+        # If there were no extra attributes, pass None, not an empty dict.
         if not attrs:
             attrs = None
 
