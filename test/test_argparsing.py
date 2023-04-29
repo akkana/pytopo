@@ -7,31 +7,9 @@ import shutil
 sys.path.insert(0, '..')
 
 from .utils import assertCloseEnough, create_kmz
-from pytopo import MapViewer, MapWindow, ArgParseException
+from pytopo import MapViewer, MapWindow, ArgParseException, configfile
 from pytopo.MapUtils import MapUtils
 
-
-def create_config_file(configdir):
-    with open(os.path.join(configdir, 'pytopo', 'pytopo.sites'),
-              "w") as cfp:
-        cfp.write('''Collections = [
-    OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
-                      ".png", 256, 256, 13,
-                      "http://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-                      maxzoom=15,
-                      attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
-    ]
-
-# Default to whichever MapCollection is listed first.
-defaultCollection = Collections[0].name
-
-KnownSites = [
-    [ "san-francisco", -122.245, 37.471, "", 11 ],
-    ]''')
-        # The site file uses dd.mmss but everything else wants DD
-        return ("san-francisco",
-                MapUtils.deg_min2dec_deg(-122.245),
-                MapUtils.deg_min2dec_deg(37.471))
 
 class ArgparseTests(unittest.TestCase):
 
@@ -40,6 +18,7 @@ class ArgparseTests(unittest.TestCase):
         self.configparent = os.path.join('test', 'files', 'config')
         self.assertNotEqual(self.configparent, '')
         self.configdir = os.path.join(self.configparent, 'pytopo')
+        configfile.CONFIG_DIR = self.configdir
         self.assertNotEqual(self.configdir, '')
         os.environ['XDG_CONFIG_HOME'] = self.configdir
 
@@ -63,8 +42,8 @@ class ArgparseTests(unittest.TestCase):
         self.viewer.exec_config_file()
 
         self.viewer.first_saved_site = len(self.viewer.KnownSites)
-        self.viewer.read_saved_sites()
-        self.viewer.read_tracks()
+        self.viewer.KnownSites += configfile.read_saved_sites()
+        self.viewer.KnownTracks += configfile.read_tracks()
         # gc.enable()
 
     # executed after each test
@@ -77,6 +56,24 @@ class ArgparseTests(unittest.TestCase):
 
         self.configdir = None
         self.configparent = None
+
+    def create_config_file(self):
+        with open(os.path.join(self.configdir, 'pytopo.sites'), "w") as cfp:
+            cfp.write('''Collections = [
+    OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
+                      ".png", 256, 256, 13,
+                      "http://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+                      maxzoom=15,
+                      attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
+    ]
+
+    KnownSites = [
+        [ "san-francisco", -122.245, 37.471, "", 11 ],
+    ]''')
+            # The site file uses dd.mmss but everything else wants DD
+            return ("san-francisco",
+                    MapUtils.deg_min2dec_deg(-122.245),
+                    MapUtils.deg_min2dec_deg(37.471))
 
     def test_gpx_arg(self):
         args = [ 'pytopo', 'test/files/otowi-mesa-arch.gpx' ]
@@ -201,7 +198,7 @@ class ArgparseTests(unittest.TestCase):
                 print("SystemExit, fine")
 
     def test_known_site(self):
-        sitename, sitelon, sitelat = create_config_file(self.configdir)
+        sitename, sitelon, sitelat = self.create_config_file()
         args = [ 'pytopo', sitename ]
 
         mapwin =  MapWindow(self.viewer)
@@ -214,7 +211,7 @@ class ArgparseTests(unittest.TestCase):
         assertCloseEnough(mapwin.center_lat, sitelat)
 
     def test_known_site_plus_overlay(self):
-        sitename, sitelon, sitelat = create_config_file(self.configdir)
+        sitename, sitelon, sitelat = self.create_config_file()
         args = [ 'pytopo', '-k', 'own',
                  'test/files/Surface_Ownership_10_14_2015.geojson',
                  sitename ]

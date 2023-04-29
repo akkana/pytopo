@@ -8,7 +8,7 @@ import sys, os
 sys.path.insert(0, '..')
 
 from .utils import assertCloseEnough, create_kmz
-from pytopo.MapViewer import parse_saved_site_line
+from pytopo.configfile import parse_saved_site_line
 from pytopo.TrackPoints import TrackPoints, GeoPoint
 
 
@@ -29,10 +29,10 @@ class ParseTests(unittest.TestCase):
             '[ "Treasure Island, zoomed", -122.221287, 37.493330, humanitarian, 13]',
         ]
         expected = [
-            ['San Francisco', '-122.245', '37.471'],
-            ['sydney', '151.125', '-33.517', '', '11'],
-            ['Treasure Island, zoomed', '-122.221287', '37.493330',
-             'humanitarian', '13'],
+            ( 'San Francisco', -122.245, 37.471 ),
+            ( 'sydney', 151.125, -33.517, '', 11 ),
+            [ 'Treasure Island, zoomed', -122.221287, 37.493330,
+              'humanitarian', 13 ],
         ]
         for i, line in enumerate(lines):
             parsed = parse_saved_site_line(line)
