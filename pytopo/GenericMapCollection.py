@@ -10,7 +10,7 @@
 from __future__ import print_function
 
 import os
-from pytopo.MapUtils import MapUtils
+from pytopo import MapUtils
 from pytopo.MapWindow import MapWindow
 from pytopo.TiledMapCollection import TiledMapCollection
 

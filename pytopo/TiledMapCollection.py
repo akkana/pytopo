@@ -11,7 +11,7 @@ from __future__ import print_function
 
 from pytopo.MapCollection import MapCollection
 from pytopo.MapWindow import MapWindow
-from pytopo.MapUtils import MapUtils
+from pytopo import MapUtils
 
 # For downloading tiles:
 from requests_futures.sessions import FuturesSession
@@ -120,10 +120,8 @@ TiledMapCollection classes must implement:
         max_lat = center_lat + mapwin.win_height / self.yscale / 2
 
         if (self.mapwin.controller.Debug):
-            print("Map from", min_lon, MapUtils.dec_deg2deg_min_str(min_lon), \
-                MapUtils.dec_deg2deg_min_str(min_lat), \
-                "to", MapUtils.dec_deg2deg_min_str(max_lon), \
-                MapUtils.dec_deg2deg_min_str(max_lat))
+            print("Map from", min_lon, min_lon, min_lat, \
+                  "to", max_lon, max_lat)
 
         # Start from the upper left: min_lon, max_lat
 

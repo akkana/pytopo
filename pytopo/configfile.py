@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 import os.path
+import re
 import ast
 
+from pytopo import MapUtils
 
 if 'XDG_CONFIG_HOME' in os.environ:
     CONFIG_DIR = os.path.join(os.environ['XDG_CONFIG_HOME'], "pytopo")
@@ -16,21 +18,40 @@ DEBUG = False
 
 NEED_SAVED_SITE_REWRITE = False
 
+FORMATPAT = re.compile(r'FORMAT\s*=\s*([DMS]+)')
 
-# Check for a user config file named .pytopo
-# in either $HOME/.config/pytopo or $HOME.
+# Originally, config files defaulted to DM (Degrees + decimal Minutes),
+# so that must be the default.
+# More recently written configs will have a comment specifying FORMAT=DD
+# (Decimal Degrees).
+# You can also specify DMS (Degrees Minutes Seconds).
+# This will be reset for every file, so e.g. pytopo.sites and saved.sites
+# both need to specify if they want FORMAT=DD.
+DEFAULT_DEGREE_FORMAT = 'DM'
+DEGREE_FORMAT = DEFAULT_DEGREE_FORMAT
+
+
+# Check for a user config file named .config/pytopo.sites
+# or various other equivalent locations.
 #
 # Format of the user config file:
 # It is a python script, which can include arbitrary python code,
-# but the most useful will be KnownSites definitions,
-# with coordinates specified in degrees.decimal_minutes,
-# like this:
+# but the most useful will be KnownSites definitions.
+#
+# Values in KnownSites are: name, longitude, latitude,
+# optional collection name, optional zoom level
+#
+# Coordinates can be specified in:
+# - decimal degrees, if you first set DEGREE_FORMAT = "DD"
+# - degrees.decimal_minutes (if DEGREE_FORMAT isn't set)
+# - a DMS string, like '''-111° 54' 43.2"''', which will be parsed;
+#   you may use ^ in place of the degree symbol
+
+# Old style, decimal minutes:
 # KnownSites = [
 #     # Death Valley
 #     [ "zabriskie", 116.475, 36.245, "dv_data" ],
-#     [ "badwater", 116.445, 36.125, "dv_data" ],
-#     # East Mojave
-#     [ "zzyzyx", 116.05, 35.08, "emj_data" ]
+#     [ "badwater", 116.445, 36.125, "dv_data", 17 ],
 #     ]
 def exec_config_file(init_width, init_height):
     """Load the user's .pytopo config file,
@@ -38,6 +59,8 @@ def exec_config_file(init_width, init_height):
        Returns a dictionary with keys that may include:
        KnownSites, init_width, init_height, defaultCollection, user_agent
     """
+    global DEGREE_FORMAT
+
     userfile = os.path.join(CONFIG_DIR, "pytopo.sites")
     if not os.access(userfile, os.R_OK):
         if DEBUG:
@@ -85,6 +108,16 @@ from pytopo import GenericMapCollection
         # modify your pytopo.sites. So don't.
         execstring += fp.read()
         exec(execstring, globs, locs)
+    # print("locs KnownSites:", locs["KnownSites"])
+    if "DEGREE_FORMAT" in locs:
+        if locs["DEGREE_FORMAT"] == "DD":
+            return locs
+        DEGREE_FORMAT = locs["DEGREE_FORMAT"]
+
+    # Sites need converting to decimal degrees
+    for site in locs["KnownSites"]:
+        site[1] = MapUtils.to_decimal_degrees(site[1], DEGREE_FORMAT)
+        site[2] = MapUtils.to_decimal_degrees(site[2], DEGREE_FORMAT)
 
     return locs
 
@@ -93,13 +126,33 @@ def parse_saved_site_line(line):
     """The saved sites file has lines like
        ['paria-ranger', -111.912, 37.106, 'opencyclemap']
        ['PEEC', -106.183758, 35.530912, opencyclemap, 18]
-       name, longitude, latitude, collection, optional zoom
+       name, longitude, latitude, [collection, [zoom]]
        Note the lack of quotes around the collection name in the
        second example; that was a bug in an earlier version of pytopo
        that the parser needs to account for.
+       Return a list of the parsed line.
     """
+    # Strip out comments, and look for FORMAT= in comments.
+    hash = line.find('#')
+    if hash >= 0:
+        comment = line[hash+1:].strip()
+        try:
+            degree_format = FORMATPAT.search(comment).group(1)
+            global DEGREE_FORMAT
+            DEGREE_FORMAT = degree_format
+        except AttributeError:
+            pass
+
+        # and remove the commend for further processing
+        line = line[:hash]
+
+    if not line.strip():   # empty line or comments only
+        return None
+
     try:
+        # Now try to evaluate what remains in the line
         ret = ast.literal_eval(line)
+
     except SyntaxError:
         print("Syntax error parsing saved site line '%s'" % line)
         return None
@@ -111,11 +164,21 @@ def parse_saved_site_line(line):
         if ret and len(ret) >= 3:
             NEED_SAVED_SITE_REWRITE = True
 
-    if type(ret) is not list and type(ret) is not tuple:
-        print("Saved site line isn't a list: '%s'" % line)
+    if type(ret) is tuple:
+        ret = list(ret)
+    elif type(ret) is not list:
         return None
     if len(ret) < 3:
         print("Warning: not enough elements in saved site line '%s'" % line)
+        print(len(ret), "elements")
+
+    # ret should now be (name, lon, lat, [collection [zoom]].
+    # Do DMS conversions if needed.
+    # print("Coordinates:", ret[1], ret[2])
+    ret[1] = MapUtils.to_decimal_degrees(ret[1], DEGREE_FORMAT)
+    ret[2] = MapUtils.to_decimal_degrees(ret[2], DEGREE_FORMAT)
+    # print("         -->", ret[1], ret[2])
+
     return ret
 
 
@@ -134,15 +197,23 @@ def parse_unquoted_saved_site_line(line):
     return ast.literal_eval(fixed_input)
 
 
-def read_saved_sites():
+def read_saved_sites(filepath=None):
     """Read previously saved (favorite) sites."""
+
+    # Reset to DMS format; the file can override with # FORMAT=DD
+    global DEGREE_FORMAT
+    DEGREE_FORMAT = DEFAULT_DEGREE_FORMAT
 
     # A line typically looks like this:
     # [ "san-francisco", -121.750000, 37.400000, "openstreetmap" ]
     # or, with an extra optional zoom level and included comma,
     # [ "Treasure Island, zoomed", -122.221, 37.493, humanitarian, 13 ]
+
+    if not filepath:
+        filepath = saved_sites_filename()
+
     try:
-        sitesfile = open(saved_sites_filename(), "r")
+        sitesfile = open(filepath, "r")
     except:
         return []
 
@@ -151,13 +222,13 @@ def read_saved_sites():
     for line in sitesfile:
         site = parse_saved_site_line(line.strip())
         if not site:
-            print(f"Couldn't parse line: '{ line }'")
+            # print(f"Couldn't parse line: '{ line }'")
             continue
 
-        site[1] = float(site[1])    # longitude
-        site[2] = float(site[2])    # latitude
-        if len(site) > 4:
-            site[4] = int(site[4])  # zoom level
+        # site[1] = float(site[1])    # longitude
+        # site[2] = float(site[2])    # latitude
+        # if len(site) > 4:
+        #     site[4] = int(site[4])  # zoom level
 
         known_sites.append(site)
 
@@ -191,6 +262,10 @@ def save_sites(known_sites):
     except:
         print("Couldn't open save file", saved_sites_filename())
         return
+
+    # Now sites are always saved in decimal degrees.
+    print("# FORMAT=DD", file=savefile)
+    print("", file=savefile)
 
     for site in known_sites:
         # known_sites is a list of lists:

@@ -9,7 +9,7 @@
 from __future__ import print_function
 
 from pytopo.TiledMapCollection import TiledMapCollection
-from pytopo.MapUtils import MapUtils
+from pytopo import MapUtils
 from pytopo.MapWindow import MapWindow
 
 import os
@@ -78,8 +78,8 @@ class TopoMapCollection(TiledMapCollection):
         filename = self.coords_to_filename(longitude - self.lon_correction,
                                            latitude - self.lat_correction)
         if (self.Debug):
-            print("T1MC get_maplet(", MapUtils.dec_deg2deg_min_str(longitude), end=' ')
-            print(",", MapUtils.dec_deg2deg_min_str(latitude), "):", filename)
+            print("T1MC get_maplet(", longitude, end=' ')
+            print(",", latitude, "):", filename)
 
         # Calculate offsets.
         # Maplets are self.series minutes wide and tall,
@@ -94,18 +94,16 @@ class TopoMapCollection(TiledMapCollection):
         x_off = int((longitude - MapUtils.truncate2frac(longitude, self.frac)
                      - self.lon_correction) * self.xscale)
         if (self.Debug):
-            print("truncated", MapUtils.dec_deg2deg_min_str(longitude), "to", end=' ')
-            print(MapUtils.dec_deg2deg_min_str(MapUtils.truncate2frac(longitude,
-                                                                     self.frac)))
+            print("truncated", longitude, "to", end=' ')
+            print(MapUtils.truncate2frac(longitude, self.frac))
 
         # Latitude decreases downward:
         y_off = int((MapUtils.truncate2frac(latitude, self.frac) +
                      self.frac - latitude - self.lat_correction) * self.yscale)
 
         if (self.Debug):
-            print("truncated", MapUtils.dec_deg2deg_min_str(latitude), "to", end=' ')
-            print(MapUtils.dec_deg2deg_min_str(MapUtils.truncate2frac(latitude,
-                                                                     self.frac)))
+            print("truncated", latitude, "to", end=' ')
+            print(MapUtils.truncate2frac(latitude, self.frac))
             print("y_off is", y_off)
 
         if not os.access(filename, os.R_OK):

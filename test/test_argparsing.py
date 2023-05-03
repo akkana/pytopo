@@ -8,7 +8,7 @@ sys.path.insert(0, '..')
 
 from .utils import assertCloseEnough, create_kmz
 from pytopo import MapViewer, MapWindow, ArgParseException, configfile
-from pytopo.MapUtils import MapUtils
+from pytopo import MapUtils
 
 
 class ArgparseTests(unittest.TestCase):
@@ -21,6 +21,7 @@ class ArgparseTests(unittest.TestCase):
         configfile.CONFIG_DIR = self.configdir
         self.assertNotEqual(self.configdir, '')
         os.environ['XDG_CONFIG_HOME'] = self.configdir
+        self.sitefile = None
 
         try:
             shutil.rmtree(self.configdir)
@@ -57,8 +58,12 @@ class ArgparseTests(unittest.TestCase):
         self.configdir = None
         self.configparent = None
 
+        if self.sitefile and os.path.exists(self.sitefile):
+            os.unlink(self.sitefile)
+
     def create_config_file(self):
-        with open(os.path.join(self.configdir, 'pytopo.sites'), "w") as cfp:
+        self.sitefile = os.path.join(self.configdir, 'pytopo.sites')
+        with open(self.sitefile, "w") as cfp:
             cfp.write('''Collections = [
     OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
                       ".png", 256, 256, 13,

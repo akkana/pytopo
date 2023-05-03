@@ -20,7 +20,7 @@ try:
 except ImportError:
     pass
 
-from pytopo.MapUtils import MapUtils
+from pytopo import MapUtils
 
 
 CLIMB_THRESHOLD = 8

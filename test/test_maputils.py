@@ -7,7 +7,9 @@ import sys
 
 sys.path.insert(0, '..')
 
-from pytopo.MapUtils import MapUtils
+from pytopo import MapUtils
+from .utils import assertCloseEnough
+
 
 class MapUtilsTests(unittest.TestCase):
 
@@ -34,9 +36,32 @@ class MapUtilsTests(unittest.TestCase):
             self.assertEqual(round(MapUtils.bearing(*p1, *p2), 1), bearing1)
             self.assertEqual(round(MapUtils.bearing(*p2, *p1), 1), bearing2)
 
-
         test_between_two_points(san_francisco, los_alamos,
                                 901.0, 93.7, 283.3)
         test_between_two_points(san_francisco, sydney,
                                 7412.7, 240.6, 56.1)
+
+    def test_coord_parsing(self):
+        # In coordlists, the first element of each list is decimal degrees;
+        # the rest are different versions of DMS representations.
+        coordlists = [
+            # PEEC longitude
+            [
+                -106.306290,
+                -106.182264,
+                "-106° 18' 22.644\"",
+                " -106^  18'  22.644\" ",
+            ],
+            # PEEC latitude
+            [
+                35.884835,
+                35.530541,
+                "35° 53' 05.41\"",
+                "35^ 53' 05.41\""
+            ],
+        ]
+        for clist in coordlists:
+            for coord in clist[1:]:
+                parsed = MapUtils.to_decimal_degrees(coord, "DMS")
+                assertCloseEnough(parsed, clist[0])
 

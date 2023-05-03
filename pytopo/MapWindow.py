@@ -11,7 +11,7 @@ from gi import pygtkcompat
 pygtkcompat.enable()
 pygtkcompat.enable_gtk(version='3.0')
 
-from pytopo.MapUtils import MapUtils
+from pytopo import MapUtils
 from pytopo.TrackPoints import TrackPoints, NULL_WP_NAME
 from . import trackstats
 
@@ -338,8 +338,8 @@ but if you want to, contact me and I'll help you figure it out.)
         if self.controller.Debug:
             print("\n\n>>>>>>>>>>>>>>>>")
             print("window draw_map centered at", end=' ')
-            print(MapUtils.dec_deg2deg_min_str(self.center_lon), end=' ')
-            print(MapUtils.dec_deg2deg_min_str(self.center_lat))
+            print(self.center_lon, end=' ')
+            print(self.center_lat)
 
         self.collection.draw_map(self.center_lon, self.center_lat, self)
         if self.controller.Debug:
@@ -986,16 +986,17 @@ but if you want to, contact me and I'll help you figure it out.)
                 abs(event_y - gps_y) < GPS_MARKER_RADIUS)
 
     def print_location(self, widget=None):
-        print("%30s     (decimal degrees)" % \
+        print()
+        print("%30s  (decimal degrees, use for saved.sites)" % \
             MapUtils.coord2str_dd(self.cur_lon, self.cur_lat))
 
-        print("%-15s   %-15s (DD.MMSS, suitable for pytopo.sites)" % \
+        print("%-15s   %-15s (D M S)" % \
+            (MapUtils.dec_deg2dms_str(self.cur_lon),
+             MapUtils.dec_deg2dms_str(self.cur_lat)))
+
+        print("%-15s   %-15s (DD.MMMM)" % \
             (MapUtils.dec_deg2deg_min(self.cur_lon),
              MapUtils.dec_deg2deg_min(self.cur_lat)))
-
-        print("%-15s   %-15s (D M S)" % \
-            (MapUtils.dec_deg2deg_min_str(self.cur_lon),
-             MapUtils.dec_deg2deg_min_str(self.cur_lat)))
 
     def zoom_to(self, zoomlevel):
         if self.cur_lon:
@@ -1578,11 +1579,9 @@ but if you want to, contact me and I'll help you figure it out.)
             comment = "Name can't be empty"
 
         # Add to KnownSites
-        self.controller.append_known_site([name,
-                            MapUtils.dec_deg2deg_min(self.pin_lon),
-                            MapUtils.dec_deg2deg_min(self.pin_lat),
-                            self.collection.name,
-                            self.collection.zoomlevel])
+        self.controller.append_known_site([name, self.pin_lon, self.pin_lat,
+                                           self.collection.name,
+                                           self.collection.zoomlevel])
 
         self.controller.save_sites()
 
@@ -2424,8 +2423,8 @@ but if you want to, contact me and I'll help you figure it out.)
 
             if self.controller.Debug:
                 print("Click:", \
-                    MapUtils.dec_deg2deg_min_str(cur_long), \
-                    MapUtils.dec_deg2deg_min_str(cur_lat))
+                    MapUtils.dec_deg2dms_str(cur_long), \
+                    MapUtils.dec_deg2dms_str(cur_lat))
 
             # Find angle and distance since last click.
             if self.controller.Debug or event.state & gtk.gdk.SHIFT_MASK:

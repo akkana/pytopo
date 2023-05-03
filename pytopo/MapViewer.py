@@ -11,7 +11,7 @@
 from __future__ import print_function
 
 from pytopo.MapWindow import MapWindow
-from pytopo.MapUtils import MapUtils
+from pytopo import MapUtils
 from pytopo.TrackPoints import TrackPoints, BoundingBox
 
 import pytopo.configfile as configfile
@@ -285,20 +285,16 @@ to standard output.
             mapwin.collection = collection
 
         # site[1] and site[2] are the long and lat in decimal degrees
-        mapwin.center_lon = MapUtils.deg_min2dec_deg(site[1])
-        mapwin.center_lat = MapUtils.deg_min2dec_deg(site[2])
-        # XXX
-        # mapwin.center_lon = site[1]
-        # mapwin.center_lat = site[2]
+        mapwin.center_lon = site[1]
+        mapwin.center_lat = site[2]
         mapwin.cur_lon = mapwin.center_lon
         mapwin.cur_lat = mapwin.center_lat
         mapwin.pin_lon = mapwin.center_lon
         mapwin.pin_lat = mapwin.center_lat
 
         if (self.Debug):
-            print(site[0] + ":", \
-                MapUtils.dec_deg2deg_min_str(mapwin.center_lon), \
-                MapUtils.dec_deg2deg_min_str(mapwin.center_lat))
+            print(site[0] + ":", mapwin.center_lon
+                  , mapwin.center_lat)
 
         return True
 
@@ -478,6 +474,10 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
                 if len(args) >= 2:
                     lat = to_coord(args[0])
                     lon = to_coord(args[1])
+                    if lat > 90 or lat < -90:
+                        print("Guessing", lat,
+                              "is a latitude. Please specify latitude first")
+                        lat, lon = lon, lat
                     if lat is not None and lon is not None:
                         mapwin.center_lat = lat
                         mapwin.center_lon = lon
