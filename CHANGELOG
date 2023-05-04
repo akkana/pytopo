@@ -1,3 +1,8 @@
+2023-05-02  Akkana Peck <akkana@shallowsky.com>
+	Change to save decimal degrees (DD) by default in saved.sites,
+	and to understand them in pytopo.sites and saved.sites if
+	a format variable is set.
+
 2022-09-17  Akkana Peck <akkana@shallowsky.com>
 	Display a speed plot in ellie.
 
