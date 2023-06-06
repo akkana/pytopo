@@ -6,7 +6,7 @@ import shutil
 
 sys.path.insert(0, '..')
 
-from .utils import assertCloseEnough, create_kmz
+from .testutils import assertCloseEnough, create_kmz
 from pytopo import MapViewer, MapWindow, ArgParseException, configfile
 from pytopo import MapUtils
 

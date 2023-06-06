@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, '..')
 
 from pytopo import MapUtils
-from .utils import assertCloseEnough
+from .testutils import assertCloseEnough
 
 
 class MapUtilsTests(unittest.TestCase):

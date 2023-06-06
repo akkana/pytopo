@@ -7,7 +7,7 @@ sys.path.insert(0, '..')
 
 import pytopo.configfile as configfile
 
-from .utils import assertCloseEnough, create_kmz
+from .testutils import assertCloseEnough, create_kmz
 from pytopo.TrackPoints import TrackPoints, GeoPoint
 
 
