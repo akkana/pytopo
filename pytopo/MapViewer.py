@@ -462,21 +462,12 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
 
             # Doesn't match a known site. Maybe the args are coordinates?
             try:
-                def to_coord(s):
-                    if len(s) <= 0:
-                        return None
-                    try:
-                        f = float(s)
-                        return f
-                    except:
-                        return None
-
                 if len(args) >= 2:
-                    lat = to_coord(args[0])
-                    lon = to_coord(args[1])
-                    if lat > 90 or lat < -90:
+                    lat = MapUtils.to_decimal_degrees(args[0], "DD")
+                    lon = MapUtils.to_decimal_degrees(args[1], "DD")
+                    if abs(lat) > 90:
                         print("Guessing", lat,
-                              "is a latitude. Please specify latitude first")
+                              "is a longitude. Please specify latitude first")
                         lat, lon = lon, lat
                     if lat is not None and lon is not None:
                         mapwin.center_lat = lat

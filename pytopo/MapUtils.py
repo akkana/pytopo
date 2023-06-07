@@ -72,7 +72,7 @@ def deg_min_sec2dec_deg(coord):
     return (deg + mins/60. + secs/3600.) * sign
 
 
-def to_decimal_degrees(coord, degformat):
+def to_decimal_degrees(coord, degformat="DD"):
     """Try to parse various different forms of deg-min-sec strings
        as well as floats, returning float decimal degrees.
 
@@ -81,16 +81,25 @@ def to_decimal_degrees(coord, degformat):
        from degrees + decimal minutes or degrees minutes seconds.
     """
     # Is it already a number?
-    if type(coord) is float or type(coord) is int:
-        if degformat == "DD":
-            return coord
-        elif degformat == "DMS":
-            return deg_min_sec2dec_deg(coord)
-        else:
-            return deg_min2dec_deg(coord)
+    try:
+        coord = float(coord)
+
+        if type(coord) is float or type(coord) is int:
+            if degformat == "DD":
+                return coord
+            elif degformat == "DMS":
+                return deg_min_sec2dec_deg(coord)
+            elif degformat == "DM":
+                return deg_min2dec_deg(coord)
+            else:
+                print("Error: unknown coordinate format %s" % degformat)
+                return None
+    except:
+        pass
 
     # Format used in EXIF in Pixel phone cameras
     # e.g. 35 deg 54' 35.67" N, 106 deg 16' 10.78" W
+    # which is also the format handled by exiftool.
     # Also handles a form with an actual degree symbol,
     # like 106° 16' 10.78" W, or a ^ in place of the degree symbol.
     DMS_COORD_PAT = "\s*([+-]?[0-9]{1,3})\s*(?:deg|°|\^)" \
