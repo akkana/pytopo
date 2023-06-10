@@ -217,3 +217,32 @@ def haversine_distance(latitude_1, longitude_1,
         return EARTH_RADIUS_MI * c
 
 
+if __name__ == '__main__':
+    # You can use this file for degree conversions
+    import sys
+    degfmt = "DD"
+
+    def Usage():
+        import os
+        print("Usage: %s [--dm] deg deg deg" % os.path.basename(sys.argv[0]))
+        print("""      --dm enables decimal minutes mode, so floating point 
+      numbers will be interpreted as dd.mmmm.""")
+        sys.exit(1)
+
+    for coord in sys.argv[1:]:
+        if coord == "-h" or coord == "--help":
+            Usage()
+        if coord == "--dm":
+            degfmt = "DM"
+            continue
+        try:
+            deg = to_decimal_degrees(coord, degfmt)
+        except:
+            print("Can't parse", coord)
+            Usage()
+
+        print('\n"%s":' % coord)
+        print("Decimal degrees:         ", deg)
+        d, m, s = dec_deg2dms(deg)
+        print("Degrees Minutes Seconds:  %d° %d' %.3f\"" % (d, m, s))
+        print("Degrees.Minutes          ", dec_deg2deg_min(deg))
