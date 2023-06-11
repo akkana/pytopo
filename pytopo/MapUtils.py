@@ -217,10 +217,11 @@ def haversine_distance(latitude_1, longitude_1,
         return EARTH_RADIUS_MI * c
 
 
-if __name__ == '__main__':
-    # You can use this file for degree conversions
+def main():
+    """You can use this file for degree conversions.
+       It's installed as a commandline script called "degreeconv".
+    """
     import sys
-    degfmt = "DD"
 
     def Usage():
         import os
@@ -229,6 +230,7 @@ if __name__ == '__main__':
       numbers will be interpreted as dd.mmmm.""")
         sys.exit(1)
 
+    degfmt = "DD"
     for coord in sys.argv[1:]:
         if coord == "-h" or coord == "--help":
             Usage()
@@ -246,3 +248,7 @@ if __name__ == '__main__':
         d, m, s = dec_deg2dms(deg)
         print("Degrees Minutes Seconds:  %d° %d' %.3f\"" % (d, m, s))
         print("Degrees.Minutes          ", dec_deg2deg_min(deg))
+
+
+if __name__ == '__main__':
+    main()

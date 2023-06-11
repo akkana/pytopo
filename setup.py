@@ -67,7 +67,8 @@ setup(name='pytopo',
               'pytopo=pytopo.MapViewer:main',
           ],
           'console_scripts': [
-              'ellie=pytopo.trackstats:main'
+              'ellie=pytopo.trackstats:main',
+              'degreeconv=pytopo.MapUtils:main'
           ],
       },
       project_urls={
