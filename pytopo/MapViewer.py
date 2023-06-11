@@ -212,65 +212,6 @@ to standard output.
             dialog.destroy()
         return False
 
-    def location_select(self, mapwin):
-        """Bring up a dialog giving a choice of known starting locations.
-        """
-        dialog = gtk.Dialog("Locations", None, 0,
-                            (gtk.STOCK_REMOVE, gtk.RESPONSE_APPLY,
-                             gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
-                             gtk.STOCK_OK, gtk.RESPONSE_OK))
-        dialog.set_size_request(400, 300)
-
-        sw = gtk.ScrolledWindow()
-        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-
-        # List store will hold name, collection-name and site object
-        store = gtk.ListStore(str, str, object)
-
-        # Create the list
-        for site in self.KnownSites:
-            store.append([site[0], site[3], site])
-
-        # Make a treeview from the list:
-        treeview = gtk.TreeView(store)
-
-        renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Location", renderer, text=0)
-        treeview.append_column(column)
-        renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Collection", renderer, text=1)
-        treeview.append_column(column)
-
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        sw.add(treeview)
-
-        dialog.vbox.pack_start(sw, expand=True)
-
-        dialog.show_all()
-
-        response = dialog.run()
-        while response == gtk.RESPONSE_APPLY:
-            selection = treeview.get_selection()
-            model, it = selection.get_selected()
-            if it:
-                site = store.get_value(it, 2)
-                self.KnownSites.remove(site)
-                store.remove(it)
-            response = dialog.run()
-
-        if response == gtk.RESPONSE_OK:
-            selection = treeview.get_selection()
-            model, it = selection.get_selected()
-            if it:
-                site = store.get_value(it, 2)
-                self.use_site(site, mapwin)
-                dialog.destroy()
-                return True
-        else:
-            dialog.destroy()
-        return False
-
     def use_site(self, site, mapwin):
         """Given a starting site, center the map on it and show the map.
            Returns true for success.
@@ -291,6 +232,8 @@ to standard output.
         mapwin.cur_lat = mapwin.center_lat
         mapwin.pin_lon = mapwin.center_lon
         mapwin.pin_lat = mapwin.center_lat
+        if len(site) >= 5:
+            mapwin.zoom_to(site[4])
 
         if (self.Debug):
             print(site[0] + ":", mapwin.center_lon

@@ -151,7 +151,7 @@ def parse_saved_site_line(line):
 
     try:
         # Now try to evaluate what remains in the line
-        ret = ast.literal_eval(line)
+        ret = ast.literal_eval(line)[0]
 
     except SyntaxError:
         print("Syntax error parsing saved site line '%s'" % line)
@@ -288,20 +288,19 @@ def create_initial_config():
     if not os.access(CONFIG_DIR, os.W_OK):
         os.makedirs(CONFIG_DIR)
     userfile = os.path.join(CONFIG_DIR, "pytopo.sites")
-    fp = open(userfile, 'w')
+    with open(userfile, 'w') as fp:
 
-    # Try to get a username
-    import getpass
-    try:
-        username = getpass.getuser()
-        if not username:
+        # Try to get a username
+        import getpass
+        try:
+            username = getpass.getuser()
+            if not username:
+                username = "<unknown>"
+        except:
             username = "<unknown>"
-    except:
-        username = "<unknown>"
 
-    # Now we have fp open. Write a very basic config to it.
-    print("""# Pytopo site file
-
+        # fp is open. Write a very basic config to it.
+        print("""# Pytopo site file
 
 #
 # Older versions of PyTopo used dd.mmss (degrees, minutes, seconds)
@@ -309,12 +308,13 @@ def create_initial_config():
 # As of 2023, the default for new site files has changed to
 # "DecimalDegrees"
 #
-# If KnownSitesFormat is unset, PyTopo will assume coordinates
-# are in DD.MMSS, and will convert them to decimal degrees any
-# time the site file is rewritten,
-# unless you set KnownSitesFormat to "DD.MMSS".
+# If DEGREE_FORMAT is unset, PyTopo will assume coordinates
+# are in DD.MM (DEGREE_FORMAT = "DM"). Otherwise, it can be specified
+# as "DD" (decimal degrees) or "DMS" (DD.MMSS).
 #
-# KnownSitesFormat = "DecimalDegrees"
+# The default prior to June 2023 was DM; subsequently it is DD.
+#
+DEGREE_FORMAT = "DD"
 
 
 # Map collections
@@ -332,7 +332,7 @@ Collections = [
 
     # Humanitarian
     OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
-                      ".png", 256, 256, 10,
+                      ".png", 256, 256, 11,
                       "http://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
                       maxzoom=15,
                       attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
@@ -343,7 +343,7 @@ Collections = [
     # but in practice they give an error after zoom level 15.
     # They're a bit flaky: sometimes they don't load, or load blank tiles.
     OSMMapCollection( "USGS", "~/Maps/USGS",
-                      ".jpg", 256, 256, 10,
+                      ".jpg", 256, 256, 11,
                        "https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/WMTS?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=USGSTopo&STYLE=default&TILEMATRIXSET=GoogleMapsCompatible&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}&FORMAT=image%%2Fjpeg",
                       maxzoom=15,
                       attribution="USGS National Map"),
@@ -362,27 +362,28 @@ Collections = [
     #                   "https://tile.thunderforest.com/cycle/{z}/{x}/{y}.png?apikey=YOUR_API_KEY_HERE",
     #                   maxzoom=22, reload_if_older=90,  # reload if > 90 days
     #                   attribution="Maps © www.thunderforest.com, Data © www.osm.org/copyright"),
-    ]
-
-KnownSites = [
-    # Some base values to get new users started.
-    # Note that these coordinates are a bit northwest of the city centers;
-    # they're the coordinates of the map top left, not center.
-    [ "san-francisco", -122.245, 37.471, "", 11 ],
-    [ "new-york", -74.001, 40.4351, "", 11 ],
-    [ "london", -0.072, 51.3098, "", 11 ],
-    [ "sydney", 151.125, -33.517, "", 11 ],
-    ]
+]
 
 user_agent = "PyTopo customized by %s"
 """ % (username), file=fp)
-    fp.close()
+
+    savedsitefile = saved_sites_filename()
+    if not os.path.exists(savedsitefile):
+        with open(savedsitefile, 'w') as fp:
+            print("""# FORMAT=DD
+
+    [ "san-francisco", -122.4276, 37.7807, "USGS" ],
+    [ "new-york", -73.9766, 40.7646, "USGS" ],
+    [ "london", -0.1191, 51.5141, "humanitarian", 13 ],
+    [ "sydney", 151.2094, -33.8707, "humanitarian", 13 ],
+""", file=fp)
 
     print("""Welcome to Pytopo!
 Created an initial site file in %s
+and some initial sites in %s
 You can add new sites and collections there; see the instructions at
    http://shallowsky.com/software/topo/
-""" % (userfile))
+""" % (userfile, savedsitefile))
 
     return userfile
 

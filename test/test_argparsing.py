@@ -73,12 +73,10 @@ class ArgparseTests(unittest.TestCase):
     ]
 
     KnownSites = [
-        [ "san-francisco", -122.245, 37.471, "", 11 ],
+         "san-francisco", -122.4276, 37.7807, "USGS" ],
     ]''')
             # The site file uses dd.mmss but everything else wants DD
-            return ("san-francisco",
-                    MapUtils.deg_min2dec_deg(-122.245),
-                    MapUtils.deg_min2dec_deg(37.471))
+            return ("san-francisco", -122.4276, 37.7807)
 
     def test_gpx_arg(self):
         args = [ 'pytopo', 'test/files/otowi-mesa-arch.gpx' ]

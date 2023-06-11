@@ -1184,8 +1184,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
     def mylocations(self, widget):
         """Show the location_select dialog"""
-        self.controller.location_select(self)
-
+        self.selection_window()
 
     def selection_window(self):
         """Show a window that lets the user choose a known starting point.
