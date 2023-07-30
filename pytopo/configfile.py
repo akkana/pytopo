@@ -3,6 +3,7 @@
 import os.path
 import re
 import ast
+import sys
 
 from pytopo import MapUtils
 
@@ -124,9 +125,10 @@ from pytopo import GenericMapCollection
 
 def parse_saved_site_line(line):
     """The saved sites file has lines like
+       [name, longitude, latitude, [collection, [zoom]]
+       e.g.
        ['paria-ranger', -111.912, 37.106, 'opencyclemap']
        ['PEEC', -106.183758, 35.530912, opencyclemap, 18]
-       name, longitude, latitude, [collection, [zoom]]
        Note the lack of quotes around the collection name in the
        second example; that was a bug in an earlier version of pytopo
        that the parser needs to account for.
@@ -146,38 +148,48 @@ def parse_saved_site_line(line):
         # and remove the commend for further processing
         line = line[:hash]
 
-    if not line.strip():   # empty line or comments only
+    line = line.strip()
+    if not line:   # empty line or comments only
         return None
 
     try:
-        # Now try to evaluate what remains in the line
-        ret = ast.literal_eval(line)[0]
+        # Now try to evaluate what remains in the line.
+
+        # If the line ends with a comma, e.g.
+        # ' [ "san-francisco", -122.4276, 37.7807, "USGS" ],'
+        # literal_eval will wrap it in a tuple,
+        # so try to forstall that before it happens by removing commas.
+        while line.endswith(','):
+            line = line[:-1]
+            line = line.strip()
+
+        ret = ast.literal_eval(line)
 
     except SyntaxError:
-        print("Syntax error parsing saved site line '%s'" % line)
+        print("Syntax error parsing saved site line '%s'" % line,
+              file=sys.stderr)
         return None
     except ValueError:
         # An unquoted string will raise a ValueError.
-        print("Value error parsing saved site line '%s'" % line)
+        print("Value error parsing saved site line '%s'" % line,
+              file=sys.stderr)
         global NEED_SAVED_SITE_REWRITE
         ret = parse_unquoted_saved_site_line(line)
         if ret and len(ret) >= 3:
             NEED_SAVED_SITE_REWRITE = True
 
-    if type(ret) is tuple:
-        ret = list(ret)
-    elif type(ret) is not list:
+    if type(ret) is not list:
+        print(f"Couldn't parse line: '{ line }'", file=sys.stderr)
         return None
     if len(ret) < 3:
-        print("Warning: not enough elements in saved site line '%s'" % line)
-        print(len(ret), "elements")
+        print("Warning: not enough elements in saved site line '%s'" % line,
+              file=sys.stderr)
+        print(len(ret), "elements:", ret, file=sys.stderr)
 
     # ret should now be (name, lon, lat, [collection [zoom]].
     # Do DMS conversions if needed.
-    # print("Coordinates:", ret[1], ret[2])
     ret[1] = MapUtils.to_decimal_degrees(ret[1], DEGREE_FORMAT)
     ret[2] = MapUtils.to_decimal_degrees(ret[2], DEGREE_FORMAT)
-    # print("         -->", ret[1], ret[2])
 
     return ret
 
@@ -215,6 +227,7 @@ def read_saved_sites(filepath=None):
     try:
         sitesfile = open(filepath, "r")
     except:
+        print("Couldn't open", filepath, file=sys.stderr)
         return []
 
     known_sites = []
@@ -222,7 +235,6 @@ def read_saved_sites(filepath=None):
     for line in sitesfile:
         site = parse_saved_site_line(line.strip())
         if not site:
-            # print(f"Couldn't parse line: '{ line }'")
             continue
 
         # site[1] = float(site[1])    # longitude
