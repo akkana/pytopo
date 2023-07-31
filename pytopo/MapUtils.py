@@ -97,30 +97,56 @@ def to_decimal_degrees(coord, degformat="DD"):
     except:
         pass
 
-    # Format used in EXIF in Pixel phone cameras
-    # e.g. 35 deg 54' 35.67" N, 106 deg 16' 10.78" W
-    # which is also the format handled by exiftool.
-    # Also handles a form with an actual degree symbol,
-    # like 106° 16' 10.78" W, or a ^ in place of the degree symbol.
-    DMS_COORD_PAT = "\s*([+-]?[0-9]{1,3})\s*(?:deg|°|\^)" \
-                    "\s*([0-9]{1,3})'\s*" \
-                    "([0-9]{1,3})(.[0-9]+\")?\s*([NSEW])?"
-    m = re.match(DMS_COORD_PAT, coord)
+    # Match the following formats and variants:
+    # jhead, for EXIF from photos:    N 35d 51m 21.08s
+    # exiftool for EXIF from photos:  35 deg 51' 21.08" N
+    # More general format:            35° 54' 35.67" N, 106 deg 16' 10.78" W
+    # For degrees, accept deg d ° ^
+    # For minutes, accept ' min m
+    # For seconds, accept " sec s
+    # NSEW can either begin or end the string, or may be missing entirely,
+    # in which case positive means north/east.
+    # Degrees may start with a + or -
+    coord_pat = r"\s*([NSEW])?\s*([+-]?[0-9]{1,3})\s*(?:deg|d|°|\^)" \
+        r"\s*([0-9]{1,3})(?:'|m|min)\s*" \
+        r"([0-9]{1,3})(.[0-9]+)?\s*(?:\"|s|sec)\s*([NSEW])?"
+    m = re.match(coord_pat, coord)
     if m:
-        deg, mins, secs, subsecs, direc = m.groups()
+        direc1, deg, mins, secs, subsecs, direc2 = m.groups()
+        if direc1 and direc2 and direc1 != direc2:
+            print("%s: Conflicting directions, %s vs %s" % (coord,
+                                                            direc1, direc2),
+                  file=sys.stderr)
+            raise ValueError("Can't parse '%s' as a coordinate" % coord)
+
+        # Sign fiddling: end up with positive value but save the sign
+        if direc2 and not direc1:
+            direc1 = direc2
+        if direc1 == 'S' or direc1 == 'W':
+            sign = -1
+        else:
+            sign = 1
+        val = int(deg) * sign
+        if val < 0:
+            sign = -1
+            val = -val
+        else:
+            sign = 1
+
         secs = float(secs)
         if subsecs:
             if subsecs.endswith('"'):
                 subsecs = subsecs[:-1]
             secs += float(subsecs)
         mins = int(mins) + secs/60.
-        val = int(deg)
         if val >= 0:
             val += mins/60.
         else:
             val -= mins/60.
-        if direc == 'S' or direc == 'W':
-            val = -val
+
+        # Restore the sign
+        val *= sign
+        # print("Parsed", coord, "to", val)
         return val
 
     raise ValueError("Can't parse '%s' as a coordinate" % coord)

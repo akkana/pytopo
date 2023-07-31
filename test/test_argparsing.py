@@ -142,13 +142,36 @@ class ArgparseTests(unittest.TestCase):
                                 -106.2283611, 35.895508))
 
     def test_explicit_coords(self):
-        args = [ 'pytopo', '37.537', '-122.37' ]
+        argslists = [
+            # Several syntax variants for the same location:
+            # decimal degrees syntax
+            ( [ 'pytopo', '37.537', '-122.37' ],
+              [ 37.537, -122.37] ),
+            # exiftool (and most normal humans) syntax
+            ( [ 'pytopo',
+                '37 deg 32\' 13.12" N', '122° 22\' 12.0" W' ],
+              [ 37.537, -122.37] ),
+            # jhead syntax
+            ( [ 'pytopo', 'N 37d 32m 13.12s', 'W 122d 22m 12.0s' ],
+              [ 37.537, -122.37] ),
 
-        mapwin =  MapWindow(self.viewer)
-        self.viewer.parse_args(mapwin, args)
+            # east and south
+            ( [ 'pytopo',
+                '37 deg 32\' 13.12" S', '122° 22\' 12.0" E' ],
+              [ -37.537, 122.37] ),
+            # negative signs
+            ( [ 'pytopo',
+                '-37 deg 32\' 13.12"', '-122° 22\' 12.0" E' ],
+              [ -37.537, -122.37] ),
+        ]
 
-        assertCloseEnough(mapwin.center_lon, -122.37)
-        assertCloseEnough(mapwin.center_lat, 37.537)
+        for argtuple in argslists:
+            args, realcoords = argtuple
+            mapwin =  MapWindow(self.viewer)
+            self.viewer.parse_args(mapwin, args)
+
+            assertCloseEnough(mapwin.center_lat, realcoords[0])
+            assertCloseEnough(mapwin.center_lon, realcoords[1])
 
     def test_explicit_coords_plus_gpx(self):
         args = [ 'pytopo', '35.85', '-106.4',
@@ -227,3 +250,4 @@ class ArgparseTests(unittest.TestCase):
 
         assertCloseEnough(mapwin.center_lon, sitelon)
         assertCloseEnough(mapwin.center_lat, sitelat)
+
