@@ -163,6 +163,15 @@ class ArgparseTests(unittest.TestCase):
             ( [ 'pytopo',
                 '-37 deg 32\' 13.12"', '-122° 22\' 12.0" E' ],
               [ -37.537, -122.37] ),
+
+            # Coordinates together in one string, like exiftool
+            ( [ 'pytopo',
+                '-37 deg 32\' 13.12" -122° 22\' 12.0" E' ],
+              [ -37.537, -122.37] ),
+            # Coordinates together in one string, like jhead
+            ( [ 'pytopo',
+                '37 deg 32\' 13.12" N 122° 22\' 12.0" W' ],
+              [ 37.537, -122.37] ),
         ]
 
         for argtuple in argslists:

@@ -45,19 +45,27 @@ class MapUtilsTests(unittest.TestCase):
         # In coordlists, the first element of each list is decimal degrees;
         # the rest are different versions of DMS representations.
         coordlists = [
-            # PEEC longitude
             [
+                # PEEC longitude
                 -106.306290,
                 -106.182264,
                 "-106° 18' 22.644\"",
                 " -106^  18'  22.644\" ",
+                # exiftool format
+                "106 deg 18' 22.644\" W",
+                # jhead format
+                "W 106d 18m 22.644s",
             ],
-            # PEEC latitude
             [
+                # PEEC latitude
                 35.884835,
                 35.530541,
                 "35° 53' 05.41\"",
                 "35^ 53' 05.41\""
+                # exiftool format
+                "35 deg 53' 5.41\" N",
+                # jhead format
+                "N 35d 53m 05.41s"
             ],
         ]
         for clist in coordlists:

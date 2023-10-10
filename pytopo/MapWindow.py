@@ -1190,15 +1190,35 @@ but if you want to, contact me and I'll help you figure it out.)
         """Show a window that lets the user choose a known starting point.
            Returns True if the user chose a valid site, otherwise False.
         """
-        dialog = gtk.Dialog("Choose a point", None, 0,
+        dialog = gtk.Dialog("Choose a starting point", None, 0,
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
         # dialog.connect('destroy', lambda win: gtk.main_quit())
-        dialog.set_size_request(400, 300)
+        dialog.set_size_request(480, 300)
 
         sw = gtk.ScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+
+        svbox = gtk.VBox(spacing=10)
+
+        hbox = gtk.HBox(spacing=6)
+        svbox.pack_start(hbox, expand=False)
+
+        hbox.pack_start(gtk.Label("Coordinates:"), expand=False)
+
+        # An entry to enter specific coordinates
+        coord_entry = gtk.Entry()
+        coord_entry.set_width_chars(45)
+        coord_entry.set_activates_default(True)
+        hbox.pack_start(coord_entry, expand=False)
+        dialog.coord_entry = coord_entry
+
+        # make OK button the default, so Enter in the entry will trigger OK
+        okButton = dialog.get_widget_for_response(
+            response_id=gtk.ResponseType.OK)
+        okButton.set_can_default(True)
+        okButton.grab_default()
 
         # List store will hold name, collection-name and site object
         store = gtk.ListStore(str, str, object)
@@ -1227,8 +1247,14 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # store.set_sort_column_id(0, gtk.SORT_ASCENDING)
 
+        # Catch middle-mouse pastes over the treeview
+        treeview.connect("button-release-event", self.accept_paste)
+
         sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        sw.add(treeview)
+        svbox.pack_start(treeview, expand=True)
+        # sw.add(treeview)
+
+        sw.add(svbox)
 
         def submit(self, value, widget):
             # Tell the dialog to give an OK response
@@ -1241,20 +1267,86 @@ but if you want to, contact me and I'll help you figure it out.)
 
         dialog.show_all()
 
-        response = dialog.run()
-        if response == gtk.RESPONSE_OK:
-            selection = treeview.get_selection()
-            model, it = selection.get_selected()
-            if it:
-                # locname = store.get_value(it, 0)
-                # collname = store.get_value(it, 1)
-                site = store.get_value(it, 2)
-                self.controller.use_site(site, self)
+        while True:
+            response = dialog.run()
+            if response == gtk.RESPONSE_OK:
+                coordtext = coord_entry.get_text()
+                if coordtext:
+                    try:
+                        lat, lon = MapUtils.parse_full_coords(
+                            coord_entry.get_text())
+                        self.controller.use_coordinates(lat, lon, self)
+                    except Exception as e:
+                        print("Oops", e)
+                        continue
+                    dialog.destroy()
+                    return True
+
+                selection = treeview.get_selection()
+                model, it = selection.get_selected()
+                if it:
+                    # locname = store.get_value(it, 0)
+                    # collname = store.get_value(it, 1)
+                    site = store.get_value(it, 2)
+                    self.controller.use_site(site, self)
+                    dialog.destroy()
+                    return True
+            else:
                 dialog.destroy()
-                return True
-        else:
-            dialog.destroy()
-        return False
+            return False
+
+
+    def accept_paste(self, widget, event):
+        """Handle middlemouse pastes over the site selection dialog.
+           Ideally this would actually submit the dialog and open up
+           the MapWindow.
+        """
+        if event.button != 2:
+            return False
+
+        dialog = widget.get_toplevel()
+
+        # clipboard = gtk.Clipboard.get(gtk.gdk.SELECTION_CLIPBOARD)
+        selection = gtk.Clipboard.get(gtk.gdk.SELECTION_PRIMARY)
+        coordstr = selection.wait_for_text()
+
+        dialog.coord_entry.set_text(coordstr)
+
+        '''
+        # Now that the dialog's entry is filled, the goal is to
+        # submit the dialog. But I haven't found any way to do that.
+        # Sending a fake enter key event from the entry doesn't do it,
+        # nor does sending a button press event on the dialog's OK button.
+        # Better would be to send the "clicked" signal to the button,
+        # but there doesn't seem to be a way to manually generate signals.
+        print("Trying to send event ...")
+
+        event = gtk.gdk.Event(gtk.gdk.KEY_PRESS)
+        event.window = dialog.coord_entry.get_window()
+        display = gtk.gdk.Display().get_default()
+        keymap = gtk.gdk.Keymap().get_for_display(display)
+        key = keymap.get_entries_for_keyval(gtk.gdk.KEY_Return)
+        event.hardware_keycode = key[1][0].keycode
+        event.send_event = True
+        event = gtk.gdk.Event(gtk.gdk.KEY_RELEASE)
+        dialog.coord_entry.emit('key-release-event', event)
+
+        ok_button = dialog.get_widget_for_response(
+            response_id=gtk.ResponseType.OK)
+        event = gtk.gdk.Event(gtk.gdk.BUTTON_PRESS)
+        event.window = dialog.get_window()
+        event.button = 1
+        event.send_event = True
+        ok_button.emit('button-press-event', event)
+        event = gtk.gdk.Event(gtk.gdk.BUTTON_RELEASE)
+        event.window = dialog.get_window()
+        event.button = 1
+        event.send_event = True
+        ok_button.emit('button-release-event', event)
+        '''
+
+        return True
+
 
     @staticmethod
     def ignorecasefilter(filter_info, data):
@@ -2324,6 +2416,9 @@ but if you want to, contact me and I'll help you figure it out.)
             self.cur_lon, self.cur_lat = self.xy2coords(x, y)
             self.context_menu(event)
             return True
+
+        if event.button != 1:
+            return False
 
         # If it wasn't a double click, set a timeout for LongPress
         if event.type != gtk.gdk._2BUTTON_PRESS:

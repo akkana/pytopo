@@ -212,6 +212,18 @@ to standard output.
             dialog.destroy()
         return False
 
+    def use_coordinates(self, lat, lon, mapwin):
+        """Center the map on the given coordinates"""
+        if not mapwin.collection:
+            collection = self.find_collection(self.default_collection)
+            # mapwin.change_collection(collection)
+            mapwin.collection = collection
+        mapwin.center_lat = lat
+        mapwin.center_lon = lon
+        mapwin.pin_lat = lat
+        mapwin.pin_lon = lon
+        # mapwin.draw_map()
+
     def use_site(self, site, mapwin):
         """Given a starting site, center the map on it and show the map.
            Returns true for success.
@@ -405,33 +417,38 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
 
             # Doesn't match a known site. Maybe the args are coordinates?
             try:
-                if len(args) >= 2:
+                if len(args) == 1:
+                    lat, lon = MapUtils.parse_full_coords(args[0], "DD")
+                elif len(args) >= 2:
                     lat = MapUtils.to_decimal_degrees(args[0], "DD")
                     lon = MapUtils.to_decimal_degrees(args[1], "DD")
-                    if abs(lat) > 90:
-                        print("Guessing", lat,
-                              "is a longitude. Please specify latitude first")
-                        lat, lon = lon, lat
-                    if lat is not None and lon is not None:
-                        mapwin.center_lat = lat
-                        mapwin.center_lon = lon
+                else:
+                    raise(RuntimeError("Can't make sense of arguments: %s"
+                                       % str(args)))
+                if abs(lat) > 90:
+                    print("Guessing", lat,
+                          "is a longitude. Please specify latitude first")
+                    lat, lon = lon, lat
+                if lat is not None and lon is not None:
+                    mapwin.center_lat = lat
+                    mapwin.center_lon = lon
 
-                        # Set a pin on the specified point.
-                        mapwin.pin_lat = lat
-                        mapwin.pin_lon = lon
+                    # Set a pin on the specified point.
+                    mapwin.pin_lat = lat
+                    mapwin.pin_lon = lon
 
-                        args = args[2:]
+                    args = args[2:]
 
-                        # The next argument after latitude, longitude
-                        # might be a collection, but it also might not.
-                        # Try it and see.
-                        if args:
-                            coll = self.find_collection(args[0])
-                            if coll:
-                                mapwin.collection = coll
-                                args = args[1:]
+                    # The next argument after latitude, longitude
+                    # might be a collection, but it also might not.
+                    # Try it and see.
+                    if args:
+                        coll = self.find_collection(args[0])
+                        if coll:
+                            mapwin.collection = coll
+                            args = args[1:]
 
-                        continue
+                    continue
 
                 print("Can't make sense of argument:", args[0])
                 args = args[1:]

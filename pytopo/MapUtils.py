@@ -72,13 +72,43 @@ def deg_min_sec2dec_deg(coord):
     return (deg + mins/60. + secs/3600.) * sign
 
 
-def to_decimal_degrees(coord, degformat="DD"):
+def parse_full_coords(coordstr, degformat="DD"):
+    """Parse a full coordinate string, e.g.
+       35 deg 53' 30.81" N 106 deg 24' 4.17" W"
+       Return a tuple of floats.
+       # XXX Needs smarts about which is lat and which is lon.
+       Can also parse a single coordinate, in which case returns a 1-tuple.
+    """
+    firstcoord, charsmatched = to_decimal_degrees(coordstr, degformat,
+                                                  report_chars_matched=True)
+    if not charsmatched:
+        # This can happen in a case like "37.123 -102.456")
+        try:
+            coordstrings = coordstr.split()
+            if len(coordstrings) > 0:
+                return (firstcoord, to_decimal_degrees(coordstrings[1],
+                                                       degformat))
+        except:
+            return (firstcoord)
+
+    coordstr = coordstr[charsmatched:]
+    if not coordstr:
+        return (firstcoord)
+    return ( firstcoord, to_decimal_degrees(coordstr, degformat) )
+
+
+def to_decimal_degrees(coord, degformat="DD", report_chars_matched=False):
     """Try to parse various different forms of deg-min-sec strings
-       as well as floats, returning float decimal degrees.
+       as well as floats for a single coordinate (lat or lon, not both).
+       Returns float decimal degrees.
 
        degformat can be "DM", "DMS" or "DD" and controls whether
        float inputs are just passed through, or converted
        from degrees + decimal minutes or degrees minutes seconds.
+
+       If report_chars_matched is true, returns a tuple:
+       the coordinate parsed, plus the number of characters matched,
+       to make it easier to parse the second coordinate.
     """
     # Is it already a number?
     try:
@@ -86,14 +116,18 @@ def to_decimal_degrees(coord, degformat="DD"):
 
         if type(coord) is float or type(coord) is int:
             if degformat == "DD":
-                return coord
+                pass
             elif degformat == "DMS":
-                return deg_min_sec2dec_deg(coord)
+                coord = deg_min_sec2dec_deg(coord)
             elif degformat == "DM":
-                return deg_min2dec_deg(coord)
+                coord = deg_min2dec_deg(coord)
             else:
                 print("Error: unknown coordinate format %s" % degformat)
-                return None
+                coord = None
+
+            if report_chars_matched:
+                return (coord, 0)
+            return coord
     except:
         pass
 
@@ -111,45 +145,48 @@ def to_decimal_degrees(coord, degformat="DD"):
         r"\s*([0-9]{1,3})(?:'|m|min)\s*" \
         r"([0-9]{1,3})(.[0-9]+)?\s*(?:\"|s|sec)\s*([NSEW])?"
     m = re.match(coord_pat, coord)
-    if m:
-        direc1, deg, mins, secs, subsecs, direc2 = m.groups()
-        if direc1 and direc2 and direc1 != direc2:
-            print("%s: Conflicting directions, %s vs %s" % (coord,
-                                                            direc1, direc2),
-                  file=sys.stderr)
-            raise ValueError("Can't parse '%s' as a coordinate" % coord)
+    if not m:
+        raise ValueError("Can't parse '%s' as a coordinate" % coord)
 
-        # Sign fiddling: end up with positive value but save the sign
-        if direc2 and not direc1:
-            direc1 = direc2
-        if direc1 == 'S' or direc1 == 'W':
-            sign = -1
-        else:
-            sign = 1
-        val = int(deg) * sign
-        if val < 0:
-            sign = -1
-            val = -val
-        else:
-            sign = 1
+    direc1, deg, mins, secs, subsecs, direc2 = m.groups()
+    if direc1 and direc2 and direc1 != direc2:
+        print("%s: Conflicting directions, %s vs %s" % (coord,
+                                                        direc1, direc2),
+              file=sys.stderr)
+        raise ValueError("Can't parse '%s' as a coordinate" % coord)
 
-        secs = float(secs)
-        if subsecs:
-            if subsecs.endswith('"'):
-                subsecs = subsecs[:-1]
-            secs += float(subsecs)
-        mins = int(mins) + secs/60.
-        if val >= 0:
-            val += mins/60.
-        else:
-            val -= mins/60.
+    # Sign fiddling: end up with positive value but save the sign
+    if direc2 and not direc1:
+        direc1 = direc2
+    if direc1 == 'S' or direc1 == 'W':
+        sign = -1
+    else:
+        sign = 1
+    val = int(deg) * sign
+    if val < 0:
+        sign = -1
+        val = -val
+    else:
+        sign = 1
 
-        # Restore the sign
-        val *= sign
-        # print("Parsed", coord, "to", val)
-        return val
+    secs = float(secs)
+    if subsecs:
+        if subsecs.endswith('"'):
+            subsecs = subsecs[:-1]
+        secs += float(subsecs)
+    mins = int(mins) + secs/60.
+    if val >= 0:
+        val += mins/60.
+    else:
+        val -= mins/60.
 
-    raise ValueError("Can't parse '%s' as a coordinate" % coord)
+    # Restore the sign
+    val *= sign
+
+    if report_chars_matched:
+        return (val, len(m.group(0)))
+    return val
+
 
 @staticmethod
 def bearing(lat1, lon1, lat2, lon2):
@@ -257,23 +294,24 @@ def main():
         sys.exit(1)
 
     degfmt = "DD"
-    for coord in sys.argv[1:]:
-        if coord == "-h" or coord == "--help":
+    for coordstr in sys.argv[1:]:
+        if coordstr == "-h" or coordstr == "--help":
             Usage()
-        if coord == "--dm":
+        if coordstr == "--dm":
             degfmt = "DM"
             continue
         try:
-            deg = to_decimal_degrees(coord, degfmt)
-        except:
-            print("Can't parse", coord)
+            coords = parse_full_coords(coordstr, degfmt)
+        except RuntimeError as e:
+            print("Can't parse", coordstr, ":", e)
             Usage()
 
-        print('\n"%s":' % coord)
-        print("Decimal degrees:         ", deg)
-        d, m, s = dec_deg2dms(deg)
-        print("Degrees Minutes Seconds:  %d° %d' %.3f\"" % (d, m, s))
-        print("Degrees.Minutes          ", dec_deg2deg_min(deg))
+        print('\n"%s":' % coordstr)
+        print("Decimal degrees:         ", coords)
+        for c in coords:
+            d, m, s = dec_deg2dms(c)
+            print("Degrees Minutes Seconds:  %d° %d' %.3f\"" % (d, m, s))
+            print("Degrees.Minutes          ", dec_deg2deg_min(c))
 
 
 if __name__ == '__main__':
