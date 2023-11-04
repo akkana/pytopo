@@ -43,13 +43,36 @@ import pangocairo
 
 from pkg_resources import resource_filename
 
+from enum import Enum
+
 # As of GTK3 there's no longer any HSV support, because cairo is
-# solely RGB. Use colorsys instead
+# solely RGB. Use colorsys instead.
 import colorsys
 
 import traceback
 
 GPS_MARKER_RADIUS=10
+
+# Track colorization styles
+class TrackColor(Enum):
+    SEPARATE_COLORS  = 1
+    SPEED_COLORS     = 2
+    ELEVATION_COLORS = 3
+
+
+def is_color(color):
+    try:
+        return len(color) == 3
+    except:
+        return False
+
+
+def colorize_by_value(val):
+    """val is a float between 0 and 1.
+       Return a color (a triplet of floats between 0 and 1)
+       from a smooth gradient between blue (low) and red (high).
+    """
+    return (val, 0., 1. - val)
 
 
 class MapWindow(object):
@@ -70,6 +93,12 @@ that are expected by the MapCollection classes:
 No one has ever actually tried to adapt this code for a different toolkit,
 but if you want to, contact me and I'll help you figure it out.)
     """
+
+    TRACK_COLOR_VIEW_MENU = OrderedDict([
+        ("Each track a different color", TrackColor.SEPARATE_COLORS),
+        ("By Elevation", TrackColor.ELEVATION_COLORS),
+        ("By Speed", TrackColor.SPEED_COLORS)
+    ])
 
     def __init__(self, _controller):
         """Initialize variables, but don't create the window yet."""
@@ -96,6 +125,9 @@ but if you want to, contact me and I'll help you figure it out.)
         self.drawing_track = False
         self.selected_track = None
         self.selected_waypoint = None
+
+        # By default, each track is a different colors
+        self.track_colorize = TrackColor.SEPARATE_COLORS
 
         # No redraws initially scheduled
         self.redraw_scheduled = False
@@ -461,7 +493,12 @@ but if you want to, contact me and I'll help you figure it out.)
            Stop drawing if we reach another start string, and return the index
            of that string. Return None if we reach the end of the list.
         """
-        self.cr.set_source_rgb (*linecolor)
+        if self.track_colorize == TrackColor.SEPARATE_COLORS and \
+           is_color(linecolor):
+            self.cr.set_source_rgb (*linecolor)
+        elif self.track_colorize == TrackColor.SPEED_COLORS or\
+             self.track_colorize == TrackColor.ELEVATION_COLORS:
+            linewidth *= 2
 
         cur_x = None
         cur_y = None
@@ -481,6 +518,28 @@ but if you want to, contact me and I'll help you figure it out.)
             # Skip over dictionaries of attributes
             if self.trackpoints.is_attributes(pt):
                 continue
+
+            # If specified, colorize according to speed or altitude:
+            try:
+                if self.track_colorize == TrackColor.SPEED_COLORS:
+                    speedfrac = float(pt.speed) / self.trackpoints.max_speed
+                    linecolor = colorize_by_value(speedfrac)
+                    self.cr.set_source_rgb (*linecolor)
+
+                elif (self.track_colorize == TrackColor.ELEVATION_COLORS and
+                      self.trackpoints.min_ele and self.trackpoints.max_ele):
+                    elefrac = ((pt.ele - self.trackpoints.min_ele) /
+                               (self.trackpoints.max_ele
+                                - self.trackpoints.min_ele))
+                    linecolor = colorize_by_value(elefrac)
+                    # print("(ele)", int(elefrac * 100),
+                    #       ": Setting color to (%.2f, %.2f, %.2f)"
+                    #       % linecolor)
+                    self.cr.set_source_rgb (*linecolor)
+
+            except Exception as e:
+                # print("can't set color:", e)
+                pass
 
             x = int((pt.lon - self.center_lon) * self.collection.xscale
                     + self.win_width / 2)
@@ -1106,12 +1165,12 @@ but if you want to, contact me and I'll help you figure it out.)
             ("Remove point from track", self.remove_trackpoint),
             ("Undo", self.undo),
             ("Save GPX or GeoJSON...", self.save_all_tracks_as),
-            # ("Save Area as GPX...", self.save_area_tracks_as),
 
             ("View", SEPARATOR),
             ("Zoom here...", self.zoom),
             (draw_track_label, self.toggle_track_drawing),
             (show_waypoint_label, self.toggle_show_waypoints),
+            ("Colorize tracks", None),
 
             ("Rest", SEPARATOR),
             ("Download Area...", self.download_area),
@@ -1141,6 +1200,17 @@ but if you want to, contact me and I'll help you figure it out.)
 
                 item.set_submenu(submenu)
 
+            elif itemname == "Colorize tracks":
+                submenu = gtk.Menu()
+                for name in self.TRACK_COLOR_VIEW_MENU:
+                    subitem = gtk.MenuItem(name)
+                    subitem.connect("activate", self.change_track_colorize,
+                                    self.TRACK_COLOR_VIEW_MENU[name])
+                    submenu.append(subitem)
+                    subitem.show()
+
+                item.set_submenu(submenu)
+
             elif contextmenu[itemname]:
                 item.connect("activate", contextmenu[itemname])
 
@@ -1162,6 +1232,10 @@ but if you want to, contact me and I'll help you figure it out.)
             # "the time of the event in milliseconds" -- but since when?
             # Not since the epoch.
         menu.popup(None, None, None, None, button, t)
+
+    def change_track_colorize(self, widget, whichcolorize):
+        self.track_colorize = whichcolorize
+        self.draw_map()
 
     def change_collection(self, widget, name):
         if self.collection:
@@ -1406,13 +1480,6 @@ but if you want to, contact me and I'll help you figure it out.)
     def save_all_tracks_as(self, widget):
         """Prompt for a filename to save all tracks and waypoints."""
         return self.save_tracks_as(widget, False)
-
-    def save_area_tracks_as(self, widget):
-        """Prompt for a filename to save all tracks and waypoints,
-           then let the user drag out an area with the mouse
-           and save all tracks that are completely within that area.
-        """
-        return self.save_tracks_as(widget, True)
 
     def save_tracks_as(self, widget, select_area=False):
         """Prompt for a filename to save all tracks and waypoints.

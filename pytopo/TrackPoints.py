@@ -193,6 +193,10 @@ class TrackPoints(object):
         # in case there are no track- or waypoints
         self.outer_bbox = BoundingBox()
 
+        self.max_speed = 0
+        self.min_ele = 0
+        self.max_ele = 0
+
         # Remember which files each set of points came from
         self.srcfiles = {}
 
@@ -250,8 +254,11 @@ class TrackPoints(object):
         """
         # Currently attributes are represented by a dictionary
         # as the next item after the name in the trackpoints list.
-        if self.is_attributes(self.points[trackindex + 1]):
-            return self.points[trackindex + 1]
+        try:
+            if self.is_attributes(self.points[trackindex + 1]):
+                return self.points[trackindex + 1]
+        except:
+            pass
         return None
 
     def handle_track_point(self, lat, lon, ele=None, speed=None,
@@ -265,6 +272,20 @@ class TrackPoints(object):
 
         point = GeoPoint(lat, lon, ele=ele, speed=speed, timestamp=timestamp,
                          name=waypoint_name, attrs=attrs)
+
+        try:
+            if point.ele:
+                if not self.min_ele or point.ele < self.min_ele:
+                    self.min_ele = point.ele
+                if point.ele > self.max_ele:
+                    self.max_ele = point.ele
+        except:
+            pass
+
+        try:
+            self.max_speed = max(self.max_speed, float(speed))
+        except:
+            pass
 
         if waypoint_name:
             self.waypoints.append(point)
@@ -429,8 +450,13 @@ class TrackPoints(object):
         """
         lat = float(pointnode.getAttribute("lat"))
         lon = float(pointnode.getAttribute("lon"))
-        ele = self.get_DOM_text(pointnode, "ele")
         time = self.get_DOM_text(pointnode, "time")
+
+        ele = self.get_DOM_text(pointnode, "ele")
+        try:
+            ele = float(ele)
+        except:
+            ele = 0.
 
         # Python dom and minidom have no easy way to combine sub-nodes
         # into a dictionary, or to serialize them.
@@ -447,6 +473,10 @@ class TrackPoints(object):
         # Old versions of osmand used a <speed> node, but now it's inside
         # <extensions><osmand:speed>.
         speed = self.get_DOM_text(pointnode, SPEEDRE)
+        try:
+            speed = float(speed)
+        except:
+            speed = None
 
         # If there were no extra attributes, pass None, not an empty dict.
         if not attrs:
