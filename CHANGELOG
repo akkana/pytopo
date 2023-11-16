@@ -1,3 +1,7 @@
+2023-11-14  Akkana Peck <akkana@shallowsky.com>
+	Revise how draw events happen, to fix a redrawing problem
+	on Ubuntu Desktop. Remove some old GTK2 expose handling code.
+
 2023-11-04  Akkana Peck <akkana@shallowsky.com>
 	Add the ability to colorize tracks by speed or elevation.
 

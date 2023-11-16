@@ -283,14 +283,7 @@ but if you want to, contact me and I'll help you figure it out.)
                                      gtk.gdk.BUTTON_PRESS_MASK |
                                      gtk.gdk.BUTTON_RELEASE_MASK)
 
-        try:
-            # GTK2:
-            self.drawing_area.connect("expose-event", self.expose_event)
-        except TypeError:
-            # Python3/GI GTK3:
-            self.drawing_area.connect('size-allocate', self.on_size_allocate)
-            self.width = self.height = 0
-            self.drawing_area.connect('draw', self.expose3)
+        self.drawing_area.connect('draw', self.draw_handler)
 
         self.drawing_area.connect("button-press-event",   self.mousepress)
         self.drawing_area.connect("button-release-event", self.mouserelease)
@@ -299,7 +292,6 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # The default focus in/out handlers on drawing area cause
         # spurious expose events.  Trap the focus events, to block that:
-        # XXX can we pass "pass" in to .connect?
         self.drawing_area.connect("focus-in-event", self.nop)
         self.drawing_area.connect("focus-out-event", self.nop)
 
@@ -317,6 +309,11 @@ but if you want to, contact me and I'll help you figure it out.)
             gobject.threads_init()
 
         gtk.main()
+
+    def force_redraw(self):
+        if not self.drawing_area:
+            return
+        self.drawing_area.queue_draw()
 
     def gpsd_callback(self, gpsd):
         """Update the map given the GPS location"""
@@ -338,7 +335,7 @@ but if you want to, contact me and I'll help you figure it out.)
             self.cur_lon = self.center_lon
             self.cur_lat = self.center_lat
 
-        self.draw_map()
+        self.force_redraw()
 
     #
     # Draw maplets to fill the window, centered at center_lon, center_lat
@@ -468,7 +465,7 @@ but if you want to, contact me and I'll help you figure it out.)
         if self.redraw_scheduled:
             return
         self.redraw_scheduled = True
-        gobject.timeout_add(1000, self.draw_map)
+        gobject.timeout_add(1000, self.force_redraw)
 
     def contrasting_color(self, color):
         """Takes a color triplet (values between 0 and 1)
@@ -1072,7 +1069,7 @@ but if you want to, contact me and I'll help you figure it out.)
             ov.zoom_to(zoomlevel)
 
         self.text_overlays = []
-        self.draw_map()
+        self.force_redraw()
 
     def zoom(self, widget=None, amount=1):
         """Zoom the map by the given amount: positive to zoom in, negative out.
@@ -1112,13 +1109,13 @@ but if you want to, contact me and I'll help you figure it out.)
 
         self.text_overlays = []
 
-        self.draw_map()
+        self.force_redraw()
         return True
 
     def toggle_track_drawing(self, mode):
         """Toggle whether tracks are drawn."""
         if self.drawing_track:
-            self.draw_map()
+            self.force_redraw()
 
         else:
             if not self.trackpoints:
@@ -1235,7 +1232,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
     def change_track_colorize(self, widget, whichcolorize):
         self.track_colorize = whichcolorize
-        self.draw_map()
+        self.force_redraw()
 
     def change_collection(self, widget, name):
         if self.collection:
@@ -1247,14 +1244,14 @@ but if you want to, contact me and I'll help you figure it out.)
             self.collection = newcoll
             self.collection.Debug = self.controller.Debug
             self.zoom_to(savezoom)
-            # self.draw_map()
+            # self.force_redraw()
         else:
             print("Couldn't find a collection named '%s'" % name)
 
     def toggle_show_waypoints(self, widget):
         """Toggle whether waypoints are shown."""
         self.show_waypoints = not self.show_waypoints
-        self.draw_map()
+        self.force_redraw()
 
     def mylocations(self, widget):
         """Show the location_select dialog"""
@@ -1268,7 +1265,11 @@ but if you want to, contact me and I'll help you figure it out.)
                             (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
                              gtk.STOCK_OK, gtk.RESPONSE_OK))
         # dialog.connect('destroy', lambda win: gtk.main_quit())
-        dialog.set_size_request(480, 300)
+        # Wouldn't it be nice if GTK dialogs would automatically
+        # size to their contents? Sigh. Without this, the dialog
+        # is wide enough for the text box but includes none of the
+        # site list in the scrolled window below it.
+        dialog.set_size_request(600, 400)
 
         sw = gtk.ScrolledWindow()
         sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
@@ -1563,7 +1564,7 @@ but if you want to, contact me and I'll help you figure it out.)
            splitting a track or deleting early or late points.
         """
         self.trackpoints.undo()
-        self.draw_map()
+        self.force_redraw()
 
     def remove_before_mouse(self, widget):
         """Remove any points before the current mouse position."""
@@ -1584,7 +1585,7 @@ but if you want to, contact me and I'll help you figure it out.)
            If remove is zero, split the track into two tracks.
         """
 
-        self.draw_map()
+        self.force_redraw()
         near_track, near_point, near_waypoint, polygons = \
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
@@ -1607,7 +1608,7 @@ but if you want to, contact me and I'll help you figure it out.)
                 # Split the track there
                 self.trackpoints.points.insert(near_point, trackname)
 
-        self.draw_map()
+        self.force_redraw()
 
     def remove_trackpoint(self, widget):
         """Remove the point nearest the mouse from its track."""
@@ -1623,7 +1624,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # way to remove something from a list is to search through the
         # list for an exact item match.
         self.trackpoints.points.remove(self.trackpoints.points[near_point])
-        self.draw_map()
+        self.force_redraw()
 
     def remove_waypoint(self, widget):
         """Remove the point nearest the mouse from its track."""
@@ -1639,7 +1640,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # way to remove something from a list is to search through the
         # list for an exact item match.
         self.trackpoints.waypoints.remove(self.trackpoints.waypoints[near_waypoint])
-        self.draw_map()
+        self.force_redraw()
 
     def add_waypoint_by_mouse(self, widget):
         """Set the pin at the current mouse location"""
@@ -1659,17 +1660,17 @@ but if you want to, contact me and I'll help you figure it out.)
 
         self.trackpoints.handle_track_point(self.cur_lat, self.cur_lon,
                                             waypoint_name=wpname)
-        self.draw_map()
+        self.force_redraw()
 
     def set_pin_by_mouse(self, widget):
         """Set the pin at the current mouse location"""
         self.pin_lon, self.pin_lat = self.cur_lon, self.cur_lat
-        self.draw_map()
+        self.force_redraw()
 
     def set_center_to_pin(self, widget):
         """Set the center at the current pin point"""
         self.center_lon, self.center_lat = self.pin_lon, self.pin_lat
-        self.draw_map()
+        self.force_redraw()
 
     def prompt(self, prompt, comment="", default=""):
         """Prompt the user for a string, returning the string.
@@ -1750,7 +1751,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.controller.track_select(self)
         if self.trackpoints is not None:
             self.trackpoints_center()
-        self.draw_map()
+        self.force_redraw()
 
     def trackpoints_center(self):
         """Try to center the loaded trackpoints in the window"""
@@ -2250,28 +2251,8 @@ but if you want to, contact me and I'll help you figure it out.)
         self.width = allocation.width
         self.height = allocation.height
 
-    def expose3(self, _unused, _ctx):
-        """An expose event for Cairo drawing."""
-        self.expose_event(self.drawing_area, None)
-
-    def expose_event(self, widget, event):
-        """Handle exposes on the canvas."""
-        # print("Expose:", event.type, "for object", self)
-        # print("area:", event.area.x, event.area.y, \
-        #       event.area.width, event.area.height)
-
-        # Cairo requires creating a new context each time the
-        # window is exposed.
-        self.cr = self.drawing_area.get_window().cairo_create()
-
-        # if self.xgc == 0:
-        #     self.xgc = self.drawing_area.get_window().new_gc()
-
-        # x, y, w, h = event.area
-
+    def draw_handler(self, widget, cr):
         self.draw_map()
-
-        return True
 
     def key_press_event(self, widget, event):
         """Handle key presses."""
@@ -2332,7 +2313,7 @@ but if you want to, contact me and I'll help you figure it out.)
             # print("Unknown key,", event.keyval)
             return False
 
-        self.draw_map()
+        self.force_redraw()
         return True
 
     def map_bounds(self):
@@ -2442,7 +2423,7 @@ but if you want to, contact me and I'll help you figure it out.)
         dy = y - self.y_start_drag
         self.center_lon -= dx / self.collection.xscale
         self.center_lat += dy / self.collection.yscale
-        self.draw_map()
+        self.force_redraw()
 
         # Reset the drag coordinates now that we're there
         self.x_start_drag = x
@@ -2461,7 +2442,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # XXX Preferably, just draw the line ourselves,
         # and figure it'll get drawn nicely later when the map needs to redraw.
         # This way there's some annoying flicker.
-        self.draw_map()
+        self.force_redraw()
 
         return True
 
@@ -2498,7 +2479,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.zoom(amount=1)
         if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
             print("doubleclick: zoomed in to", self.collection.zoomlevel)
-        self.draw_map()
+        self.force_redraw()
         return True
 
     def longpress(self):
@@ -2541,7 +2522,7 @@ but if you want to, contact me and I'll help you figure it out.)
             self.x_last_drag = None
             self.y_last_drag = None
 
-            self.draw_map()
+            self.force_redraw()
 
             return True
 
@@ -2563,7 +2544,7 @@ but if you want to, contact me and I'll help you figure it out.)
                 if self.controller.Debug and hasattr(self.collection,
                                                      'zoomlevel'):
                     print("zoomed to", self.collection.zoomlevel)
-                self.draw_map()
+                self.force_redraw()
                 return True
 
             # Clicking on the blue GPS circle toggles following GPS,
@@ -2575,7 +2556,7 @@ but if you want to, contact me and I'll help you figure it out.)
                     self.center_lat = self.last_gpsd.fix.latitude
                     self.cur_lon = self.center_lon
                     self.cur_lat = self.center_lat
-                    self.draw_map()
+                    self.force_redraw()
                 return True
 
             # Is this needed for anything?
@@ -2625,13 +2606,13 @@ but if you want to, contact me and I'll help you figure it out.)
             else:
                 self.selected_waypoint = None
 
-            self.draw_map()
+            self.force_redraw()
 
         return True
 
     @staticmethod
     def nop(*args):
-        "Do nothing."
+        """Do nothing."""
         return True
 
     def graceful_exit(self, extra=None):
