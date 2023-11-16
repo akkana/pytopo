@@ -1,3 +1,6 @@
+2023-11-15  Akkana Peck <akkana@shallowsky.com>
+	Release 1.7.1
+
 2023-11-14  Akkana Peck <akkana@shallowsky.com>
 	Revise how draw events happen, to fix a redrawing problem
 	on Ubuntu Desktop. Remove some old GTK2 expose handling code.
