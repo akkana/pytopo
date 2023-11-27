@@ -741,16 +741,23 @@ class TrackPoints(object):
                 self.polygons.append(newpoly)
                 bbox.union(poly_bbox)
 
+            def look_for_name(feature):
+                if "name" in feature["properties"]:
+                    return feature["properties"]["name"]
+                elif "description" in feature["properties"]:
+                    return feature["properties"]["description"]
+                elif "name" in feature:
+                    return feature["name"]
+                elif "id" in feature:
+                    return "id=%s" % str(feature["id"])
+                else:
+                    return None
+
             if featuretype == "Polygon" or featuretype == "MultiPolygon":
+                name = look_for_name(feature)
                 # A feature may have more than one polygon
                 # in its coordinate list. First store the values
                 # that apply to all of them:
-                if "name" in feature["properties"]:
-                    name = feature["properties"]["name"]
-                elif "description" in feature["properties"]:
-                    name = feature["properties"]["description"]
-                else:
-                    name = None
 
                 if not self.fieldnames:
                     self.fieldnames = ["class"]
@@ -777,6 +784,9 @@ class TrackPoints(object):
                     kl = key.lower()
                     if kl == "name" or kl == "trailname":
                         name = props[key]
+                        break
+            if not name:
+                name = look_for_name(feature)
 
             # Properties may specify a null name, but we need something.
             if not name:

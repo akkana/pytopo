@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2016 by Akkana Peck.
+# Copyright (C) 2009-2023 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -188,9 +188,10 @@ def to_decimal_degrees(coord, degformat="DD", report_chars_matched=False):
     return val
 
 
-@staticmethod
 def bearing(lat1, lon1, lat2, lon2):
-    """Bearing from wp1 to wp2."""
+    """Bearing from wp1 to wp2.
+       Input angles are degrees; output is also degrees.
+    """
     # Python's trig functions take radians, not degrees
     lat1 = math.radians(lat1)
     lon1 = math.radians(lon1)
@@ -209,7 +210,7 @@ def bearing(lat1, lon1, lat2, lon2):
     return brng
 
 
-# Convert an angle (deg) to the appropriate quadrant string, e.g. N 57 E.
+# Convert an angle (degrees) to the appropriate quadrant string, e.g. N 57 E.
 def angle_to_quadrant(angle):
     if angle > 180:
         angle = angle - 360
@@ -251,9 +252,11 @@ def ohstring(num, numdigits):
 
 def haversine_angle(latitude_1, longitude_1, latitude_2, longitude_2):
     """
-    Haversine angle between two points.
-    From https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
-    Implemented from http://www.movable-type.co.uk/scripts/latlong.html
+    Haversine angle (in radians) between two points
+    specified by coordinates (in degrees).
+    (This is the angle from the earth's center, not bearing on the surface.)
+    References: https://github.com/tkrajina/gpxpy/blob/master/gpxpy/geo.py
+                http://www.movable-type.co.uk/scripts/latlong.html
     """
     d_lat = math.radians(latitude_1 - latitude_2)
     d_lon = math.radians(longitude_1 - longitude_2)
@@ -263,6 +266,7 @@ def haversine_angle(latitude_1, longitude_1, latitude_2, longitude_2):
     a = math.sin(d_lat / 2) * math.sin(d_lat / 2) + \
         math.sin(d_lon / 2) * math.sin(d_lon / 2) * \
         math.cos(lat1) * math.cos(lat2)
+    ha = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
@@ -272,8 +276,7 @@ def haversine_distance(latitude_1, longitude_1,
     Haversine distance between two points.
     Returns distance in miles or meters.
     """
-    c = haversine_angle(latitude_1, longitude_1,
-                                 latitude_2, longitude_2)
+    c = haversine_angle(latitude_1, longitude_1, latitude_2, longitude_2)
     if metric:
         return EARTH_RADIUS_KM * c
     else:
