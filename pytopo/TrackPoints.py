@@ -717,8 +717,15 @@ class TrackPoints(object):
                     name = feature["properties"]["name"]
                 elif "description" in feature["properties"]:
                     name = feature["properties"]["description"]
+                if not name:
+                    # It has to have some non-null name, since that's
+                    # the signal handle_track_point uses to tell it's
+                    # a waypoint and not a track point.
+                    # So make a name that will be invisible.
+                    name = " "
                 self.handle_track_point(lat, lon, waypoint_name=name)
                 bbox.add_point(lat, lon)
+                continue
 
             def add_polygon(polycoords, polyname, properties):
                 polyclasses = []
@@ -774,6 +781,8 @@ class TrackPoints(object):
                                         feature["properties"])
 
             if featuretype != "LineString" and featuretype != "MultiLineString":
+                print("Don't know how to handle GeoJSON feature of type",
+                      featuretype)
                 continue
 
             # It's a track. Add it.

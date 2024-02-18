@@ -651,7 +651,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
                 if x >= 0 and x < self.win_width and \
                    y >= 0 and y < self.win_height:
-                    if pt.name and pt.name != NULL_WP_NAME:
+                    if pt.name.strip() and pt.name != NULL_WP_NAME:
                         self.draw_label(pt.name, x, y,
                                         color=self.waypoint_color,
                                         dropshadow=True,
