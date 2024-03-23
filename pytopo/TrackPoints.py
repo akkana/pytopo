@@ -779,6 +779,7 @@ class TrackPoints(object):
                         for featurepoly in container:
                             add_polygon(featurepoly, name,
                                         feature["properties"])
+                    continue
 
             if featuretype != "LineString" and featuretype != "MultiLineString":
                 print("Don't know how to handle GeoJSON feature of type",
