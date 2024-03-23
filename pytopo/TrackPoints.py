@@ -52,7 +52,7 @@ class GeoPoint(object):
     # lat and lon are floats; the rest are strings.
     # At least from GPX format,
     # ele is a string representing elevation in meters;
-    # timestamp is an string like 2014-08-07T01:19:24Z.
+    # timestamp is a string like 2014-08-07T01:19:24Z.
     # If you need to add timestamps, see add_bogus_timestamps.
     # attrs is an optional list of other attributes like hdop and speed.
     def __init__(self, lat, lon, ele=None, speed=None,
@@ -267,9 +267,12 @@ class TrackPoints(object):
            If waypoint_name, we assume this is a waypoint,
            otherwise assume it's a track point.
            attrs is an optional dict of other attributes, like hdop or speed.
+           If timestamp==0, add a bogus timestamp; if None, add no timestamp.
         """
         self.bbox.add_point(lat, lon)
 
+        if timestamp == 0:
+            timestamp = self.make_bogus_timestamp()
         point = GeoPoint(lat, lon, ele=ele, speed=speed, timestamp=timestamp,
                          name=waypoint_name, attrs=attrs)
 
@@ -485,6 +488,12 @@ class TrackPoints(object):
         # For now, keep elevation and time as unchanged strings.
         return lat, lon, ele, speed, time, attrs
 
+    @staticmethod
+    def make_bogus_timestamp(t=None):
+        if not t:
+            t = time.time()
+        return time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(t))
+
     def add_bogus_timestamps(self):
         """Add made-up timestamps to every track point."""
         # 2007-10-02T09:22:06Z
@@ -493,8 +502,7 @@ class TrackPoints(object):
         interval = 15
         for pt in self.points:
             if not self.is_start(pt) and not pt.timestamp:
-                pt.timestamp = time.strftime('%Y-%m-%dT%H:%M:%S',
-                                             time.gmtime(t))
+                pt.timestamp = self.make_bogus_timestamp(t)
                 t += interval
 
     def undo(self):

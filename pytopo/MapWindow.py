@@ -2437,7 +2437,8 @@ but if you want to, contact me and I'll help you figure it out.)
 
         lon, lat = self.xy2coords(event.x, event.y)
 
-        self.trackpoints.handle_track_point(lat, lon, waypoint_name=None)
+        self.trackpoints.handle_track_point(lat, lon, timestamp=0,
+                                            waypoint_name=None)
 
         # XXX Preferably, just draw the line ourselves,
         # and figure it'll get drawn nicely later when the map needs to redraw.
