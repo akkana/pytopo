@@ -229,6 +229,10 @@ descended.
 
 `PyTopo's source is hosted on Github <https://github.com/akkana/pytopo>`_
 if you want the latest and greatest.
+You can pip install it from the source directory with:
+::
+
+    pip install .
 
 Dependencies include
 
