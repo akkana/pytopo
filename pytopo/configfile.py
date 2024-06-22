@@ -342,13 +342,6 @@ Collections = [
     # user_agent = "PyTopo customized by Your Name Here"
     # and use it sparingly, so OSM doesn't get upset and ban all PyTopo users.
 
-    # Humanitarian
-    OSMMapCollection( "humanitarian", "~/Maps/humanitarian",
-                      ".png", 256, 256, 11,
-                      "http://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-                      maxzoom=15,
-                      attribution="Humanitarian OSM Maps, map data © OpenStreetMap contributors"),
-
     # The USGS National Map provides various kinds of tiles.
     # Here's their basic Topo tile.
     # Their documentation says they support zooms to 19,

@@ -781,6 +781,7 @@ class TrackPoints(object):
                 if featuretype == "Polygon":
                     for featurepoly in feature["geometry"]["coordinates"]:
                         add_polygon(featurepoly, name, feature["properties"])
+                    continue
 
                 elif featuretype == "MultiPolygon":
                     for container in feature["geometry"]["coordinates"]:
