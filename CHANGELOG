@@ -1,3 +1,10 @@
+2024-06-22  Akkana Peck <akkana@shallowsky.com>
+	Release 1.7.2.
+	Change default map to USGS (Humanitarian no longer works).
+
+2024-02-18  Akkana Peck <akkana@shallowsky.com>
+	GeoJSON reading improvements.
+
 2023-11-15  Akkana Peck <akkana@shallowsky.com>
 	Release 1.7.1
 
