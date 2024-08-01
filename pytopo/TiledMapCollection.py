@@ -316,7 +316,7 @@ TiledMapCollection classes must implement:
             print("Bad tile filename", path)
             return
 
-        # Now we need to turn tilex and tiley into x, y, x_off, y_off
+        # Now, turn tilex and tiley into x, y, x_off, y_off
         # for the MapWindow's current position.
         lat_deg, lon_deg = self.num2deg(tilex, tiley)
 
