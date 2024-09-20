@@ -1,3 +1,7 @@
+2024-09-20  Akkana Peck <akkana@shallowsky.com>
+	1.7.2.1, try to make a release.
+	Minor changes to track colors.
+
 2024-06-22  Akkana Peck <akkana@shallowsky.com>
 	Release 1.7.2.
 	Change default map to USGS (Humanitarian no longer works).

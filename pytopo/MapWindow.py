@@ -215,8 +215,8 @@ but if you want to, contact me and I'll help you figure it out.)
         self.red_color = (1., 0., 0.)
         self.blue_color = (0., 0., 1.)
         self.bg_scale_color = (1., 1., 1., .3)
-        self.first_track_color = (1., 0., 1.)
         self.grid_color = (.45, .45, .45)
+        self.first_track_color = None
 
         # waypoint_color is the color for waypoint *labels*.
         # We'll try to give the actual waypoints the color of their track file.
@@ -471,13 +471,15 @@ but if you want to, contact me and I'll help you figure it out.)
         """Takes a color triplet (values between 0 and 1)
            and converts it to a similar saturation and value but different hue
         """
+        if not self.first_track_color:
+            self.first_track_color = (.9, 0., 1.)
         if not color:
             return self.first_track_color
 
         h, s, v = colorsys.rgb_to_hsv(*color[:3])
 
         # Hue is a floating point between 0 and 1. How much should we jump?
-        jump = .71
+        jump = .17
 
         newcolor = colorsys.hsv_to_rgb(h + jump, s, v)
         if len(color) == 3:
@@ -1599,7 +1601,7 @@ but if you want to, contact me and I'll help you figure it out.)
             else:
                 # Split the track. Make a name for the new track segment:
                 trackname = self.trackpoints.points[near_track]
-                match = re.search('(.*) (\d+)$', trackname)
+                match = re.search(r'(.*) (\d+)$', trackname)
                 if match:
                     trackname = "%s %d" % (match.group(1), int(match.group(2)) + 1)
                 else:
