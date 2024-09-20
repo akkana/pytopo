@@ -216,7 +216,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.blue_color = (0., 0., 1.)
         self.bg_scale_color = (1., 1., 1., .3)
         self.grid_color = (.45, .45, .45)
-        self.first_track_color = None
+        self.first_track_color = (.9, 0., 1.)
 
         # waypoint_color is the color for waypoint *labels*.
         # We'll try to give the actual waypoints the color of their track file.
@@ -471,8 +471,6 @@ but if you want to, contact me and I'll help you figure it out.)
         """Takes a color triplet (values between 0 and 1)
            and converts it to a similar saturation and value but different hue
         """
-        if not self.first_track_color:
-            self.first_track_color = (.9, 0., 1.)
         if not color:
             return self.first_track_color
 
