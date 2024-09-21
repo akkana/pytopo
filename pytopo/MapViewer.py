@@ -258,6 +258,8 @@ to standard output.
 
         args = args[1:]
 
+        # For the case of no arguments, raise an exception
+        # which will bring up the site selection window.
         if not args:
             raise(ArgParseException)
 
@@ -552,6 +554,8 @@ Please specify either a site or a file containing geographic data.""")
         if mapwin.collection and mapwin.gps_poller:
             return
 
+        # No arguments specified a site.
+        # Raise an exception so the caller can bring up a selection window.
         raise(ArgParseException)
 
 
@@ -609,20 +613,25 @@ Please specify either a site or a file containing geographic data.""")
 
         gc.enable()
 
+        # Fork and run in the background.
+        # This must happen before any GTK; a 2024 change in GTK
+        # makes the mapwin hang if it's in a subprocess but the
+        # selection dialog already came up in the parent process.
+        rc = os.fork()
+        if rc:
+            sys.exit(0)
+
         mapwin = MapWindow(self)
 
         try:
             self.parse_args(mapwin, pytopo_args)
         except ArgParseException:
-            # Didn't match any known run mode:
-            # start in selector mode to choose a location:
+            # Didn't match any known run arguments:
+            # bring up the selection window to choose a location.
+            # It will return True if the user chooses a location,
+            # False for Cancel or some other way out.
             if not mapwin.selection_window():
                 sys.exit(0)
-
-        # Fork and run in the background.
-        rc = os.fork()
-        if rc:
-            sys.exit(0)
 
         # For cProfile testing, run with a dummy collection (no data needed):
         # mapwin.collection = MapCollection("dummy", "/tmp")

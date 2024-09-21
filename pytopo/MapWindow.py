@@ -229,7 +229,8 @@ but if you want to, contact me and I'll help you figure it out.)
         self.attr_font_desc = pango.FontDescription("Sans Bold Italic 12")
         self.select_font_desc = pango.FontDescription("Sans Bold 15")
 
-        # For running on tablets:
+        # For running on tablets/touchscreens
+        # (not sure why GTK can't figure this out on its own):
         settings = gtk.settings_get_default()
         settings.set_property("gtk-touchscreen-mode", True)
 
@@ -289,7 +290,6 @@ but if you want to, contact me and I'll help you figure it out.)
         self.drawing_area.connect("button-release-event", self.mouserelease)
         self.drawing_area.connect("scroll-event",         self.scroll_event)
         self.drawing_area.connect("motion_notify_event",  self.drag_event)
-
         # The default focus in/out handlers on drawing area cause
         # spurious expose events.  Trap the focus events, to block that:
         self.drawing_area.connect("focus-in-event", self.nop)
@@ -350,12 +350,16 @@ but if you want to, contact me and I'll help you figure it out.)
             return
         if not self.drawing_area:
             # Not initialized yet, not ready to draw a map
+            if self.controller.Debug:
+                print("draw_map called before drawing_area is initialized")
             return
 
         self.cr = self.drawing_area.get_window().cairo_create()
 
         self.win_width, self.win_height = \
             self.drawing_area.get_window().get_geometry()[2:4]
+        if self.controller.Debug:
+            print("window size is", self.win_width, self.win_height)
 
         # If we're in follow GPS mode and don't yet have center lat, lon,
         # display a message:
@@ -371,7 +375,7 @@ but if you want to, contact me and I'll help you figure it out.)
             print(self.center_lat)
 
         self.collection.draw_map(self.center_lon, self.center_lat, self)
-        if self.controller.Debug:
+        if self.controller.Debug and self.overlays:
             print("drawing overlay collections")
         for ov in self.overlays:
             ov.draw_map(self.center_lon, self.center_lat, self)
@@ -1261,9 +1265,11 @@ but if you want to, contact me and I'll help you figure it out.)
         """Show a window that lets the user choose a known starting point.
            Returns True if the user chose a valid site, otherwise False.
         """
-        dialog = gtk.Dialog("Choose a starting point", None, 0,
-                            (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
-                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+        dialog = gtk.Dialog("Choose a starting point",
+                            transient_for=None, flags=0)
+        dialog.add_buttons(gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
+                           gtk.STOCK_OK, gtk.RESPONSE_OK)
+
         # dialog.connect('destroy', lambda win: gtk.main_quit())
         # Wouldn't it be nice if GTK dialogs would automatically
         # size to their contents? Sigh. Without this, the dialog
@@ -1280,7 +1286,7 @@ but if you want to, contact me and I'll help you figure it out.)
         hbox = gtk.HBox(spacing=6)
         svbox.pack_start(hbox, expand=False)
 
-        hbox.pack_start(gtk.Label("Coordinates:"), expand=False)
+        hbox.pack_start(gtk.Label(label="Coordinates:"), expand=False)
 
         # An entry to enter specific coordinates
         coord_entry = gtk.Entry()
@@ -1308,7 +1314,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # http://pygtk.org/pygtk2tutorial/ch-TreeViewWidget.html
         # Make a treeview from the list:
-        treeview = gtk.TreeView(store)
+        treeview = gtk.TreeView(model=store)
 
         renderer = gtk.CellRendererText()
         column = gtk.TreeViewColumn("Location", renderer, text=0)
@@ -1368,7 +1374,7 @@ but if you want to, contact me and I'll help you figure it out.)
                     return True
             else:
                 dialog.destroy()
-            return False
+                return False
 
 
     def accept_paste(self, widget, event):

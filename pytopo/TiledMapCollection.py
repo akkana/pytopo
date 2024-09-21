@@ -120,8 +120,7 @@ TiledMapCollection classes must implement:
         max_lat = center_lat + mapwin.win_height / self.yscale / 2
 
         if (self.mapwin.controller.Debug):
-            print("Map from", min_lon, min_lon, min_lat, \
-                  "to", max_lon, max_lat)
+            print("Map from", min_lon, min_lat, "to", max_lon, max_lat)
 
         # Start from the upper left: min_lon, max_lat
 
@@ -214,13 +213,16 @@ TiledMapCollection classes must implement:
         gc.collect()
 
     def get_next_maplet_name(self, fullpathname, dX, dY):
-        """Starting from a maplet name, get the one a set distance away."""
+        """Starting from a maplet name, get the one a set distance away.
+           This needs to be overridden by child classes.
+        """
         return
 
     def get_next_maplet(self, fullpathname, dX, dY):
         """Given a maplet's pathname, get the next or previous one.
-        May not work for jumps more than 1 in any direction.
-        Returns pixbuf, newpath (either may be None).
+           May not work for jumps more than 1 in any direction.
+           Returns pixbuf, newpath (either may be None).
+           This needs to be overridden by child classes.
         """
         return
 
