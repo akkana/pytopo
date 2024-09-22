@@ -1,3 +1,10 @@
+2024-09-21  Akkana Peck <akkana@shallowsky.com>
+	1.7.3, hopefully I can release this time.
+	Fix drawing when starting from site selection dialog.
+	Use importlib instead of pgk_resources.
+	Drastically reduce size of polygon geojson test file,
+	which was causing twine to fail uploading to pypi.
+
 2024-09-20  Akkana Peck <akkana@shallowsky.com>
 	1.7.2.1, try to make a release.
 	Minor changes to track colors.
