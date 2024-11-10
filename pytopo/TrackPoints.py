@@ -293,14 +293,24 @@ class TrackPoints(object):
             pass
 
         if waypoint_name:
-            # XXX if there's already a waypoint here, it might be better
-            # to append the waypoint_name to the existing point, since
-            # PyTopo can't show multiple points at the same location.
-            self.waypoints.append(point)
+            self.add_waypoint(point)
         else:
             self.points.append(point)
 
         return point
+
+    def add_waypoint(self, point):
+        """Add the given point as a waypoint, if there isn't already
+           a waypoint at the given location.
+           If there is, append the name to the existing point.
+           Currently this requires an exact match, but eventually
+           it should use some sort of "close enough" metric.
+        """
+        for wp in self.waypoints:
+            if wp.lat == point.lat and wp.lon == point.lon:
+                wp.name += "\n" + point.name
+                return
+        self.waypoints.append(point)
 
     def inside_box(self, pt, bb):
         """Is the point inside the given bounding box?

@@ -373,6 +373,14 @@ to standard output.
                 args = args[1:]
                 continue
 
+            # Try to match a known site:
+            for site in self.KnownSites:
+                if args[0] == site[0]:
+                    mapwin.add_title(args[0])
+                    if not self.use_site(site, mapwin):
+                        continue
+                    break
+
             # args[0] doesn't start with '-'. Is it a file?
             if os.path.exists(args[0]):
 
@@ -428,16 +436,11 @@ to standard output.
                     args = args[1:]
                     continue
 
-                print(args[0], "doesn't seem to be a GPX or GeoJSON file")
+                print("Skipping '%s': doesn't seem to be a GPX or GeoJSON file"
+                      % args[0])
                 print("or an image file with GPS coordinates")
-
-            # Try to match a known site:
-            for site in self.KnownSites:
-                if args[0] == site[0]:
-                    mapwin.add_title(args[0])
-                    if not self.use_site(site, mapwin):
-                        continue
-                    break
+                args = args[1:]
+                continue
 
             if mapwin.collection and mapwin.center_lon is not None \
                and mapwin.center_lat is not None:
