@@ -264,10 +264,12 @@ class TrackPoints(object):
     def handle_track_point(self, lat, lon, ele=None, speed=None,
                            timestamp=None, waypoint_name=False, attrs=None):
         """Add a new trackpoint or waypoint after some basic sanity checks.
+           lat and lon are in degrees.
            If waypoint_name, we assume this is a waypoint,
            otherwise assume it's a track point.
            attrs is an optional dict of other attributes, like hdop or speed.
            If timestamp==0, add a bogus timestamp; if None, add no timestamp.
+           Return the newly created trackpoint.
         """
         self.bbox.add_point(lat, lon)
 
@@ -291,9 +293,14 @@ class TrackPoints(object):
             pass
 
         if waypoint_name:
+            # XXX if there's already a waypoint here, it might be better
+            # to append the waypoint_name to the existing point, since
+            # PyTopo can't show multiple points at the same location.
             self.waypoints.append(point)
         else:
             self.points.append(point)
+
+        return point
 
     def inside_box(self, pt, bb):
         """Is the point inside the given bounding box?
@@ -641,6 +648,8 @@ class TrackPoints(object):
                 outfp.write("  <trk>\n")
                 segstr = ''
                 skipping = False
+                if not self.is_start(self.points[0]):
+                    outfp.write("    <trkseg>\n")
                 for pt in self.points:
                     if self.is_start(pt):
                         if segstr:
@@ -1041,7 +1050,7 @@ class TrackPoints(object):
             return None
         # coord_tuples = coords[0].childNodes[0].data.strip().split()
         coord_tuples = re.findall(
-            '\s*([0-9.-]+)\s*,\s*([0-9.-]+)(\s*,\s*[0-9.-]+)?',
+            r'\s*([0-9.-]+)\s*,\s*([0-9.-]+)(\s*,\s*[0-9.-]+)?',
             coords[0].childNodes[0].data)
         # This gives a list of things like
         # ('-106.222544642583', '35.81443097698173', ',0')

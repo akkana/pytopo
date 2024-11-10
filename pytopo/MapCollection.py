@@ -124,7 +124,7 @@ __init__, get_maplet, draw_map.
         z = 0
 
         # Handle the case of a single point
-        if xdist == 0 or ydist == 0:
+        if xdist == 0 and ydist == 0:
             print("Single point! Defaulting to zoom level 12")
             self.zoom_to(12)
             return

@@ -12,6 +12,7 @@ from __future__ import print_function
 
 from pytopo.MapWindow import MapWindow
 from pytopo import MapUtils
+from pytopo.imggps import gps_from_image
 from pytopo.TrackPoints import TrackPoints, BoundingBox
 
 import pytopo.configfile as configfile
@@ -64,8 +65,8 @@ class MapViewer(object):
         print("pytopo", MapViewer.get_version())
         print("""
 Usage: pytopo
-       pytopo trackfile
        pytopo known_site
+       pytopo trackfile | image-with-GPS.jpg
        pytopo [-t trackfile] [-c collection] [-o overlay] [-r] [site_name]
        pytopo [-t trackfile] start_lat start_lon [collection]
        pytopo -m :  show a menu of known sites
@@ -372,37 +373,63 @@ to standard output.
                 args = args[1:]
                 continue
 
-            # args[0] doesn't start with '-'. Is it a track file?
-            try:
-                bbox = mapwin.trackpoints.read_track_file(args[0])
-                files_bbox.union(bbox)
-                mapwin.add_title(args[0])
-                args = args[1:]
-                continue
+            # args[0] doesn't start with '-'. Is it a file?
+            if os.path.exists(args[0]):
 
-            except IOError:
-                print("Can't read track file", args[0])
-                args = args[1:]
-                continue
-
-            # Catch a special case for a common KML error:
-            except xml.parsers.expat.ExpatError:
-                print("Can't read %s: syntax error." % args[0])
-                lowerarg = args[0].lower()
-                if lowerarg.endswith(".kml") or \
-                   lowerarg.endswith(".kmz"):
-                    print("""
-Is this a KML made with ArcGIS?
-It may have an illegal xsi:schemaLocation.
-If so, try changing xsi:schemaLocation to just schemaLocation.""")
+                # Is it a track file?
+                try:
+                    bbox = mapwin.trackpoints.read_track_file(args[0])
+                    files_bbox.union(bbox)
+                    mapwin.add_title(args[0])
                     args = args[1:]
-                    sys.exit(1)
+                    continue
 
-            except (RuntimeError, FileNotFoundError) as e:
-                # It wasn't a track file; continue trying to parse it
-                if self.Debug:
-                    print("%s didn't work as a track file: %s" % (args[0], e))
-                pass
+                except IOError:
+                    print("Can't read track file", args[0])
+                    args = args[1:]
+                    continue
+
+                # Catch a special case for a common KML error:
+                except xml.parsers.expat.ExpatError:
+                    print("Can't read %s: syntax error." % args[0])
+                    lowerarg = args[0].lower()
+                    if lowerarg.endswith(".kml") or \
+                       lowerarg.endswith(".kmz"):
+                        print("""
+    Is this a KML made with ArcGIS?
+    It may have an illegal xsi:schemaLocation.
+    If so, try changing xsi:schemaLocation to just schemaLocation.""")
+                        args = args[1:]
+                        sys.exit(1)
+
+                except (RuntimeError, FileNotFoundError) as e:
+                    # It wasn't a track file; continue trying to parse it
+                    if self.Debug:
+                        print("%s didn't work as a track file: %s" % (args[0], e))
+
+                # Is it an image file that might have embedded GPS coordinates?
+                # If so, add the coordinates as a waypoint.
+                img_gps = gps_from_image(args[0])
+                if img_gps:
+                    # mapwin.center_lat = img_gps['latitude']
+                    # mapwin.center_lon = img_gps['longitude']
+                    mapwin.trackpoints.handle_track_point(
+                        img_gps['latitude'], img_gps['longitude'],
+                        ele=None, speed=None,
+                        timestamp=img_gps['timestamp'],
+                        waypoint_name=img_gps['filename'],
+                        attrs=None)
+                    # mapwin.pin_lat = mapwin.center_lat
+                    # mapwin.pin_lon = mapwin.center_lon
+                    if self.Debug:
+                        print("Using GPS from image", args[0],
+                              ": latitude", img_gps['latitude'],
+                              "longitude",img_gps['longitude'])
+                    args = args[1:]
+                    continue
+
+                print(args[0], "doesn't seem to be a GPX or GeoJSON file")
+                print("or an image file with GPS coordinates")
 
             # Try to match a known site:
             for site in self.KnownSites:
@@ -436,6 +463,8 @@ If so, try changing xsi:schemaLocation to just schemaLocation.""")
                     mapwin.center_lon = lon
 
                     # Set a pin on the specified point.
+                    # XXX Should dispense with this pin business
+                    # and use trackpoints.waypoints, as with image EXIF.
                     mapwin.pin_lat = lat
                     mapwin.pin_lon = lon
 

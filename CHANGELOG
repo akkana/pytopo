@@ -1,3 +1,6 @@
+2024-11-09  Akkana Peck <akkana@shallowsky.com>
+	Add ability to extract GPS data from image file EXIF.
+
 2024-09-21  Akkana Peck <akkana@shallowsky.com>
 	1.7.3, hopefully I can release this time.
 	Fix drawing when starting from site selection dialog.
