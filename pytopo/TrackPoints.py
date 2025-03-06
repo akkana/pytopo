@@ -308,7 +308,8 @@ class TrackPoints(object):
         """
         for wp in self.waypoints:
             if wp.lat == point.lat and wp.lon == point.lon:
-                wp.name += "\n" + point.name
+                if point.name != wp.name:
+                    wp.name += "\n" + point.name
                 return
         self.waypoints.append(point)
 

@@ -122,6 +122,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.cur_lat = None
         self.trackpoints = None
         self.show_waypoints = True
+        self.show_labels = True
         self.drawing_track = False
         self.selected_track = None
         self.selected_waypoint = None
@@ -649,7 +650,8 @@ but if you want to, contact me and I'll help you figure it out.)
 
                 if x >= 0 and x < self.win_width and \
                    y >= 0 and y < self.win_height:
-                    if pt.name.strip() and pt.name != NULL_WP_NAME:
+                    if self.show_labels and \
+                       pt.name.strip() and pt.name != NULL_WP_NAME:
                         self.draw_label(pt.name, x, y,
                                         color=self.waypoint_color,
                                         dropshadow=True,
@@ -1134,6 +1136,10 @@ but if you want to, contact me and I'll help you figure it out.)
             show_waypoint_label = "Hide waypoints"
         else:
             show_waypoint_label = "Show waypoints"
+        if self.show_labels:
+            show_labels_label = "Hide labels"
+        else:
+            show_labels_label = "Show labels"
         if self.drawing_track:
             draw_track_label = "Finish drawing track"
         else:
@@ -1165,6 +1171,7 @@ but if you want to, contact me and I'll help you figure it out.)
             ("Zoom here...", self.zoom),
             (draw_track_label, self.toggle_track_drawing),
             (show_waypoint_label, self.toggle_show_waypoints),
+            (show_labels_label, self.toggle_show_labels),
             ("Colorize tracks", None),
 
             ("Rest", SEPARATOR),
@@ -1249,6 +1256,11 @@ but if you want to, contact me and I'll help you figure it out.)
     def toggle_show_waypoints(self, widget):
         """Toggle whether waypoints are shown."""
         self.show_waypoints = not self.show_waypoints
+        self.force_redraw()
+
+    def toggle_show_labels(self, widget):
+        """Toggle whether labels on waypoints are shown."""
+        self.show_labels = not self.show_labels
         self.force_redraw()
 
     def mylocations(self, widget):
@@ -2137,7 +2149,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
         if dropshadow:
             self.cr.set_source_rgb(*self.black_color)
-            if True or label_height < 15:
+            if label_height < 15:
                 self.draw_rectangle(True, x, y, label_width, label_height)
             else:
                 self.cr.move_to(x, y+2)
