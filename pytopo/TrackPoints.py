@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2016 by Akkana Peck.
+# Copyright (C) 2009-2025 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -83,6 +83,15 @@ class GeoPoint(object):
             s += " }"
 
         return s
+
+    def format_timestamp(self):
+        if self.timestamp:
+            return self.timestamp
+
+        # timestamp should be in a format like 2015-12-02T16:50:34Z
+        self.timestamp = time.strftime('%Y-%m-%dT%H:%M:%SZ',
+                                       time.gmtime(time.time()))
+        return self.timestamp
 
 
 # Impossible values:
@@ -651,9 +660,9 @@ class TrackPoints(object):
                     continue
                 if not boundingbox or self.inside_box(pt, boundingbox):
                     outfp.write('''  <wpt lat="%f" lon="%f">
-    <time>2015-12-02T16:50:34Z</time>
+    <time>%s</time>
     <name>%s</name>
-  </wpt>\n''' % (pt.lat, pt.lon, pt.name))
+  </wpt>\n''' % (pt.lat, pt.lon, pt.format_timestamp(), pt.name))
 
             if self.points:
                 outfp.write("  <trk>\n")
