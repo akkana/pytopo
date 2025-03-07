@@ -1,3 +1,7 @@
+2025-03-06  Akkana Peck <akkana@shallowsky.com>
+	Added waypoint editing, and proper timestamps on waypoints
+	in saved files.
+
 2024-11-09  Akkana Peck <akkana@shallowsky.com>
 	Add ability to extract GPS data from image file EXIF.
 

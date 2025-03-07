@@ -664,7 +664,8 @@ but if you want to, contact me and I'll help you figure it out.)
 
 
     def find_nearest_trackpoint(self, x, y):
-        """Find the nearet track, the nearest point on that track,
+        """Find the indeces of the nearest track,
+           the nearest point on that track,
            and the nearest waypoint (if any) to a given x, y point.
            Called on mouse click.
            Any of the three can be None if nothing is sufficiently close.
@@ -1159,7 +1160,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
             ("Track Editing", SEPARATOR),
             ("Add waypoint...", self.add_waypoint_by_mouse),
-            ("Remove waypoint", self.remove_waypoint),
+            ("Edit/Remove waypoint", self.edit_waypoint),
             ("Split track here", self.split_track_by_mouse),
             ("Remove points before this", self.remove_before_mouse),
             ("Remove points after this", self.remove_after_mouse),
@@ -1638,20 +1639,47 @@ but if you want to, contact me and I'll help you figure it out.)
         self.trackpoints.points.remove(self.trackpoints.points[near_point])
         self.force_redraw()
 
-    def remove_waypoint(self, widget):
+    def show_message(self, msg):
+        """Show a message only briefly.
+           It will disappear as soon as the map is moved or zoomed.
+        """
+        self.draw_label(msg, 10, self.win_height/2,
+                        color=self.black_color, dropshadow=False)
+
+    def edit_waypoint(self, widget):
         """Remove the point nearest the mouse from its track."""
 
         near_track, near_point, near_waypoint, polygons = \
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
         if near_waypoint is None:
-            print("There's no waypoint near the mouse")
+            # XXX This label and X are getting overwritten
+            # by maplets, even before any move or zoom.
+            # Looks like we'll need to store current-message and current-point.
+
+            self.show_message("There's no waypoint near the mouse")
+
+            # Draw an X at the mouse-click spot.
+            exsize = 7
+            self.draw_line(self.context_x - exsize, self.context_y - exsize,
+                           self.context_x + exsize, self.context_y + exsize)
+            self.draw_line(self.context_x - exsize, self.context_y + exsize,
+                           self.context_x + exsize, self.context_y -exsize)
             return
+
+        newname, delete = self.prompt(
+            "Edit or Delete Waypoint",
+            name=self.trackpoints.waypoints[near_waypoint].name,
+            show_delete=True)
 
         # Nuttiness: even if you know the index, apparently the only
         # way to remove something from a list is to search through the
         # list for an exact item match.
-        self.trackpoints.waypoints.remove(self.trackpoints.waypoints[near_waypoint])
+        if delete:
+            self.trackpoints.waypoints.remove(
+                self.trackpoints.waypoints[near_waypoint])
+        else:
+            self.trackpoints.waypoints[near_waypoint].name = newname
         self.force_redraw()
 
     def add_waypoint_by_mouse(self, widget):
@@ -1659,7 +1687,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.pin_lon, self.pin_lat = self.cur_lon, self.cur_lat
 
         # Prompt for a name for the waypoint
-        wpname = self.prompt("Save location", default="WP")
+        wpname = self.prompt("New waypoint", name="*")
         if wpname == None:
             return
         if wpname:
@@ -1684,14 +1712,16 @@ but if you want to, contact me and I'll help you figure it out.)
         self.center_lon, self.center_lat = self.pin_lon, self.pin_lat
         self.force_redraw()
 
-    def prompt(self, prompt, comment="", default=""):
+    def prompt(self, prompt, comment="", name="", show_delete=False):
         """Prompt the user for a string, returning the string.
            Returns None if the user presses CANCEL instead
            (as opposed to an empty string, which means the
            user didn't type anything but hit OK).
+           If show_delete is True, also show a Delete toggle button,
+           and return a tuple where the second item is the state of the button.
         """
         if not self.prompt_dialog:
-            self.prompt_dialog = gtk.Dialog("PyTopo", None, 0,
+            self.prompt_dialog = gtk.Dialog("PyTopo: %s" % prompt, None, 0,
                                             (gtk.STOCK_CANCEL,
                                                gtk.RESPONSE_NONE,
                                              gtk.STOCK_OK, gtk.RESPONSE_OK))
@@ -1701,10 +1731,16 @@ but if you want to, contact me and I'll help you figure it out.)
             self.prompt_dialog_prompt = gtk.Label(prompt)
             self.prompt_dialog.vbox.pack_start(self.prompt_dialog_prompt,
                                                expand=False)
+
+            self.prompt_dialog_del_btn = gtk.ToggleButton("Delete")
+            self.prompt_dialog.vbox.pack_start(self.prompt_dialog_del_btn,
+                                               expand=False)
+
             self.prompt_dialog_text = gtk.Entry()
             self.prompt_dialog_text.set_activates_default(True)
             self.prompt_dialog.vbox.pack_start(self.prompt_dialog_text,
                                                expand=True)
+
             self.prompt_dialog_comment = gtk.Label("")
             self.prompt_dialog.vbox.pack_start(self.prompt_dialog_comment,
                                                expand=False)
@@ -1715,20 +1751,32 @@ but if you want to, contact me and I'll help you figure it out.)
             self.prompt_dialog_comment.set_text(comment)
             self.prompt_dialog_prompt.set_text(prompt)
 
+        self.prompt_dialog_del_btn.set_active(False)
+
+        if show_delete:
+            self.prompt_dialog_del_btn.show()
+        else:
+            self.prompt_dialog_del_btn.hide()
+
         self.prompt_dialog.set_default_response(gtk.RESPONSE_OK)
-        self.prompt_dialog_text.set_text(default)
-        if default:
-            self.prompt_dialog_text.select_region(0, len(default))
+        self.prompt_dialog_text.set_text(name)
+        if name:
+            self.prompt_dialog_text.select_region(0, len(name))
         self.prompt_dialog_text.grab_focus()
         self.prompt_dialog.show()
 
         response = self.prompt_dialog.run()
         if response == gtk.RESPONSE_OK:
             self.prompt_dialog.hide()
-            return self.prompt_dialog_text.get_text()
+            retval = self.prompt_dialog_text.get_text()
         else:
             self.prompt_dialog.hide()
-            return None
+            retval = None
+
+        if show_delete:
+            return retval, self.prompt_dialog_del_btn.get_active()
+        else:
+            return retval
 
     def save_location(self, widget):
         """Save the pinned location.
