@@ -7,8 +7,6 @@
    tile naming and zoom scheme.
 """
 
-from __future__ import print_function
-
 from pytopo.TiledMapCollection import TiledMapCollection
 from pytopo.MapWindow import MapWindow
 
@@ -261,7 +259,8 @@ class OSMMapCollection(TiledMapCollection):
                               (not on_disk or
                                (self.reload_tiles and
                                 os.stat(path).st_mtime < self.reload_tiles)))
-        except OSError:
+        except OSError as e:
+            print(e)
             on_disk = False
             needs_download = True
 
@@ -292,9 +291,9 @@ class OSMMapCollection(TiledMapCollection):
 
         try:
             pixbuf = MapWindow.load_image_from_file(path)
-        except:
+        except Exception as e:
             if self.mapwin.controller.Debug:
-                print("load_image_from_file(%s) failed" % path)
+                print("load_image_from_file(%s) exception: %s" % (path, e))
             pixbuf = None
             # return None
 
@@ -303,9 +302,11 @@ class OSMMapCollection(TiledMapCollection):
             # This happens periodically even when a tile does eventually
             # get downloaded and shown. I'm not sure why, but the message
             # can be misleading, so restrict it to Debug:
+            badpath = path + ".bad"
             if self.mapwin.controller.Debug:
-                print("Couldn't open pixbuf from", path)
-            os.rename(path, path + ".bad")
+                print("Couldn't open pixbuf from %s: renaming to %s" %
+                      (path, badpath))
+            os.rename(path, badpath)
             pixbuf = None
         # XXX Sometimes despite that check, we mysteriously get
         # GtkWarning: gdk_drawable_real_draw_pixbuf:

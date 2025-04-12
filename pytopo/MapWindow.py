@@ -7,9 +7,16 @@
 
 from __future__ import print_function
 
-from gi import pygtkcompat
-pygtkcompat.enable()
-pygtkcompat.enable_gtk(version='3.0')
+import gi
+gi.require_version('Gtk', '3.0')
+gi.require_version('Gdk', '3.0')
+gi.require_version('PangoCairo', '1.0')
+from gi.repository import Gtk
+from gi.repository import Gdk
+from gi.repository import GLib
+from gi.repository import GObject
+from gi.repository import GdkPixbuf
+from gi.repository import Pango, PangoCairo
 
 from pytopo import MapUtils
 from pytopo.TrackPoints import TrackPoints, NULL_WP_NAME
@@ -33,13 +40,6 @@ except ImportError:
 
 import math
 from collections import OrderedDict
-
-import gtk
-import gobject
-import glib
-import pango
-import cairo
-import pangocairo
 
 import importlib.resources
 
@@ -153,7 +153,7 @@ but if you want to, contact me and I'll help you figure it out.)
             pinpath = str(importlib.resources.files('pytopo').joinpath(
                 'resources/pytopo-pin.png'))
 
-            self.pin = gtk.gdk.pixbuf_new_from_file(pinpath)
+            self.pin = GdkPixbuf.Pixbuf.new_from_file(pinpath)
         except:
             if self.controller.Debug:
                 print("Couldn't initialize the pin image")
@@ -172,7 +172,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # Which is a good thing since there's currently no way to change it.
         self.map_save_dir = os.path.expanduser("~/Topo/")
 
-        # X/gtk graphics variables we need:
+        # X/Gtk graphics variables we need:
         self.drawing_area = 0
         # GTK2: X GC
         self.xgc = None
@@ -218,16 +218,19 @@ but if you want to, contact me and I'll help you figure it out.)
         self.waypoint_color = self.yellow_color
         self.waypoint_color_bg = self.black_color
 
-        self.font_desc = pango.FontDescription("Sans 9")
-        self.bold_font_desc = pango.FontDescription("Sans Bold 9")
-        self.wpt_font_desc = pango.FontDescription("Sans Italic 10")
-        self.attr_font_desc = pango.FontDescription("Sans Bold Italic 12")
-        self.select_font_desc = pango.FontDescription("Sans Bold 15")
+        self.font_desc = Pango.FontDescription("Sans 9")
+        self.bold_font_desc = Pango.FontDescription("Sans Bold 9")
+        self.wpt_font_desc = Pango.FontDescription("Sans Italic 10")
+        self.attr_font_desc = Pango.FontDescription("Sans Bold Italic 12")
+        self.select_font_desc = Pango.FontDescription("Sans Bold 15")
 
         # For running on tablets/touchscreens
-        # (not sure why GTK can't figure this out on its own):
-        settings = gtk.settings_get_default()
-        settings.set_property("gtk-touchscreen-mode", True)
+        # (not sure why GTK2 can't figure this out on its own)
+        # I'm not sure how to do this in GTK3;
+        # crossing fingers and hoping GTK3 is more sensible
+        # so it doesn't need this.
+        # settings = Gtk.settings_get_default()
+        # settings.set_property("Gtk-touchscreen-mode", True)
 
         # Some defaults that hopefully will never be used
         self.zoom_btn_size = 25
@@ -256,28 +259,30 @@ but if you want to, contact me and I'll help you figure it out.)
 
     def show_window(self, init_width, init_height):
         """Create the initial window."""
-        win = gtk.Window()
+        win = Gtk.Window()
         win.set_name(self.title)
         win.set_title(self.title)
         win.connect("destroy", self.graceful_exit)
         win.set_border_width(5)
 
-        vbox = gtk.VBox(spacing=3)
+        vbox = Gtk.VBox(spacing=3)
         win.add(vbox)
 
-        self.drawing_area = gtk.DrawingArea()
+        self.drawing_area = Gtk.DrawingArea()
         # There doesn't seem to be any way to resize a window below
         # the initial size of the drawing area. So make the drawing area
         # initially tiny, then just before showing we'll resize the window.
         # self.drawing_area.size(10, 10)
-        vbox.pack_start(self.drawing_area)
+        # In gtk3 the argumesn are widget, expand, fill, padding
+        vbox.pack_start(self.drawing_area, True, True, 0)
 
-        self.drawing_area.set_events(gtk.gdk.EXPOSURE_MASK |
-                                     gtk.gdk.SCROLL_MASK |
-                                     gtk.gdk.POINTER_MOTION_MASK |
-                                     gtk.gdk.POINTER_MOTION_HINT_MASK |
-                                     gtk.gdk.BUTTON_PRESS_MASK |
-                                     gtk.gdk.BUTTON_RELEASE_MASK)
+        self.drawing_area.set_events(Gdk.EventMask.EXPOSURE_MASK |
+                                     Gdk.EventMask.SCROLL_MASK |
+                                     # Gdk.EventMask.POINTER_MOTION_MASK |
+                                     Gdk.EventMask.BUTTON1_MOTION_MASK |
+                                     Gdk.EventMask.POINTER_MOTION_HINT_MASK |
+                                     Gdk.EventMask.BUTTON_PRESS_MASK |
+                                     Gdk.EventMask.BUTTON_RELEASE_MASK)
 
         self.drawing_area.connect('draw', self.draw_handler)
 
@@ -301,9 +306,9 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # So the downloader can use threads:
         if self.gps_poller:
-            gobject.threads_init()
+            GObject.threads_init()
 
-        gtk.main()
+        Gtk.main()
 
     def force_redraw(self):
         if not self.drawing_area:
@@ -316,7 +321,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # mentioned in passing on http://www.catb.org/gpsd/client-howto.html
         if gpsd and gpsd.fix.mode > 1:
             self.last_gpsd = gpsd
-            gobject.idle_add(self.update_position_from_GPS)
+            GLib.idle_add(self.update_position_from_GPS)
 
     def update_position_from_GPS(self):
         """If gpsd is running, move the map to center the new GPS location."""
@@ -464,7 +469,7 @@ but if you want to, contact me and I'll help you figure it out.)
         if self.redraw_scheduled:
             return
         self.redraw_scheduled = True
-        gobject.timeout_add(1000, self.force_redraw)
+        GLib.timeout_add(1000, self.force_redraw)
 
     def contrasting_color(self, color):
         """Takes a color triplet (values between 0 and 1)
@@ -577,22 +582,22 @@ but if you want to, contact me and I'll help you figure it out.)
         """Show a dialog giving information about a selected track."""
         trailname = self.trackpoints.points[self.selected_track]
         if not self.traildialog:
-            self.traildialog = gtk.Dialog(trailname,
+            self.traildialog = Gtk.Dialog(trailname,
                                           None, 0,
-                                          (gtk.STOCK_CLOSE,
-                                           gtk.RESPONSE_CANCEL))
+                                          (Gtk.STOCK_CLOSE,
+                                           Gtk.ResponseType.CANCEL))
             self.traildialog.set_size_request(400, 300)
 
-            sw = gtk.ScrolledWindow()
-            sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-            sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+            sw = Gtk.ScrolledWindow()
+            sw.set_shadow_type(Gtk.SHADOW_ETCHED_IN)
+            sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
 
-            textview = gtk.TextView()
+            textview = Gtk.TextView()
             self.attributes_textbuffer = textview.get_buffer()
             sw.add(textview)
             sw.show()
             textview.show()
-            self.traildialog.vbox.pack_start(sw, expand=True)
+            self.traildialog.vbox.pack_start(sw, True, True, 0)
             self.traildialog.connect("response", self.hide_traildialog)
 
         else:
@@ -1081,11 +1086,11 @@ but if you want to, contact me and I'll help you figure it out.)
 
     def scroll_event(self, button, event):
         """Zoom in or out in response to mousewheel events."""
-        if event.direction != gtk.gdk.SCROLL_UP and \
-           event.direction != gtk.gdk.SCROLL_DOWN:
+        if event.direction != Gdk.ScrollDirection.UP and \
+           event.direction != Gdk.ScrollDirection.DOWN:
             return False
 
-        if event.direction == gtk.gdk.SCROLL_UP:
+        if event.direction == Gdk.ScrollDirection.UP:
             zoom_amount = 1
         else:
             zoom_amount = -1
@@ -1181,21 +1186,21 @@ but if you want to, contact me and I'll help you figure it out.)
             ("Quit", self.graceful_exit)
         ])
 
-        menu = gtk.Menu()
+        menu = Gtk.Menu()
         for itemname in list(contextmenu.keys()):
             if contextmenu[itemname] == SEPARATOR:
-                item = gtk.SeparatorMenuItem()
+                item = Gtk.SeparatorMenuItem()
                 menu.append(item)
                 item.show()
                 continue
 
-            item = gtk.MenuItem(itemname)
+            item = Gtk.MenuItem(itemname)
 
             # Change background map gives a submenu of available collections.
             if itemname == "Change background map":
-                submenu = gtk.Menu()
+                submenu = Gtk.Menu()
                 for coll in self.controller.collections:
-                    subitem = gtk.MenuItem(coll.name)
+                    subitem = Gtk.MenuItem(coll.name)
                     subitem.connect("activate", self.change_collection,
                                     coll.name)
                     submenu.append(subitem)
@@ -1204,9 +1209,9 @@ but if you want to, contact me and I'll help you figure it out.)
                 item.set_submenu(submenu)
 
             elif itemname == "Colorize tracks":
-                submenu = gtk.Menu()
+                submenu = Gtk.Menu()
                 for name in self.TRACK_COLOR_VIEW_MENU:
-                    subitem = gtk.MenuItem(name)
+                    subitem = Gtk.MenuItem(name)
                     subitem.connect("activate", self.change_track_colorize,
                                     self.TRACK_COLOR_VIEW_MENU[name])
                     submenu.append(subitem)
@@ -1272,44 +1277,44 @@ but if you want to, contact me and I'll help you figure it out.)
         """Show a window that lets the user choose a known starting point.
            Returns True if the user chose a valid site, otherwise False.
         """
-        dialog = gtk.Dialog("Choose a starting point",
+        dialog = Gtk.Dialog("Choose a starting point",
                             transient_for=None, flags=0)
-        dialog.add_buttons(gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
-                           gtk.STOCK_OK, gtk.RESPONSE_OK)
+        dialog.add_buttons(Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL,
+                           Gtk.STOCK_OK, Gtk.ResponseType.OK)
 
-        # dialog.connect('destroy', lambda win: gtk.main_quit())
+        # dialog.connect('destroy', lambda win: Gtk.main_quit())
         # Wouldn't it be nice if GTK dialogs would automatically
         # size to their contents? Sigh. Without this, the dialog
         # is wide enough for the text box but includes none of the
         # site list in the scrolled window below it.
         dialog.set_size_request(600, 400)
 
-        sw = gtk.ScrolledWindow()
-        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw = Gtk.ScrolledWindow()
+        sw.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
+        sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
 
-        svbox = gtk.VBox(spacing=10)
+        svbox = Gtk.VBox(spacing=10)
 
-        hbox = gtk.HBox(spacing=6)
-        svbox.pack_start(hbox, expand=False)
+        hbox = Gtk.HBox(spacing=6)
+        svbox.pack_start(hbox, False, True, 0)
 
-        hbox.pack_start(gtk.Label(label="Coordinates:"), expand=False)
+        hbox.pack_start(Gtk.Label(label="Coordinates:"), False, True, 0)
 
         # An entry to enter specific coordinates
-        coord_entry = gtk.Entry()
+        coord_entry = Gtk.Entry()
         coord_entry.set_width_chars(45)
         coord_entry.set_activates_default(True)
-        hbox.pack_start(coord_entry, expand=False)
+        hbox.pack_start(coord_entry, False, True, 0)
         dialog.coord_entry = coord_entry
 
         # make OK button the default, so Enter in the entry will trigger OK
         okButton = dialog.get_widget_for_response(
-            response_id=gtk.ResponseType.OK)
+            response_id=Gtk.ResponseType.OK)
         okButton.set_can_default(True)
         okButton.grab_default()
 
         # List store will hold name, collection-name and site object
-        store = gtk.ListStore(str, str, object)
+        store = Gtk.ListStore(str, str, object)
 
         # Create the list
         for site in self.controller.KnownSites:
@@ -1319,45 +1324,45 @@ but if you want to, contact me and I'll help you figure it out.)
                 coll = ''
             store.append([site[0], coll, site])
 
-        # http://pygtk.org/pygtk2tutorial/ch-TreeViewWidget.html
+        # http://pyGtk.org/pyGtk2tutorial/ch-TreeViewWidget.html
         # Make a treeview from the list:
-        treeview = gtk.TreeView(model=store)
+        treeview = Gtk.TreeView(model=store)
 
-        renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Location", renderer, text=0)
-        # column.pack_start(renderer, True)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Location", renderer, text=0)
+        # column.pack_start(renderer, True, True, True, 0)
         # column.set_resizable(True)
         treeview.append_column(column)
-        renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Collection", renderer, text=1)
-        # column.pack_start(renderer, False)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Collection", renderer, text=1)
+        # column.pack_start(renderer, False, True, 0)
         treeview.append_column(column)
 
-        # store.set_sort_column_id(0, gtk.SORT_ASCENDING)
+        # store.set_sort_column_id(0, Gtk.SORT_ASCENDING)
 
         # Catch middle-mouse pastes over the treeview
         treeview.connect("button-release-event", self.accept_paste)
 
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
-        svbox.pack_start(treeview, expand=True)
+        sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        svbox.pack_start(treeview, True, True, 0)
         # sw.add(treeview)
 
         sw.add(svbox)
 
         def submit(self, value, widget):
             # Tell the dialog to give an OK response
-            dialog.response(gtk.RESPONSE_OK)
+            dialog.response(Gtk.ResponseType.OK)
 
         treeview.connect("row-activated", submit)
         # treeview.connect("key-pressed", submit)
 
-        dialog.vbox.pack_start(sw, expand=True)
+        dialog.vbox.pack_start(sw, True, True, 0)
 
         dialog.show_all()
 
         while True:
             response = dialog.run()
-            if response == gtk.RESPONSE_OK:
+            if response == Gtk.ResponseType.OK:
                 coordtext = coord_entry.get_text()
                 if coordtext:
                     try:
@@ -1394,8 +1399,8 @@ but if you want to, contact me and I'll help you figure it out.)
 
         dialog = widget.get_toplevel()
 
-        # clipboard = gtk.Clipboard.get(gtk.gdk.SELECTION_CLIPBOARD)
-        selection = gtk.Clipboard.get(gtk.gdk.SELECTION_PRIMARY)
+        # clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        selection = Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY)
         coordstr = selection.wait_for_text()
 
         dialog.coord_entry.set_text(coordstr)
@@ -1409,24 +1414,24 @@ but if you want to, contact me and I'll help you figure it out.)
         # but there doesn't seem to be a way to manually generate signals.
         print("Trying to send event ...")
 
-        event = gtk.gdk.Event(gtk.gdk.KEY_PRESS)
+        event = Gdk.Event(Gdk.EventType.KEY_PRESS)
         event.window = dialog.coord_entry.get_window()
-        display = gtk.gdk.Display().get_default()
-        keymap = gtk.gdk.Keymap().get_for_display(display)
-        key = keymap.get_entries_for_keyval(gtk.gdk.KEY_Return)
+        display = Gdk.Display().get_default()
+        keymap = Gdk.Keymap().get_for_display(display)
+        key = keymap.get_entries_for_keyval(Gdk.KEY_Return)
         event.hardware_keycode = key[1][0].keycode
         event.send_event = True
-        event = gtk.gdk.Event(gtk.gdk.KEY_RELEASE)
+        event = Gdk.Event(Gdk.EventType.KEY_RELEASE)
         dialog.coord_entry.emit('key-release-event', event)
 
         ok_button = dialog.get_widget_for_response(
-            response_id=gtk.ResponseType.OK)
-        event = gtk.gdk.Event(gtk.gdk.BUTTON_PRESS)
+            response_id=Gtk.ResponseType.OK)
+        event = Gdk.Event(Gdk.EventType.BUTTON_PRESS)
         event.window = dialog.get_window()
         event.button = 1
         event.send_event = True
         ok_button.emit('button-press-event', event)
-        event = gtk.gdk.Event(gtk.gdk.BUTTON_RELEASE)
+        event = Gdk.Event(Gdk.EventType.BUTTON_RELEASE)
         event.window = dialog.get_window()
         event.button = 1
         event.send_event = True
@@ -1440,9 +1445,9 @@ but if you want to, contact me and I'll help you figure it out.)
     def ignorecasefilter(filter_info, data):
         """A GTK GtkFileFilter function that filters for
            a given set of extensions IGNORING CASE,
-           which GTK, incredibly, does not offer in gtk.FileFilter.
+           which GTK, incredibly, does not offer in Gtk.FileFilter.
            The closest to documentation I could find is at
-           http://www.manpagez.com/html/pygtk/pygtk-2.22.0/class-gtkfilefilter.php#method-gtkfilefilter--add-custom
+           http://www.manpagez.com/html/pyGtk/pyGtk-2.22.0/class-Gtkfilefilter.php#method-Gtkfilefilter--add-custom
 
            Arguments:
            data is a list of LOWERCASE file extensions,
@@ -1464,24 +1469,25 @@ but if you want to, contact me and I'll help you figure it out.)
         return False
 
     def prompt_for_track_file(self, widget):
-        dialog = gtk.FileChooserDialog(title="Open track file",
-                               action=gtk.FILE_CHOOSER_ACTION_SAVE,
-                               buttons=(gtk.STOCK_CANCEL,
-                                        gtk.RESPONSE_CANCEL,
-                                        gtk.STOCK_SAVE,
-                                        gtk.RESPONSE_OK))
+        dialog = Gtk.FileChooserDialog(title="Open track file",
+                               action=Gtk.FileChooserAction.SAVE,
+                               buttons=(Gtk.STOCK_CANCEL,
+                                        Gtk.ResponseType.CANCEL,
+                                        Gtk.STOCK_SAVE,
+                                        Gtk.ResponseType.OK))
         if self.file_read_folder:
             dialog.set_current_folder(self.file_read_folder)
 
-        filt = gtk.FileFilter()
+        filt = Gtk.FileFilter()
         filt.set_name("GPX, KML/KMX or GeoJSON Files")
-        filt.add_custom(gtk.FILE_FILTER_FILENAME, MapWindow.ignorecasefilter,
+        filt.add_custom(Gtk.FileFilterFlags.FILENAME,
+                        MapWindow.ignorecasefilter,
                         [".gpx", ".json", ".geojson", ".kml", ".kmz"])
         dialog.add_filter(filt)
 
         response = dialog.run()
 
-        if response != gtk.RESPONSE_OK:
+        if response != Gtk.ResponseType.OK:
                 dialog.destroy()
                 return
 
@@ -1496,51 +1502,50 @@ but if you want to, contact me and I'll help you figure it out.)
         return self.save_tracks_as(widget, False)
 
     def save_tracks_as(self, widget, select_area=False):
-        """Prompt for a filename to save all tracks and waypoints.
-           Then either let the user drag out an area with the mouse
-           and save all tracks that are completely within that area,
-           or save all tracks we know about.
+        """Prompt for a filename to save all tracks and waypoints,
+           then save all tracks we know about.
+           (select_area was supposed to let the user drag out an area
+           with the mouse, but it doesn't currently work
+           and isn't called from anywhere.)
         """
-        dialog = gtk.FileChooserDialog(title="Save GPX",
-                                       action=gtk.FILE_CHOOSER_ACTION_SAVE,
-                                       buttons=(gtk.STOCK_CANCEL,
-                                                gtk.RESPONSE_CANCEL,
-                                                gtk.STOCK_SAVE,
-                                                gtk.RESPONSE_OK))
+        dialog = Gtk.FileChooserDialog(title="Save GPX",
+                                       action=Gtk.FileChooserAction.SAVE,
+                                       buttons=(Gtk.STOCK_CANCEL,
+                                                Gtk.ResponseType.CANCEL,
+                                                Gtk.STOCK_SAVE,
+                                                Gtk.ResponseType.OK))
 
         if self.file_save_folder:
             dialog.set_current_folder(self.file_save_folder)
 
-        filt = gtk.FileFilter()
+        filt = Gtk.FileFilter()
         filt.set_name("GPX/GeoJSON Files")
-        filt.add_custom(gtk.FILE_FILTER_FILENAME, MapWindow.ignorecasefilter,
+        filt.add_custom(Gtk.FileFilterFlags.FILENAME,
+                        MapWindow.ignorecasefilter,
                         [".gpx", ".json", ".geojson"])
         dialog.add_filter(filt)
 
         while True:
             response = dialog.run()
 
-            if response != gtk.RESPONSE_OK:
+            if response != Gtk.ResponseType.OK:
                 dialog.destroy()
                 return
 
             outfile = dialog.get_filename()
             self.file_save_folder = dialog.get_current_folder()
             if os.path.exists(outfile):
-                d = gtk.MessageDialog(None, gtk.DIALOG_MODAL,
-                                      gtk.MESSAGE_QUESTION,
-                                      gtk.BUTTONS_YES_NO)
-
-                d = gtk.MessageDialog(None, 0,
-                                      gtk.MESSAGE_QUESTION,
-                                      gtk.BUTTONS_YES_NO,
+                d = Gtk.MessageDialog(None,
+                                      Gtk.DialogFlags.MODAL,
+                                      Gtk.MessageType.QUESTION,
+                                      Gtk.ButtonsType.YES_NO,
                                       "File exists. Overwrite?")
-                d.set_default_response(gtk.RESPONSE_YES)
+                d.set_default_response(Gtk.ResponseType.YES)
 
                 response = d.run()
                 d.destroy()
 
-                if response != gtk.RESPONSE_YES:
+                if response != Gtk.ResponseType.YES:
                     continue
                 else:
                     break
@@ -1721,29 +1726,30 @@ but if you want to, contact me and I'll help you figure it out.)
            and return a tuple where the second item is the state of the button.
         """
         if not self.prompt_dialog:
-            self.prompt_dialog = gtk.Dialog("PyTopo: %s" % prompt, None, 0,
-                                            (gtk.STOCK_CANCEL,
-                                               gtk.RESPONSE_NONE,
-                                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+            self.prompt_dialog = Gtk.Dialog("PyTopo: %s" % prompt, None, 0,
+                                            (Gtk.STOCK_CANCEL,
+                                               Gtk.ResponseType.CANCEL,
+                                             Gtk.STOCK_OK,
+                                               Gtk.ResponseType.OK))
             self.prompt_dialog.set_size_request(200, 150)
             self.prompt_dialog.vbox.set_spacing(10)
 
-            self.prompt_dialog_prompt = gtk.Label(prompt)
+            self.prompt_dialog_prompt = Gtk.Label(prompt)
             self.prompt_dialog.vbox.pack_start(self.prompt_dialog_prompt,
-                                               expand=False)
+                                               False, True, 0)
 
-            self.prompt_dialog_del_btn = gtk.ToggleButton("Delete")
+            self.prompt_dialog_del_btn = Gtk.ToggleButton("Delete")
             self.prompt_dialog.vbox.pack_start(self.prompt_dialog_del_btn,
-                                               expand=False)
+                                               False, True, 0)
 
-            self.prompt_dialog_text = gtk.Entry()
+            self.prompt_dialog_text = Gtk.Entry()
             self.prompt_dialog_text.set_activates_default(True)
             self.prompt_dialog.vbox.pack_start(self.prompt_dialog_text,
-                                               expand=True)
+                                               True, True, 0)
 
-            self.prompt_dialog_comment = gtk.Label("")
+            self.prompt_dialog_comment = Gtk.Label("")
             self.prompt_dialog.vbox.pack_start(self.prompt_dialog_comment,
-                                               expand=False)
+                                               False, True, 0)
 
             self.prompt_dialog.show_all()
 
@@ -1758,7 +1764,7 @@ but if you want to, contact me and I'll help you figure it out.)
         else:
             self.prompt_dialog_del_btn.hide()
 
-        self.prompt_dialog.set_default_response(gtk.RESPONSE_OK)
+        self.prompt_dialog.set_default_response(Gtk.ResponseType.OK)
         self.prompt_dialog_text.set_text(name)
         if name:
             self.prompt_dialog_text.select_region(0, len(name))
@@ -1766,7 +1772,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.prompt_dialog.show()
 
         response = self.prompt_dialog.run()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.ResponseType.OK:
             self.prompt_dialog.hide()
             retval = self.prompt_dialog_text.get_text()
         else:
@@ -1839,79 +1845,79 @@ but if you want to, contact me and I'll help you figure it out.)
         maxzoom = self.collection.zoomlevel + 4
 
         # Prompt the user for any adjustments to area and zoom:
-        dialog = gtk.Dialog("Download an area", None, 0,
-                            (gtk.STOCK_REFRESH, gtk.RESPONSE_APPLY,
-                             gtk.STOCK_CANCEL, gtk.RESPONSE_CANCEL,
-                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+        dialog = Gtk.Dialog("Download an area", None, 0,
+                            (Gtk.STOCK_REFRESH, Gtk.ResponseType.APPLY,
+                             Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL,
+                             Gtk.STOCK_OK, Gtk.ResponseType.OK))
         # dialog.set_size_request(200, 150)
         # dialog.vbox.set_spacing(10)
-        frame = gtk.Frame()
+        frame = Gtk.Frame()
         frame.label = "Current zoom = %d" % self.collection.zoomlevel
         dialog.vbox.pack_start(frame, True, True, 0)
 
-        table = gtk.Table(4, 3, False)
+        table = Gtk.Table(4, 3, False)
         table.set_border_width(5)
         table.set_row_spacings(5)
         table.set_col_spacings(10)
         frame.add(table)
 
-        label = gtk.Label("Min longitude:")
-        label.set_justify(gtk.JUSTIFY_RIGHT)
+        label = Gtk.Label("Min longitude:")
+        label.set_justify(Gtk.Justification.RIGHT)
         table.attach(label, 0, 1, 0, 1,
-                     gtk.SHRINK, 0, 0, 0)
-        minlon_entry = gtk.Entry()
+                     Gtk.AttachOptions.SHRINK, 0, 0, 0)
+        minlon_entry = Gtk.Entry()
         table.attach(minlon_entry, 1, 2, 0, 1,
-                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+                     Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, 0, 0, 0)
 
-        label = gtk.Label("Max longitude:")
-        label.set_justify(gtk.JUSTIFY_RIGHT)
+        label = Gtk.Label("Max longitude:")
+        label.set_justify(Gtk.Justification.RIGHT)
         table.attach(label, 2, 3, 0, 1,
-                     gtk.SHRINK, 0, 0, 0)
-        maxlon_entry = gtk.Entry()
+                     Gtk.AttachOptions.SHRINK, 0, 0, 0)
+        maxlon_entry = Gtk.Entry()
         table.attach(maxlon_entry, 3, 4, 0, 1,
-                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+                     Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, 0, 0, 0)
 
-        label = gtk.Label("Min latitude:")
-        label.set_justify(gtk.JUSTIFY_RIGHT)
+        label = Gtk.Label("Min latitude:")
+        label.set_justify(Gtk.Justification.RIGHT)
         table.attach(label, 0, 1, 1, 2,
-                     gtk.SHRINK, 0, 0, 0)
-        minlat_entry = gtk.Entry()
+                     Gtk.AttachOptions.SHRINK, 0, 0, 0)
+        minlat_entry = Gtk.Entry()
         table.attach(minlat_entry, 1, 2, 1, 2,
-                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+                     Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, 0, 0, 0)
 
-        label = gtk.Label("Max latitude:")
-        label.set_justify(gtk.JUSTIFY_RIGHT)
+        label = Gtk.Label("Max latitude:")
+        label.set_justify(Gtk.Justification.RIGHT)
         table.attach(label, 2, 3, 1, 2,
-                     gtk.SHRINK, 0, 0, 0)
-        maxlat_entry = gtk.Entry()
+                     Gtk.AttachOptions.SHRINK, 0, 0, 0)
+        maxlat_entry = Gtk.Entry()
         table.attach(maxlat_entry, 3, 4, 1, 2,
-                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+                     Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, 0, 0, 0)
 
-        label = gtk.Label("Min zoom:")
-        label.set_justify(gtk.JUSTIFY_RIGHT)
+        label = Gtk.Label("Min zoom:")
+        label.set_justify(Gtk.Justification.RIGHT)
         table.attach(label, 0, 1, 2, 3,
-                     gtk.SHRINK, 0, 0, 0)
-        minzoom_entry = gtk.Entry()
+                     Gtk.AttachOptions.SHRINK, 0, 0, 0)
+        minzoom_entry = Gtk.Entry()
         table.attach(minzoom_entry, 1, 2, 2, 3,
-                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+                     Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, 0, 0, 0)
 
-        label = gtk.Label("Max zoom:")
-        label.set_justify(gtk.JUSTIFY_RIGHT)
+        label = Gtk.Label("Max zoom:")
+        label.set_justify(Gtk.Justification.RIGHT)
         table.attach(label, 2, 3, 2, 3,
-                     gtk.SHRINK, 0, 0, 0)
-        maxzoom_entry = gtk.Entry()
+                     Gtk.AttachOptions.SHRINK, 0, 0, 0)
+        maxzoom_entry = Gtk.Entry()
         table.attach(maxzoom_entry, 3, 4, 2, 3,
-                     gtk.EXPAND | gtk.FILL, 0, 0, 0)
+                     Gtk.AttachOptions.EXPAND | Gtk.AttachOptions.FILL, 0, 0, 0)
 
-        err_label = gtk.Label("")
+        err_label = Gtk.Label("")
         dialog.vbox.pack_start(err_label, True, True, 0)
 
-        progress_label = gtk.Label("")
+        progress_label = Gtk.Label("")
         dialog.vbox.pack_start(progress_label, True, True, 0)
 
         def flush_events():
-            while gtk.events_pending():
-                gtk.main_iteration()
+            while Gtk.events_pending():
+                Gtk.main_iteration()
 
         def reset_download_dialog():
             minlon_entry.set_text(str(minlon))
@@ -1929,21 +1935,21 @@ but if you want to, contact me and I'll help you figure it out.)
 
         while True:
             response = dialog.run()
-            if response == gtk.RESPONSE_CANCEL:
+            if response == Gtk.ResponseType.CANCEL:
                 dialog.destroy()
                 return True
-            if response == gtk.RESPONSE_APPLY:
+            if response == Gtk.ResponseType.APPLY:
                 reset_download_dialog()
                 continue
             # Else the response must have been OK.
             # So connect the cancel button to cancel_download(),
             # which means first we have to find the cancel button:
             # Starting with PyGTK 2.22 we can use this easier method:
-            # cancelBtn = dialog.get_widget_for_response(gtk.RESPONSE_OK)
+            # cancelBtn = dialog.get_widget_for_response(Gtk.ResponseType.OK)
             # but for now:
             buttons = dialog.get_action_area().get_children()
             for b in buttons:
-                if b.get_label() == 'gtk-cancel':
+                if b.get_label() == 'Gtk-cancel':
                     b.connect("clicked", self.cancel_download, str)
                     break
 
@@ -1967,10 +1973,10 @@ but if you want to, contact me and I'll help you figure it out.)
             err_label.set_text("Downloading zoom level %d" % zoom)
 
             # Show a busy cursor on the dialog:
-            busy_cursor = gtk.gdk.Cursor(gtk.gdk.WATCH)
+            busy_cursor = Gdk.Cursor(Gdk.CursorType.WATCH)
             dialog.get_window().set_cursor(busy_cursor)
             flush_events()
-            gtk.gdk.flush()
+            Gdk.flush()
 
             if self.controller.Debug:
                 print("==== Zoom level", zoom)
@@ -2085,7 +2091,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # The last two args of cairo_set_source_pixbuf are the point
         # on the canvas matching the (0, 0) point of the pixmap.
         # The coordinates have to be in pixels.
-        gtk.gdk.cairo_set_source_pixbuf(self.cr, pixbuf, xo, yo)
+        Gdk.cairo_set_source_pixbuf(self.cr, pixbuf, xo, yo)
 
         # But then things get weird. Apparently, for fill(), the
         # rectangle's coordinates should be in pixels, as you might expect:
@@ -2201,21 +2207,21 @@ but if you want to, contact me and I'll help you figure it out.)
                 self.draw_rectangle(True, x, y, label_width, label_height)
             else:
                 self.cr.move_to(x, y+2)
-                pangocairo.show_layout(self.cr, layout)
+                PangoCairo.show_layout(self.cr, layout)
                 self.cr.stroke()
                 self.cr.move_to(x, y-2)
-                pangocairo.show_layout(self.cr, layout)
+                PangoCairo.show_layout(self.cr, layout)
                 self.cr.stroke()
                 self.cr.move_to(x-2, y+2)
-                pangocairo.show_layout(self.cr, layout)
+                PangoCairo.show_layout(self.cr, layout)
                 self.cr.stroke()
                 self.cr.move_to(x+2, y+2)
-                pangocairo.show_layout(self.cr, layout)
+                PangoCairo.show_layout(self.cr, layout)
                 self.cr.stroke()
 
         self.cr.set_source_rgb(*color)
         self.cr.move_to(x, y)
-        pangocairo.show_layout(self.cr, layout)
+        PangoCairo.show_layout(self.cr, layout)
         self.cr.stroke()
 
         # This isn't needed from draw_map(), but it is if it's
@@ -2223,12 +2229,13 @@ but if you want to, contact me and I'll help you figure it out.)
         # That doesn't seem to have anything to do with what the
         # documentation says restore() is for (to return to a saved
         # state after an earlier save(), which we never do).
-        # Maybe pangocairo does a save() internally?
+        # Maybe PangoCairo does a save() internally?
         # self.cr.restore()
 
     @staticmethod
     def load_image_from_file(filename):
-        return gtk.gdk.pixbuf_new_from_file(filename)
+        pixbuf = GdkPixbuf.Pixbuf.new_from_file(filename)
+        return pixbuf
 
     def draw_string_scale(self, x, y, s, whichfont=None):
         """Draw a string at the specified location.
@@ -2238,7 +2245,7 @@ but if you want to, contact me and I'll help you figure it out.)
            if it's "select" it'll be a lot bigger.
         """
         # layout = self.drawing_area.create_pango_layout(s)
-        layout = pangocairo.create_layout(self.cr)
+        layout = PangoCairo.create_layout(self.cr)
         layout.set_text(s, -1)
         if whichfont == "waypoint":
             layout.set_font_description(self.wpt_font_desc)
@@ -2260,16 +2267,15 @@ but if you want to, contact me and I'll help you figure it out.)
         # self.drawing_area.get_window().draw_layout(self.xgc, x, y, layout)
 
         # GTK3 way:
-        # pango_cr = pangocairo.CairoContext(self.cr)
-        # pango_cr.set_source_rgb(0, 0, 0)
+        # Pango_cr = PangoCairo.CairoContext(self.cr)
+        # Pango_cr.set_source_rgb(0, 0, 0)
         self.cr.move_to(x, y)
-        pangocairo.show_layout(self.cr, layout)
+        PangoCairo.show_layout(self.cr, layout)
         self.cr.stroke()
 
     # Save the current map as something which could be gimped or printed.
     # XXX THIS IS BROKEN, code assumes start_lon/start_lat but has center_.
     def save_as(self):
-
         """Save a static map. Somewhat BROKEN, needs rewriting."""
 
         file_list = ""
@@ -2318,7 +2324,7 @@ but if you want to, contact me and I'll help you figure it out.)
         """Handle key presses."""
         if event.string == "q":
             self.graceful_exit()
-            # Must return here: gtk.main_quit() (called from graceful_exit())
+            # Must return here: Gtk.main_quit() (called from graceful_exit())
             # won't actually return immediately, so without a return
             # we'll fall through and end up drawing the map again
             # before exiting.
@@ -2331,33 +2337,33 @@ but if you want to, contact me and I'll help you figure it out.)
             self.zoom(amount=-1)
             if self.controller.Debug and hasattr(self.collection, 'zoomlevel'):
                 print("zoomed out to", self.collection.zoomlevel)
-        elif event.keyval == gtk.keysyms.Left:
+        elif event.keyval == Gdk.KEY_Left:
             self.center_lon -= \
                 float(self.collection.img_width) / self.collection.xscale
             self.gps_centered = False
-        elif event.keyval == gtk.keysyms.Right:
+        elif event.keyval == Gdk.KEY_Right:
             self.center_lon += \
                 float(self.collection.img_width) / self.collection.xscale
             self.gps_centered = False
-        elif event.keyval == gtk.keysyms.Up:
+        elif event.keyval == Gdk.KEY_Up:
             self.center_lat += \
                 float(self.collection.img_height) / self.collection.yscale
             self.gps_centered = False
-        elif event.keyval == gtk.keysyms.Down:
+        elif event.keyval == Gdk.KEY_Down:
             self.center_lat -= \
                 float(self.collection.img_height) / self.collection.yscale
             self.gps_centered = False
-        elif event.keyval == gtk.keysyms.space:
+        elif event.keyval == Gdk.KEY_space:
             self.set_center_to_pin(None)
             self.gps_centered = False
-        elif event.keyval == gtk.keysyms.l and \
-                event.state == gtk.gdk.CONTROL_MASK:
+        elif event.keyval == Gdk.KEY_l and \
+                event.state == Gdk.ModifierType.CONTROL_MASK:
             pass    # Just fall through to draw_map()
-        elif event.keyval == gtk.keysyms.q and \
-                event.state == gtk.gdk.CONTROL_MASK:
+        elif event.keyval == Gdk.KEY_q and \
+                event.state == Gdk.ModifierType.CONTROL_MASK:
             self.graceful_exit()
-        elif event.keyval == gtk.keysyms.z and \
-                event.state == gtk.gdk.CONTROL_MASK:
+        elif event.keyval == Gdk.KEY_z and \
+                event.state == Gdk.ModifierType.CONTROL_MASK:
             self.undo()
         # m pops up a window to choose a point
         elif event.string == "m":
@@ -2418,8 +2424,10 @@ but if you want to, contact me and I'll help you figure it out.)
     def drag_event(self, widget, event):
         """Move the map as the user drags."""
 
+        # event.state is <flags GDK_BUTTON1_MASK of type Gdk.ModifierType>
+
         # The GTK documentation @ 24.2.1
-        # http://www.pygtk.org/pygtk2tutorial/sec-EventHandling.html
+        # http://www.pyGtk.org/pyGtk2tutorial/sec-EventHandling.html
         # says the first event is a real motion event and subsequent
         # ones are hints; but in practice, nothing but hints are
         # ever sent.
@@ -2430,13 +2438,8 @@ but if you want to, contact me and I'll help you figure it out.)
             y = event.y
             state = event.state
 
-        # motion_notify events happen on every mouse move.
-        # Ignore any where no button is pressed.
-        if not state & gtk.gdk.BUTTON1_MASK:
-            return False
-
         if self.press_timeout:
-            gobject.source_remove(self.press_timeout)
+            GLib.source_remove(self.press_timeout)
             self.press_timeout = None
 
         # On a tablet (at least the ExoPC), almost every click registers
@@ -2450,20 +2453,21 @@ but if you want to, contact me and I'll help you figure it out.)
             self.y_start_drag = y
             self.is_dragging = True
 
-        if self.is_rubberbanding:
-            # Draw the new box:
-            self.xgc.function = gtk.gdk.XOR
-            self.set_color(self.white_color)
-            if self.x_last_drag and self.y_last_drag:
-                self.draw_rect_between(False,
-                                       self.x_start_drag, self.y_start_drag,
-                                       self.x_last_drag, self.y_last_drag)
-            self.draw_rect_between(False,
-                                   self.x_start_drag, self.y_start_drag,
-                                   x, y)
-            self.x_last_drag = x
-            self.y_last_drag = y
-            return True
+        # Rubberbanding doesn't currently work, and there is not Gdk.XOR
+        # if self.is_rubberbanding:
+        #     # Draw the new box:
+        #     self.xgc.function = Gdk.XOR
+        #     self.set_color(self.white_color)
+        #     if self.x_last_drag and self.y_last_drag:
+        #         self.draw_rect_between(False,
+        #                                self.x_start_drag, self.y_start_drag,
+        #                                self.x_last_drag, self.y_last_drag)
+        #     self.draw_rect_between(False,
+        #                            self.x_start_drag, self.y_start_drag,
+        #                            x, y)
+        #     self.x_last_drag = x
+        #     self.y_last_drag = y
+        #     return True
 
         self.gps_centered = False
         self.move_to(x, y, widget)
@@ -2514,7 +2518,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # because we had a doubleclick. Either way, remove any
         # existing timeout:
         if self.press_timeout:
-            gobject.source_remove(self.press_timeout)
+            GLib.source_remove(self.press_timeout)
             self.press_timeout = None
 
         # Was it a right click?
@@ -2530,8 +2534,8 @@ but if you want to, contact me and I'll help you figure it out.)
             return False
 
         # If it wasn't a double click, set a timeout for LongPress
-        if event.type != gtk.gdk._2BUTTON_PRESS:
-            self.press_timeout = gobject.timeout_add(1000, self.longpress)
+        if event.type != Gdk.EventType.DOUBLE_BUTTON_PRESS:
+            self.press_timeout = GLib.timeout_add(1000, self.longpress)
             return False
 
         # Zoom in if we get a double-click.
@@ -2548,7 +2552,7 @@ but if you want to, contact me and I'll help you figure it out.)
            Hasn't been tested in a long time.
         """
         if self.press_timeout:
-            gobject.source_remove(self.press_timeout)
+            GLib.source_remove(self.press_timeout)
             self.press_timeout = None
         bogo, x, y, state = self.drawing_area.get_window().get_pointer()
         self.cur_lon, self.cur_lat = self.xy2coords(x, y)
@@ -2560,7 +2564,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # print("Setting context coords to", self.context_x, self.context_y)
         if self.press_timeout:
-            gobject.source_remove(self.press_timeout)
+            GLib.source_remove(self.press_timeout)
             self.press_timeout = None
             # return False
 
@@ -2571,7 +2575,7 @@ but if you want to, contact me and I'll help you figure it out.)
             # The function will be called with args:
             # (start_x, start_y, end_x, end_y, other_args...)
 
-            self.xgc.function = gtk.gdk.COPY
+            self.xgc.function = Gdk.COPY
 
             lon1, lat1 = self.xy2coords(self.x_start_drag, self.y_start_drag)
             lon2, lat2 = self.xy2coords(event.x, event.y)
@@ -2630,7 +2634,8 @@ but if you want to, contact me and I'll help you figure it out.)
                     MapUtils.dec_deg2dms_str(cur_lat))
 
             # Find angle and distance since last click.
-            if self.controller.Debug or event.state & gtk.gdk.SHIFT_MASK:
+            if self.controller.Debug or \
+               event.state & Gdk.ModifierType.SHIFT_MASK:
                 print("Shift click")
                 if self.click_last_long != 0 and self.click_last_lat != 0:
                     dist = MapUtils.haversine_distance(self.click_last_lat,
@@ -2687,10 +2692,10 @@ but if you want to, contact me and I'll help you figure it out.)
 
         self.controller.save_sites()    # save any new sites/tracks
 
-        gtk.main_quit()
+        Gtk.main_quit()
         # The python profilers don't work if you call sys.exit here.
 
-        # Too bad, because gtk.main_quit() doesn't actually exit
+        # Too bad, because Gtk.main_quit() doesn't actually exit
         # until later. So any function that calls this must be sure
         # to guard against anything like extra map redraws.
 #

@@ -7,8 +7,6 @@
    A base class for more specific downloaders.
 """
 
-from __future__ import print_function
-
 from pytopo.MapCollection import MapCollection
 from pytopo.MapWindow import MapWindow
 from pytopo import MapUtils
@@ -20,8 +18,9 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 
 import os
-import glib
-import gobject
+
+from gi.repository import GLib
+
 import gc
 
 
@@ -301,6 +300,8 @@ TiledMapCollection classes must implement:
         # Then don't bother to draw this one; request a full
         # map redraw, so that overlays will also be drawn.
         if not self.urls_queued:
+            if self.mapwin.controller.Debug:
+                print("Scheduling full redraw rather than drawing single tile")
             self.mapwin.schedule_redraw()
             return
 
@@ -345,7 +346,10 @@ TiledMapCollection classes must implement:
         try:
             pixbuf = MapWindow.load_image_from_file(path)
 
-        except glib.GError as e:
+        except Exception as e:
+            # This used to look for glib.GError, but I don't know what
+            # errors the GTK3 load_image_from_file might raise.
+            print("Error loading image from file", e)
             url = self.path_to_url[path]
             if url in self.urls_queued:
                 if self.mapwin.controller.Debug:
@@ -371,9 +375,9 @@ TiledMapCollection classes must implement:
                 # But it can also mean a partially-written file.
                 # os.unlink(path)
                 os.rename(path, path + ".bad")
-                print("RENAMING", path)
-            else:
-                print("")
+                if self.mapwin.controller.Debug:
+                    print("RENAMING", path)
+
             self.num_failed_downloads += 1
             return
 
@@ -389,12 +393,16 @@ TiledMapCollection classes must implement:
         """Add a URL to the FuturesSession downloader queue,
            and keep a record of what file path it should use.
         """
+        if self.mapwin.controller.Debug:
+            print("queue_download", url, path)
         now = time.time()
         if self.num_failed_downloads > self.MAX_FAILED_DOWNLOADS:
             if self.last_failed_download_time \
                and now - self.last_failed_download_time \
                     < self.RETRY_DOWNLOADS_AFTER:
                 # too many failed downloads, too recently
+                if self.mapwin.controller.Debug:
+                    print("Too many failed downloads, skipping", url)
                 return
 
             # Downloads failed a while ago, but some time has passed.
@@ -429,6 +437,8 @@ TiledMapCollection classes must implement:
         # map redraw if the basemap tiles aren't all there yet.
         # But it's better to handle that in response_hook.
         # if self.opacity < 1.:
+        if self.mapwin.controller.Debug:
+            print("Appending", url, "to download queue")
         self.urls_queued.append(url)
 
         self.downloader.get(url)
@@ -485,8 +495,8 @@ TiledMapCollection classes must implement:
             try:
                 self.urls_queued.remove(response.url)
             except:
-                print("Yikes, downloaded a URL not in the queue:", response.url)
-                return
+                print("Yikes, downloaded a URL not in the queue:",
+                      response.url)
 
         # Schedule a redraw for this tile.
         # If this is the basemap (opacity=1), do this as soon as possible.
@@ -501,8 +511,10 @@ TiledMapCollection classes must implement:
                 if self.mapwin.controller.Debug:
                     print("All tiles downloaded for", self,
                           ": scheduling redraw")
-                glib.idle_add(self.mapwin.draw_map)
+                GLib.idle_add(self.mapwin.draw_map)
             # elif self.mapwin.controller.Debug:
             #     print("downloaded", tilepath, "but still tiles to download")
         else:
-            glib.idle_add(self.draw_single_tile, tilepath, self.mapwin)
+            if self.mapwin.controller.Debug > 1:
+                print("Schedule drawing of single tile", tilepath)
+            GLib.idle_add(self.draw_single_tile, tilepath, self.mapwin)
