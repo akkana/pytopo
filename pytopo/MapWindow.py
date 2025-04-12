@@ -14,6 +14,7 @@ gi.require_version('PangoCairo', '1.0')
 from gi.repository import Gtk
 from gi.repository import Gdk
 from gi.repository import GLib
+from gi.repository import Gio
 from gi.repository import GObject
 from gi.repository import GdkPixbuf
 from gi.repository import Pango, PangoCairo
@@ -158,6 +159,11 @@ but if you want to, contact me and I'll help you figure it out.)
             if self.controller.Debug:
                 print("Couldn't initialize the pin image")
             self.pin = None
+
+        self.markerpath = str(
+            importlib.resources.files('pytopo').joinpath(
+                'resources/blue-marker.svg'))
+        self.marker_svg_bytes = None
 
         self.pin_lon = 0
         self.pin_lat = 0
@@ -617,13 +623,15 @@ but if you want to, contact me and I'll help you figure it out.)
         if not self.trackpoints:
             return
 
-        # Now draw any trackpoints that are visible.
-        # self.trackpoints may be trackpoints or waypoints
+        # Now draw any trackpoints or waypoints that are visible.
         self.track_color = None
 
         # Store the colors we use for each named track segment,
         # so we can try to use that color for the matching waypoints.
+        # But waypoints that come on their own, unassociated with a track,
+        # get their own colors too.
         track_colors = {}
+        wpcolor = None
 
         if len(self.trackpoints.points) > 0:
             cur_x = None
@@ -647,6 +655,11 @@ but if you want to, contact me and I'll help you figure it out.)
                    self.trackpoints.is_attributes(pt):
                     if pt in track_colors:
                         wpcolor = track_colors[pt]
+                    elif type(pt) is str:
+                        if wpcolor:
+                            wpcolor = self.contrasting_color(wpcolor)
+                        else:
+                            wpcolor = self.contrasting_color(self.track_color)
                     continue
                 x = int((pt.lon - self.center_lon) * self.collection.xscale
                         + self.win_width / 2)
@@ -655,6 +668,10 @@ but if you want to, contact me and I'll help you figure it out.)
 
                 if x >= 0 and x < self.win_width and \
                    y >= 0 and y < self.win_height:
+                    self.draw_marker(0, 0,
+                                     x - 8, y - 21,
+                                     # x + self.pin_xoff, y + self.pin_yoff,
+                                     color=wpcolor)
                     if self.show_labels and \
                        pt.name.strip() and pt.name != NULL_WP_NAME:
                         self.draw_label(pt.name, x, y,
@@ -662,10 +679,6 @@ but if you want to, contact me and I'll help you figure it out.)
                                         dropshadow=True,
                                         font=self.font_desc,
                                         offsets=(1, 1))
-
-                    self.draw_pixbuf(self.pin, 0, 0,
-                                     x + self.pin_xoff,
-                                     y + self.pin_yoff, -1, -1)
 
 
     def find_nearest_trackpoint(self, x, y):
@@ -1688,9 +1701,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.force_redraw()
 
     def add_waypoint_by_mouse(self, widget):
-        """Set the pin at the current mouse location"""
-        self.pin_lon, self.pin_lat = self.cur_lon, self.cur_lat
-
+        """Set a new waypoint at the current mouse location"""
         # Prompt for a name for the waypoint
         wpname = self.prompt("New waypoint", name="*")
         if wpname == None:
@@ -1702,6 +1713,10 @@ but if you want to, contact me and I'll help you figure it out.)
 
         if not self.trackpoints:
             self.trackpoints = TrackPoints()
+
+        # XXX Might want to add a start string to the waypoint list to
+        # differentiate this point from previous points that might
+        # have been read in from GPX files.
 
         self.trackpoints.handle_track_point(self.cur_lat, self.cur_lon,
                                             waypoint_name=wpname)
@@ -2062,7 +2077,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # self.xgc.set_rgb_fg_color(color)
         self.cr.set_source_rgb(*color)
 
-    def draw_pixbuf(self, pixbuf, x_off, y_off, x, y, w, h, opacity=1.):
+    def draw_pixbuf(self, pixbuf, x_off, y_off, x, y, w=0, h=0, opacity=1.):
         """Draw the pixbuf at the given position and size,
            starting at the specified offset.
            If width and height are provided, assume the offset
@@ -2111,6 +2126,42 @@ but if you want to, contact me and I'll help you figure it out.)
         # paint*() doesn't need rectangle() first,
         # they transfer the whole source region.
         self.cr.paint_with_alpha(opacity)
+
+    def draw_marker(self, x_off, y_off, x, y, opacity=1., color=None):
+        if not self.marker_svg_bytes:
+            with open(self.markerpath, 'rb') as ifp:
+                self.marker_svg_bytes = ifp.read()
+        if color:
+            if type(color) is bytes:
+                iconbytes = self.marker_svg_bytes.replace(b'blue', color)
+            elif type(color) is str:
+                iconbytes = self.marker_svg_bytes.replace(b'blue',
+                                                          color.encode())
+            # is it an RGB triple, like a list or tuple?
+            elif hasattr(color, "__getitem__"):
+                iconbytes = self.marker_svg_bytes.replace(
+                    # *255 rather than 256 in the next line
+                    # to restrict it to 00-ff.
+                    b'blue', b'#%02x%02x%02x' % tuple([ int(c*255)
+                                                        for c in color ]))
+            else:
+                print("Internal error: ignoring unknown color type",
+                      type(color), file=sys.stderr)
+
+        else:
+            iconbytes = self.marker_svg_bytes
+
+        # pixbuf = GdkPixbuf.Pixbuf.new_from_bytes(
+        #     GLib.Bytes.new(iconbytes),
+        #     GdkPixbuf.Colorspace.RGB, True, 8, 20, 20, 0)
+
+        # Pixbuf.new_from_bytes returns NULL, whereas converting
+        # the bytes into a stream works. Sigh.
+        pixbuf = GdkPixbuf.Pixbuf.new_from_stream(
+            Gio.MemoryInputStream.new_from_bytes(
+                GLib.Bytes.new(iconbytes)))
+
+        self.draw_pixbuf(pixbuf, x_off, y_off, x, y, 16, 16, opacity)
 
     def draw_rect_between(self, fill, x1, y1, x2, y2, color=None):
         """Draw a rectangle. between two sets of ordinates,

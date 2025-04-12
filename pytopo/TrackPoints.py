@@ -175,6 +175,9 @@ class TrackPoints(object):
        segment as a string or unicode, but use is_start() to test for
        that in case of future changes.
 
+       Waypoint origin (filename) can be specified in a similar way:
+       a string in the list of waypoints applies to all successive waypoints.
+
        A trackpoint is an array where the first two elements are
        longitude and latitude, as floatings.
        Following longitude there may be an optional elevation, a float,
@@ -316,6 +319,8 @@ class TrackPoints(object):
            it should use some sort of "close enough" metric.
         """
         for wp in self.waypoints:
+            if type(wp) is str:
+                continue
             if wp.lat == point.lat and wp.lon == point.lon:
                 if point.name != wp.name:
                     wp.name += "\n" + point.name
@@ -408,7 +413,7 @@ class TrackPoints(object):
         first_segment_name = None
         waypts = dom.getElementsByTagName("wpt")
         if waypts:
-            # self.waypoints.append(os.path.basename(filename))
+            self.waypoints.append(os.path.basename(filename))
             for pt in waypts:
                 lat, lon, ele, speed, time, attrs = self.GPX_point_coords(pt)
                 name = self.get_DOM_text(pt, "name")
