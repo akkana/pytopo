@@ -127,6 +127,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.drawing_track = False
         self.selected_track = None
         self.selected_waypoint = None
+        self.selected_trackpoint = None
 
         # By default, each track is a different colors
         self.track_colorize = TrackColor.SEPARATE_COLORS
@@ -433,6 +434,19 @@ but if you want to, contact me and I'll help you figure it out.)
             self.draw_label("Waypoint: " +
                       self.trackpoints.waypoints[self.selected_waypoint].name,
                             15, 40, color=self.yellow_color)
+        elif self.selected_trackpoint is not None:
+            self.draw_label(
+                "Track point: (%.2f, %.2f, %.1f)\n%s"
+                % (self.trackpoints.points[self.selected_trackpoint].lat,
+                   self.trackpoints.points[self.selected_trackpoint].lon,
+                   self.trackpoints.points[self.selected_trackpoint].ele,
+                   self.trackpoints.points[self.selected_trackpoint].timestamp),
+                15, 40, color=self.yellow_color)
+            point_x, point_y = self.coords2xy(
+                self.trackpoints.points[self.selected_trackpoint].lon,
+                self.trackpoints.points[self.selected_trackpoint].lat,
+                self.win_width, self.win_height)
+            self.draw_marker(point_x, point_y)
 
         # Copyright info or other attribution
         self.set_color(self.grid_color)
@@ -668,9 +682,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
                 if x >= 0 and x < self.win_width and \
                    y >= 0 and y < self.win_height:
-                    self.draw_marker(0, 0,
-                                     x - 8, y - 21,
-                                     # x + self.pin_xoff, y + self.pin_yoff,
+                    self.draw_marker(x, y,     #x - 8, y - 21,
                                      color=wpcolor)
                     if self.show_labels and \
                        pt.name.strip() and pt.name != NULL_WP_NAME:
@@ -2127,7 +2139,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # they transfer the whole source region.
         self.cr.paint_with_alpha(opacity)
 
-    def draw_marker(self, x_off, y_off, x, y, opacity=1., color=None):
+    def draw_marker(self, x, y, opacity=1., color=None):
         if not self.marker_svg_bytes:
             with open(self.markerpath, 'rb') as ifp:
                 self.marker_svg_bytes = ifp.read()
@@ -2160,8 +2172,10 @@ but if you want to, contact me and I'll help you figure it out.)
         pixbuf = GdkPixbuf.Pixbuf.new_from_stream(
             Gio.MemoryInputStream.new_from_bytes(
                 GLib.Bytes.new(iconbytes)))
-
-        self.draw_pixbuf(pixbuf, x_off, y_off, x, y, 16, 16, opacity)
+        marker_xoff = pixbuf.get_width() / 2
+        marker_yoff = pixbuf.get_height()
+        self.draw_pixbuf(pixbuf, marker_xoff, marker_yoff,
+                         x, y, 16, 16, opacity)
 
     def draw_rect_between(self, fill, x1, y1, x2, y2, color=None):
         """Draw a rectangle. between two sets of ordinates,
@@ -2718,10 +2732,10 @@ but if you want to, contact me and I'll help you figure it out.)
                 self.select_track(near_track)
             else:
                 self.select_track(None)
-            if near_waypoint is not None:
-                self.selected_waypoint = near_waypoint
-            else:
-                self.selected_waypoint = None
+
+            self.selected_trackpoint = near_point
+
+            self.selected_waypoint = near_waypoint
 
             self.force_redraw()
 
