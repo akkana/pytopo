@@ -257,12 +257,22 @@ but if you want to, contact me and I'll help you figure it out.)
         self.file_read_folder = None
         self.file_save_folder = None
 
+        self.draw_functions = []
+
     def add_title(self, moretitle):
         self.title = "%s %s" % (self.title, os.path.basename(moretitle))
 
     def add_overlay(self, overlay, opacity=.4):
         overlay.opacity = opacity
         self.overlays.append(overlay)
+
+    def add_draw_function(self, draw_fcn):
+        """Add a function that will be called when we get a draw signal
+           for the window. The function will only be run once and then
+           will be removed from the queue.
+           XXX This isn't currently used, because it blocks the main thread.
+        """
+        self.draw_functions.append(draw_fcn)
 
     def show_window(self, init_width, init_height):
         """Create the initial window."""
@@ -316,6 +326,15 @@ but if you want to, contact me and I'll help you figure it out.)
             GObject.threads_init()
 
         Gtk.main()
+
+    def init_message(self):
+        """Draw an 'initializing' message so the user knows something is
+           happening even if there's a lot of data to read.
+        """
+        self.draw_label("Initializing PyTopo...",
+                        250, 250,
+                        # self.win_width * .4, self.win_height/2,
+                        self.black_color)
 
     def force_redraw(self):
         if not self.drawing_area:
@@ -1086,6 +1105,19 @@ but if you want to, contact me and I'll help you figure it out.)
              MapUtils.dec_deg2deg_min(self.cur_lat)))
 
     def zoom_to(self, zoomlevel):
+        if zoomlevel < 2:
+            print("Can't zoom to less than zoom level 2", file=sys.stderr)
+            return
+        try:
+            if zoomlevel > self.collection.maxzoom:
+                print("Can't zoom to more than", self.collection.maxzoom,
+                      file=sys.stderr)
+                return
+        except:
+            pass
+        if self.controller.Debug:
+            print("zooming to", zoomlevel, file=sys.stderr)
+
         if self.cur_lon:
             self.center_lon = self.cur_lon
         else:
@@ -2383,7 +2415,16 @@ but if you want to, contact me and I'll help you figure it out.)
         self.height = allocation.height
 
     def draw_handler(self, widget, cr):
+        if not self.collection:
+            self.init_message()
+            return
         self.draw_map()
+
+        # draw functions will only be useful once they can be called
+        # from other threads. Otherwise, they block the UI thread.
+        # for draw_fcn in self.draw_functions:
+        #     draw_fcn()
+        #     self.draw_functions.remove(draw_fcn)
 
     def key_press_event(self, widget, event):
         """Handle key presses."""

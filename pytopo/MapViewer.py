@@ -29,8 +29,10 @@ import glob
 import gc
 import xml.parsers.expat
 
-import gtk    # XXX any gtk calls should be moved into MapWindow
-import gobject
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+from gi.repository import GLib
 
 
 class ArgParseException(Exception):
@@ -169,29 +171,29 @@ to standard output.
     def track_select(self, mapwin):
         """Show a dialog giving a choice of known tracks.
         """
-        dialog = gtk.Dialog("Tracks", None, 0,
-                            (gtk.STOCK_CLOSE, gtk.RESPONSE_NONE,
-                             gtk.STOCK_OK, gtk.RESPONSE_OK))
+        dialog = Gtk.Dialog("Tracks", None, 0,
+                            (Gtk.STOCK_CLOSE, Gtk.RESPONSE_NONE,
+                             Gtk.STOCK_OK, Gtk.RESPONSE_OK))
         dialog.set_size_request(400, 300)
 
-        sw = gtk.ScrolledWindow()
-        sw.set_shadow_type(gtk.SHADOW_ETCHED_IN)
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw = Gtk.ScrolledWindow()
+        sw.set_shadow_type(Gtk.SHADOW_ETCHED_IN)
+        sw.set_policy(Gtk.POLICY_AUTOMATIC, Gtk.POLICY_AUTOMATIC)
 
         # List store will hold Track name and Track file path
-        store = gtk.ListStore(str, str)
+        store = Gtk.ListStore(str, str)
 
         # Create the list
         for track in self.KnownTracks:
             store.append([track[0], track[1]])
 
-        treeview = gtk.TreeView(store)
+        treeview = Gtk.TreeView(store)
 
-        renderer = gtk.CellRendererText()
-        column = gtk.TreeViewColumn("Track name", renderer, text=0)
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn("Track name", renderer, text=0)
         treeview.append_column(column)
 
-        sw.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        sw.set_policy(Gtk.POLICY_AUTOMATIC, Gtk.POLICY_AUTOMATIC)
         sw.add(treeview)
 
         dialog.vbox.pack_start(sw, expand=True)
@@ -199,7 +201,7 @@ to standard output.
         dialog.show_all()
 
         response = dialog.run()
-        if response == gtk.RESPONSE_OK:
+        if response == Gtk.RESPONSE_OK:
             selection = treeview.get_selection()
             model, it = selection.get_selected()
             if it:
@@ -655,6 +657,27 @@ Please specify either a site or a file containing geographic data.""")
 
         mapwin = MapWindow(self)
 
+        # We'll show the window immediately, and then start parsing the
+        # arguments, in case there are any huge data files that take
+        # a long time to parse. So schedule the arg parsing.
+        # This timeout can't be too short, or the window won't
+        # get shown at all.
+        # XXX It might be better to add a function to MapWindow that
+        # allows scheduling of a function after the first window draw event,
+        # probably called from MapWindow.draw_handler, rather than
+        # using Glib timeouts and guessing how long they need to be.
+        # However, I tried that and it still didn't allow for the
+        # main window to be drawn before the arguments are parsed.
+        # idle_add has the same problem. So, back to timeout_add.
+        # Sigh, I guess the only thing that might actually work is to
+        # write threading to load data files into the mapwin.
+        GLib.timeout_add(100, lambda: self.read_args(mapwin, pytopo_args))
+        # GLib.idle_add(lambda: self.read_args(mapwin, pytopo_args))
+        # mapwin.add_draw_function(lambda: self.read_args(mapwin, pytopo_args))
+
+        mapwin.show_window(self.init_width, self.init_height)
+
+    def read_args(self, mapwin, pytopo_args):
         try:
             self.parse_args(mapwin, pytopo_args)
         except ArgParseException:
@@ -676,7 +699,8 @@ Please specify either a site or a file containing geographic data.""")
         # p = pstats.Stats('fooprof')
         # p.sort_stats('time').print_stats(20)
 
-        mapwin.show_window(self.init_width, self.init_height)
+        # Now that everything is read in, draw the map
+        mapwin.draw_map()
 
 
 def main():
