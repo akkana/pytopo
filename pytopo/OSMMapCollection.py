@@ -133,6 +133,7 @@ class OSMMapCollection(TiledMapCollection):
         Pass latitude for map collections (e.g. OSM) that cover
         large areas so scale will tend to vary with latitude.
         """
+        # traceback.print_stack()
         if self.zoomlevel != newzoom:
             if newzoom > self.maxzoom:
                 print("Can't zoom past level", self.maxzoom, "in", \
@@ -147,7 +148,8 @@ class OSMMapCollection(TiledMapCollection):
 
         # But because of the Mercator projection,
         # yscale has to be adjusted for latitude.
-        (xtile, ytile, x_off, y_off) = self.deg2num(latitude, 180)
+        (xtile, ytile, x_off, y_off) = self.deg2num(latitude, 180,
+                                                    self.zoomlevel)
         (lat1, lon1) = self.num2deg(xtile, ytile)
         (lat2, lon2) = self.num2deg(xtile + 1, ytile - 1)
         self.xscale = 256. / (lon2 - lon1)
@@ -178,7 +180,8 @@ class OSMMapCollection(TiledMapCollection):
         and pixbuf or (less often) filename may be None.
         """
 
-        (xtile, ytile, x_off, y_off) = self.deg2num(latitude, longitude)
+        (xtile, ytile, x_off, y_off) = self.deg2num(latitude, longitude,
+                                                    self.zoomlevel)
 
         filename = os.path.join(self.location, str(self.zoomlevel),
                                 str(xtile), str(ytile)) + self.ext

@@ -386,7 +386,7 @@ to standard output.
             # args[0] doesn't start with '-'. Is it a file?
             if os.path.exists(args[0]):
 
-                # Is it a track file?
+                # Is it a track or other GIS data file?
                 try:
                     bbox = mapwin.trackpoints.read_track_file(args[0])
                     files_bbox.union(bbox)
@@ -547,6 +547,9 @@ to standard output.
         if not bbox:
             bbox = files_bbox
 
+        if self.Debug:
+            print("Starting bbox is", bbox)
+
         if not mapwin.center_lat or not mapwin.center_lon:
             if not bbox:
                 print("""No center coordinates!
@@ -592,6 +595,30 @@ Please specify either a site or a file containing geographic data.""")
         # Raise an exception so the caller can bring up a selection window.
         raise(ArgParseException)
 
+    def read_args(self, mapwin, pytopo_args):
+        try:
+            self.parse_args(mapwin, pytopo_args)
+        except ArgParseException:
+            # Didn't match any known run arguments:
+            # bring up the selection window to choose a location.
+            # It will return True if the user chooses a location,
+            # False for Cancel or some other way out.
+            if not mapwin.selection_window():
+                sys.exit(0)
+
+        # For cProfile testing, run with a dummy collection (no data needed):
+        # mapwin.collection = MapCollection("dummy", "/tmp")
+
+        # print(cProfile.__file__)
+        # cProfile.run('mapwin.show_window()', 'cprof.out')
+        # http://docs.python.org/library/profile.html
+        # To analyze cprof.out output, do this:
+        # import pstats
+        # p = pstats.Stats('fooprof')
+        # p.sort_stats('time').print_stats(20)
+
+        # Now that everything is read in, draw the map
+        mapwin.draw_map()
 
     def exec_config_file(self):
         settings = configfile.exec_config_file(self.init_width,
@@ -676,31 +703,6 @@ Please specify either a site or a file containing geographic data.""")
         # mapwin.add_draw_function(lambda: self.read_args(mapwin, pytopo_args))
 
         mapwin.show_window(self.init_width, self.init_height)
-
-    def read_args(self, mapwin, pytopo_args):
-        try:
-            self.parse_args(mapwin, pytopo_args)
-        except ArgParseException:
-            # Didn't match any known run arguments:
-            # bring up the selection window to choose a location.
-            # It will return True if the user chooses a location,
-            # False for Cancel or some other way out.
-            if not mapwin.selection_window():
-                sys.exit(0)
-
-        # For cProfile testing, run with a dummy collection (no data needed):
-        # mapwin.collection = MapCollection("dummy", "/tmp")
-
-        # print(cProfile.__file__)
-        # cProfile.run('mapwin.show_window()', 'cprof.out')
-        # http://docs.python.org/library/profile.html
-        # To analyze cprof.out output, do this:
-        # import pstats
-        # p = pstats.Stats('fooprof')
-        # p.sort_stats('time').print_stats(20)
-
-        # Now that everything is read in, draw the map
-        mapwin.draw_map()
 
 
 def main():

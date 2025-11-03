@@ -104,19 +104,29 @@ TiledMapCollection classes must implement:
            Also set some win-specific variables which can be referenced later
            by draw_single_tile as downloaded tiles become available.
         """
+        # print("TiledMapCollection.draw_map centered at lon", center_lon,
+        #       "lat", center_lat)
+        # print("xscale", self.xscale, "yscale", self.yscale)
+        # print("zoomlevel:", self.zoomlevel)
+        # print("win size", mapwin.win_width, mapwin.win_height)
+
         # In case this hasn't been initialized yet:
         self.mapwin = mapwin
 
         # Call zoom to set the x and y scales accurately for this latitude.
-        self.zoom(0, center_lat)
+        self.zoom_to(self.zoomlevel, center_lat)
 
         # Find the coordinate boundaries for the set of maps to draw.
         # This may (indeed, usually will) include maps partly off the screen,
         # so the coordinates will span a greater area than the visible window.
         min_lon = center_lon - mapwin.win_width / self.xscale / 2
+        min_lon = max(min_lon, -180)
         max_lon = center_lon + mapwin.win_width / self.xscale / 2
+        max_lon = min(max_lon, 180)
         min_lat = center_lat - mapwin.win_height / self.yscale / 2
+        min_lat = max(min_lat, -90)
         max_lat = center_lat + mapwin.win_height / self.yscale / 2
+        max_lat = min(max_lat, 90)
 
         if (self.mapwin.controller.Debug):
             print("Map from", min_lon, min_lat, "to", max_lon, max_lat)

@@ -121,7 +121,11 @@ __init__, get_maplet, draw_map.
         # zoom level is about 256 * distance/40000000 * 2^zoom.
         # But it needs another factor of 100000, determined empirically.
         mult = 256. * 100000. / 40000000.
-        z = 0
+
+        # Start at zoom level 2. I don't know what zoomlevel 1 is good for,
+        # but 2 shows the whole planet.
+        # The code will use z-1, so set z to 3 to limit to zoom level 2.
+        z = 3
 
         # Handle the case of a single point
         if xdist == 0 and ydist == 0:
