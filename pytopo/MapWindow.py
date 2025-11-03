@@ -399,9 +399,7 @@ but if you want to, contact me and I'll help you figure it out.)
             print("window draw_map centered at", end=' ')
             print(self.center_lon, self.center_lat)
 
-        print("Calling collection.draw_map: zoom is", self.collection.zoomlevel)
         self.collection.draw_map(self.center_lon, self.center_lat, self)
-        print("After collection.draw_map, zoom is", self.collection.zoomlevel)
         if self.controller.Debug and self.overlays:
             print("drawing overlay collections")
         for ov in self.overlays:
@@ -1140,7 +1138,6 @@ but if you want to, contact me and I'll help you figure it out.)
            Be sure to pass amount as a named argument, amount=X
            otherwise it will be taken as the (unused) widget argument.
         """
-        print("\n\nzoom: amount =", amount)
         self.zoom_to(self.collection.zoomlevel + amount)
 
     def scroll_event(self, button, event):
