@@ -1210,6 +1210,7 @@ but if you want to, contact me and I'll help you figure it out.)
         contextmenu = OrderedDict([
             (MapUtils.coord2str_dd(self.cur_lon, self.cur_lat),
              self.print_location),
+            ('    Zoom level: %d' % self.collection.zoomlevel, None),
             ("Open track file...", self.prompt_for_track_file),
             ("My Locations...", self.mylocations),
             ("My Tracks...", self.mytracks),

@@ -77,9 +77,11 @@ Usage: pytopo
        pytopo -h :  print this message
 
 Other flags:
+       -g        : follow a GPS if available
+       -z zoom   : Initial zoom level, from 3 (widest) to the most allowed
+                   by the collection, typically around 16 or 22
        -k keys   : comma-separated list of fields (keys) to look for
                    when grouping polygonal regions.
-       -g        : follow a GPS if available
        -d[level] : debugging mode. Defaults to 1, level 2 shows a little more.
 
 With no arguments, will display a menu of known sites
@@ -284,6 +286,8 @@ to standard output.
         mapwin.trackpoints = TrackPoints()
         files_bbox = BoundingBox()
 
+        initial_zoom = None
+
         while len(args) > 0:
             if args[0][0] == '-' and not args[0][1].isdigit():
                 if args[0] == "-m":
@@ -329,6 +333,17 @@ to standard output.
                         self.error_out("Can't find a map collection called "
                                         + args[1])
                     mapwin.add_overlay(overlay)
+                    args = args[1:]
+
+                elif args[0] == "-z":
+                    try:
+                        initial_zoom = int(args[1])
+                    except ValueError:
+                        print("Can't understand zoom level '%s'" % args[1])
+                        sys.exit(1)
+                    except IndexError:
+                        print("-z: No zoom level specified!")
+                        sys.exit(1)
                     args = args[1:]
 
                 elif args[0].startswith("-d"):
@@ -560,7 +575,10 @@ Please specify either a site or a file containing geographic data.""")
 
             mapwin.center_lat, mapwin.center_lon = bbox.center()
 
-        if bbox:
+        if initial_zoom:
+            mapwin.collection.zoom_to(initial_zoom)
+
+        elif bbox:
             mapwin.collection.zoom_to_bounds(bbox)
             for ov in mapwin.overlays:
                 ov.zoom_to_bounds(bbox)

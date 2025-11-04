@@ -93,9 +93,11 @@ Usage (command-line arguments)
           pytopo -h :  print this message
 
    Other flags:
+          -g        : follow a GPS if available
+          -z zoom   : Initial zoom level, from 3 (widest) to the most allowed
+                      by the collection, typically around 16 or 22
           -k keys   : comma-separated list of fields (keys) to look for
                       when grouping polygonal regions.
-          -g        : follow a GPS if available
           -d[level] : debugging mode. Defaults to 1, level 2 shows a little more.
 
    With no arguments, will display a menu of known sites
