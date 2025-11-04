@@ -256,6 +256,21 @@ to standard output.
 
         return True
 
+    def parse_help_args(self, args):
+        """Check the argument list for anything that should just
+           print help and not pop up any window.
+        """
+        while len(args) > 1:
+            args = args[1:]
+            if args[0][0] == '-' and not args[0][1].isdigit():
+                if args[0] == "-v" or args[0] == "--version":
+                    print(self.get_version())
+                    sys.exit(0)
+                elif args[0] == "-h" or args[0] == "--help":
+                    self.Usage()
+                elif args[0] == "-p":
+                    self.print_sites()
+
     def parse_args(self, mapwin, args):
         """Parse runtime arguments."""
 
@@ -271,20 +286,7 @@ to standard output.
 
         while len(args) > 0:
             if args[0][0] == '-' and not args[0][1].isdigit():
-                if args[0] == "-v" or args[0] == "--version":
-                    print(self.get_version())
-                    sys.exit(0)
-                elif args[0] == "-h" or args[0] == "--help":
-                    self.Usage()
-
-                # Next clause is impossible because of the prev isdigit check:
-                # if args[0] == "-15":
-
-                #    series = 15
-                elif args[0] == "-p":
-                    self.print_sites()
-
-                elif args[0] == "-m":
+                if args[0] == "-m":
                     raise ArgParseException
 
                 elif args[0] == "-g":
@@ -671,6 +673,10 @@ Please specify either a site or a file containing geographic data.""")
 
         # And saved tracks
         self.KnownTracks += configfile.read_tracks()
+
+        # First, check for -h or --help arguments, or -m or -p.
+        # If so, nothing else should happen, no window should come up.
+        self.parse_help_args(pytopo_args)
 
         gc.enable()
 
