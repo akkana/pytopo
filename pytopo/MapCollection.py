@@ -99,6 +99,22 @@ __init__, get_maplet, draw_map.
                 * math.log(math.tan(math.pi / 4.0
                                     + a * (math.pi / 180.0) / 2.0)))
 
+    def latlon2xy(self, lat, lon,
+                  center_lat, center_lon, win_width, win_height):
+        """Convert a coordinate to a position in a map window.
+           at the Collection's current zoom level
+           and the center coordinate and pixel size of the window.
+           Return x, y.
+           This works okay at 5 and above, but fails for zoomlevels 2-4
+           because of projection issues.
+           MAP COLLECTIONS SHOULD OVERRIDE THIS WITH A BETTER CALCULATION
+           THAT TAKES PROJECTION INTO ACCOUNT.
+        """
+        # xscale is pixels/degree, which we shouldn't even use because it
+        # varies depending on coordinate and projection.
+        return (int((lon - center_lon) * self.xscale + win_width / 2),
+                int((center_lat - lat) * self.yscale + win_height / 2))
+
     def zoom_to_bounds(self, *args):
         """Zoom to a reasonable level for the given bounds,
            which may be either a TrackPoints.BoundingBox

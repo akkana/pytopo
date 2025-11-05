@@ -453,17 +453,23 @@ but if you want to, contact me and I'll help you figure it out.)
                       self.trackpoints.waypoints[self.selected_waypoint].name,
                             15, 40, color=self.yellow_color)
         elif self.selected_trackpoint is not None:
-            self.draw_label(
-                "Track point: (%.2f, %.2f, %.1f)\n%s"
-                % (self.trackpoints.points[self.selected_trackpoint].lat,
-                   self.trackpoints.points[self.selected_trackpoint].lon,
-                   self.trackpoints.points[self.selected_trackpoint].ele,
-                   self.trackpoints.points[self.selected_trackpoint].timestamp),
-                15, 40, color=self.yellow_color)
-            point_x, point_y = self.coords2xy(
-                self.trackpoints.points[self.selected_trackpoint].lon,
-                self.trackpoints.points[self.selected_trackpoint].lat,
-                self.win_width, self.win_height)
+            try:
+                self.draw_label(
+                    "Track point: (%.2f, %.2f, %.1f)\n%s"
+                    % (self.trackpoints.points[self.selected_trackpoint].lat,
+                       self.trackpoints.points[self.selected_trackpoint].lon,
+                       self.trackpoints.points[self.selected_trackpoint].ele,
+                       self.trackpoints.points[self.selected_trackpoint].timestamp),
+                    15, 40, color=self.yellow_color)
+                point_x, point_y = self.coords2xy(
+                    self.trackpoints.points[self.selected_trackpoint].lon,
+                    self.trackpoints.points[self.selected_trackpoint].lat,
+                    self.win_width, self.win_height)
+            except IndexError:
+                # I'm not sure why this happens, but I've seen it once
+                # from right-clicking on a trackpoint to "delete points after"
+                print("Internal error: Selected trackpoint",
+                      self.selected_trackpoint, "is out of range")
             self.draw_marker(point_x, point_y)
 
         # Copyright info or other attribution
@@ -580,10 +586,9 @@ but if you want to, contact me and I'll help you figure it out.)
                 # print("can't set color:", e)
                 pass
 
-            x = int((pt.lon - self.center_lon) * self.collection.xscale
-                    + self.win_width / 2)
-            y = int((self.center_lat - pt.lat) * self.collection.yscale
-                    + self.win_height / 2)
+            x, y = self.collection.latlon2xy(pt.lat, pt.lon,
+                                             self.center_lat, self.center_lon,
+                                             self.win_width, self.win_height)
 
             # Call draw_line whether or not the point is visible;
             # even with one or both endpoints off screen, some of
