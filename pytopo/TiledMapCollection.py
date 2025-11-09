@@ -15,7 +15,9 @@ from pytopo import MapUtils
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
 # import threading
+
 import time
+import math
 
 import os
 
@@ -100,125 +102,82 @@ TiledMapCollection classes must implement:
             self.reload_tiles = False
 
     def draw_map(self, center_lon, center_lat, mapwin):
-        """Draw tiles at the specified coordinates, to fill the mapwin.
-           Also set some win-specific variables which can be referenced later
-           by draw_single_tile as downloaded tiles become available.
-        """
-        # print("TiledMapCollection.draw_map centered at lon", center_lon,
-        #       "lat", center_lat)
-        # print("xscale", self.xscale, "yscale", self.yscale)
-        # print("zoomlevel:", self.zoomlevel)
-        # print("win size", mapwin.win_width, mapwin.win_height)
-
-        # In case this hasn't been initialized yet:
+        # In case the mapwin hasn't been initialized yet:
         self.mapwin = mapwin
 
         # Call zoom to set the x and y scales accurately for this latitude.
         self.zoom_to(self.zoomlevel, center_lat)
 
-        # Find the coordinate boundaries for the set of maps to draw.
-        # This may (indeed, usually will) include maps partly off the screen,
-        # so the coordinates will span a greater area than the visible window.
-        min_lon = center_lon - mapwin.win_width / self.xscale / 2
-        min_lon = max(min_lon, -180)
-        max_lon = center_lon + mapwin.win_width / self.xscale / 2
-        max_lon = min(max_lon, 180)
-        min_lat = center_lat - mapwin.win_height / self.yscale / 2
-        min_lat = max(min_lat, -90)
-        max_lat = center_lat + mapwin.win_height / self.yscale / 2
-        max_lat = min(max_lat, 90)
+        # Convert center to Mercator and then to tile coordinates
+        center_merc_x, center_merc_y = MapUtils.latlon_to_mercator(center_lat,
+                                                                   center_lon)
 
-        if (self.mapwin.controller.Debug):
-            print("Map from", min_lon, min_lat, "to", max_lon, max_lat)
+        # Calculate resolution (meters per pixel)
+        initial_resolution = 2 * math.pi * 6378137.0 / 256.0
+        resolution = initial_resolution / (2 ** self.zoomlevel)
 
-        # Start from the upper left: min_lon, max_lat
+        # Find the tile that contains the center
+        n = 2 ** self.zoomlevel
+        center_tile_x = int(n * (center_lon + 180) / 360)
+        center_lat_rad = math.radians(center_lat)
+        center_tile_y = int(n * (
+            1 - math.log(math.tan(center_lat_rad)
+                         + 1/math.cos(center_lat_rad)) / math.pi) / 2)
+        if self.mapwin.controller.Debug:
+            print("center tile is", center_tile_x, center_tile_y)
 
-        # pdb.set_trace()
-        curlat = max_lat
-        cur_y = 0
-        y_maplet_name = None
-        initial_x_off = None
-        while cur_y < mapwin.win_height:
-            curlon = min_lon
-            cur_x = 0
-            x_maplet_name = None
+        # Get Mercator coords of the center tile's top-left corner
+        tile_lon = center_tile_x / n * 360 - 180
+        tile_y_rad = math.atan(math.sinh(math.pi * (1 - 2 * center_tile_y / n)))
+        tile_lat = math.degrees(tile_y_rad)
+        tile_merc_x, tile_merc_y = MapUtils.latlon_to_mercator(tile_lat, tile_lon)
 
-            while cur_x < mapwin.win_width:
-                # Reset the expected image size:
-                w = self.img_width
-                h = self.img_height
+        # Offset of center point within its tile (in pixels)
+        center_offset_x = (center_merc_x - tile_merc_x) / resolution
+        center_offset_y = (tile_merc_y - center_merc_y) / resolution
 
-                # Is it the first maplet in this row?
-                if x_maplet_name is None:
+        # Where to draw the center tile so the center pt appears at window center
+        center_tile_draw_x = mapwin.win_width / 2 - center_offset_x
+        center_tile_draw_y = mapwin.win_height / 2 - center_offset_y
 
-                    # Is it the first maplet in the map --
-                    # usually the one in the upper left corner?
-                    # Then we need to specify coordinates.
-                    if y_maplet_name is None:
-                        pixbuf, x_off, y_off, x_maplet_name = \
-                            self.get_maplet(curlon, curlat)
+        # Determine range of tiles needed
+        tiles_left = int(math.ceil(-center_tile_draw_x / self.img_width))
+        tiles_right = int(math.ceil((mapwin.win_width - center_tile_draw_x)
+                                    / self.img_width))
+        tiles_up = int(math.ceil(-center_tile_draw_y / self.img_height))
+        tiles_down = int(math.ceil((mapwin.win_height - center_tile_draw_y)
+                                   / self.img_height))
+        if self.mapwin.controller.Debug > 1:
+            print("tiles left, right, up, down:",
+                  tiles_left, tiles_right, tiles_up, tiles_down)
 
-                        # Save the x offset: we'll need it for the
-                        # beginning of each subsequent row.
-                        initial_x_off = x_off
+        tiles = []
+        for dy in range(tiles_up-1, tiles_down):
+            for dx in range(tiles_left-1, tiles_right):
+                tile_x = center_tile_x + dx
+                tile_y = center_tile_y + dy
 
-                        # Save parameters that will help draw_single_tile later.
-                        # These will be reset on the first tile of
-                        # each draw_map() call.
-                        self.initial_x_off = x_off
-                        self.initial_y_off = y_off
-                        self.upper_left_maplet_name = x_maplet_name
+                # Skip tiles outside valid range
+                if tile_x < 0 or tile_x >= n or tile_y < 0 or tile_y >= n:
+                    continue
 
-                    # Not upper left corner --
-                    # must be the beginning of a new row.
-                    # Get the maplet below the beginning of the last row.
-                    else:
-                        pixbuf, x_maplet_name = \
-                            self.get_next_maplet(y_maplet_name, 0, 1)
-                        x_off = initial_x_off
-                        y_off = 0
+                draw_x = int(center_tile_draw_x + dx * self.img_width)
+                draw_y = int(center_tile_draw_y + dy * self.img_height)
 
-                    # Either way, whether or not we got a pixbuf,
-                    # if we're at the beginning of a row, save the
-                    # beginning-of-row maplet name and the offset:
-                    if cur_x == 0:
-                        y_maplet_name = x_maplet_name
+                if self.mapwin.controller.Debug:
+                    print(f"Tile ({tile_x}, {tile_y}) -> draw at"
+                          f"({draw_x}, {draw_y})")
+                pixbuf, filename = self.get_maplet_by_number(tile_x, tile_y)
+                x_off, y_off = 0, 0
+                self.draw_tile_at_position(pixbuf, mapwin,
+                                           draw_x, draw_y, x_off, y_off)
 
-                # Continuing an existing row.
-                # Get the maplet to the right of the last one.
-                else:
-                    pixbuf, x_maplet_name = self.get_next_maplet(x_maplet_name,
-                                                                 1, 0)
-                    x_off = 0
-
-                x = cur_x
-                y = cur_y
-                w, h = self.draw_tile_at_position(pixbuf, mapwin,
-                                                  x, y, x_off, y_off)
-                # You may ask, why not just do this subtraction before
-                # draw_pixbuf so we don't have to subtract w and h twice?
-                # Alas, we may not have the real w and h until we've done
-                # pixbuf.get_width(), so we'd be subtracting the wrong thing.
-                # XXX Not true in most collections, with fixed tile size.
-                # XXX Could be optimized in OSMMapCollection.
-                cur_x += w
-                curlon += float(w) / self.xscale
-
-            if self.mapwin.controller.Debug >= 2:
-                print(" ")
-                print("New row: adding y =", h, end=' ')
-                print("Subtracting lat", float(h) / self.yscale)
-
-            cur_y += h
-            curlat -= float(h) / self.yscale
-            # curlat -= float(self.img_height) / self.yscale
-
-        # Free all pixbuf data. Just letting pixbuf go out of scope
-        # isn't enough; it's necessary to force garbage collection
+        # Free all pixbuf data after drawing the whole map.
+        # Just letting pixbuf go out of scope # isn't enough;
+        # it's necessary to force garbage collection
         # otherwise Python will let the process grow until it
         # fills all of memory.
         # http://www.daa.com.au/pipermail/pygtk/2003-December/006499.html
-        # (At this indentation level, we free after drawing the whole map.)
         gc.collect()
 
     def get_next_maplet_name(self, fullpathname, dX, dY):
@@ -240,14 +199,17 @@ TiledMapCollection classes must implement:
            at a specified location.
            Return width, height of the given tile.
         """
+        if pixbuf is None:
+            if self.mapwin.controller.Debug:
+                print("Can't draw_tile_at_position: no pixbuf for",
+                      x, y, "offset", x_off, y_off)
+            return
+
         if self.mapwin.controller.Debug >= 2:
             print("draw_tile_at_position", self, x, y)
 
-        if pixbuf is not None:
-            w = pixbuf.get_width() - x_off
-            h = pixbuf.get_height() - y_off
-        else:
-            w, h = 0, 0
+        w = pixbuf.get_width() - x_off
+        h = pixbuf.get_height() - y_off
 
         if w and h:
             # If the image won't completely fill the grid space,
@@ -284,11 +246,11 @@ TiledMapCollection classes must implement:
                 mapwin.draw_rectangle(1, x, y, w, h)
 
         # Sometimes useful when testing:
-        # if (self.mapwin.controller.Debug > 1):
-        #     mapwin.set_color(mapwin.grid_color)
-        #     mapwin.draw_rectangle(0, x, y, w, h)
-        #     mapwin.draw_line(x, y, x + w, y + h)
-        #     mapwin.set_bg_color()
+        if self.mapwin.controller.Debug > 1:
+            mapwin.set_color(mapwin.grid_color)
+            mapwin.draw_rectangle(0, x, y, w, h)
+            mapwin.draw_line(x, y, x + w, y + h)
+            mapwin.set_bg_color()
 
         return w, h
 

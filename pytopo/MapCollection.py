@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2016 by Akkana Peck.
+# Copyright (C) 2009-2025 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -48,13 +48,18 @@ __init__, get_maplet, draw_map.
                                           os.path.basename(self.location))
 
     def get_maplet(self, longitude, latitude):
-        """Returns pixbuf, x_offset, y_offset:
+        """Returns pixbuf, x_offset, y_offset, filename:
 
          - the pixbuf for the maplet image (or null)
          - the offset in pixels into the image for the given coordinates,
            from top left.
         """
-        return None, 0, 0
+        return None, 0, 0, None
+
+    def get_maplet_by_number(self, xtile, ytile):
+        """Returns pixbuf, filename
+        """
+        return None, None
 
     def draw_map(self, center_lon, center_lat, drawwin):
         """Draw a map in a window, centered around the specified coordinates.

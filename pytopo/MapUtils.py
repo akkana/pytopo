@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2023 by Akkana Peck.
+# Copyright (C) 2009-2025 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -281,6 +281,31 @@ def haversine_distance(latitude_1, longitude_1,
         return EARTH_RADIUS_KM * c
     else:
         return EARTH_RADIUS_MI * c
+
+
+def latlon_to_mercator(lat, lon):
+    """
+    Convert latitude/longitude to Web Mercator coordinates (meters).
+    
+    Args:
+        lat (float): Latitude in degrees
+        lon (float): Longitude in degrees
+    
+    Returns:
+        tuple: (x, y) in Web Mercator meters
+    """
+    # Earth radius in meters
+    R = 6378137.0
+    
+    # Convert to radians
+    lon_rad = math.radians(lon)
+    lat_rad = math.radians(lat)
+    
+    # Web Mercator formulas
+    x = R * lon_rad
+    y = R * math.log(math.tan(math.pi / 4 + lat_rad / 2))
+    
+    return x, y
 
 
 def main():

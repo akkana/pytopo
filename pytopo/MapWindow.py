@@ -698,11 +698,10 @@ but if you want to, contact me and I'll help you figure it out.)
                         else:
                             wpcolor = self.contrasting_color(self.track_color)
                     continue
-                x = int((pt.lon - self.center_lon) * self.collection.xscale
-                        + self.win_width / 2)
-                y = int((self.center_lat - pt.lat) * self.collection.yscale
-                        + self.win_height / 2)
 
+                x, y = self.collection.latlon2xy(pt.lat, pt.lon,
+                                                 self.center_lat, self.center_lon,
+                                                 self.win_width, self.win_height)
                 if x >= 0 and x < self.win_width and \
                    y >= 0 and y < self.win_height:
                     self.draw_marker(x, y,     #x - 8, y - 21,
@@ -1215,6 +1214,7 @@ but if you want to, contact me and I'll help you figure it out.)
         contextmenu = OrderedDict([
             (MapUtils.coord2str_dd(self.cur_lon, self.cur_lat),
              self.print_location),
+            # ("(%d, %d)" % (self.context_x, self.context_y), None),
             ('    Zoom level: %d' % self.collection.zoomlevel, None),
             ("Open track file...", self.prompt_for_track_file),
             ("My Locations...", self.mylocations),

@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2016 by Akkana Peck.
+# Copyright (C) 2009-2025 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -9,6 +9,7 @@
 
 from pytopo.TiledMapCollection import TiledMapCollection
 from pytopo.MapWindow import MapWindow
+from pytopo import MapUtils
 
 import os
 import time
@@ -128,6 +129,37 @@ class OSMMapCollection(TiledMapCollection):
         lat_deg = math.degrees(lat_rad)
         return (lat_deg, lon_deg)
 
+    def latlon2xy(self, lat, lon, center_lat, center_lon, winwidth, winheight):
+        """Convert a coordinate to a position in a map window.
+           at the Collection's current zoom level
+           and the center coordinate and pixel size of the window.
+           Return x, y.
+        """
+        # Convert to Mercator coordinates (meters)
+        # print("center:", center_lat, center_lon)
+        point_x, point_y = MapUtils.latlon_to_mercator(lat, lon)
+        center_x, center_y = MapUtils.latlon_to_mercator(center_lat, center_lon)
+
+        # Calculate meters per pixel at this zoom level
+        # At zoom 0, the world is 256 pixels wide and covers
+        # ~40075017 meters (Earth's circumference)
+        initial_resolution = 2 * math.pi * 6378137.0 / 256.0
+        resolution = initial_resolution / (2 ** self.zoomlevel)
+
+        # Calculate pixel offsets from center
+        dx_meters = point_x - center_x
+        dy_meters = point_y - center_y
+
+        dx_pixels = dx_meters / resolution
+        dy_pixels = -dy_meters / resolution
+        # Negative because y increases downward in screen coordinates
+
+        # Position relative to window center
+        x = dx_pixels + (winwidth / 2)
+        y = dy_pixels + (winheight / 2)
+
+        return int(x), int(y)
+
     def zoom_to(self, newzoom, latitude=45):
         """Zoom to a specific zoom level, updating scales accordingly.
         Pass latitude for map collections (e.g. OSM) that cover
@@ -170,6 +202,16 @@ class OSMMapCollection(TiledMapCollection):
         large areas so scale will tend to vary with latitude.
         """
         self.zoom_to(self.zoomlevel + amount, latitude)
+
+    def get_maplet_by_number(self, xtile, ytile):
+        """Fetch or queue download for the maplet of the specified
+           zoom level, X and Y indices
+        Returns pixbuf, filename
+        """
+        filename = os.path.join(self.location, str(self.zoomlevel),
+                                str(xtile), str(ytile)) + self.ext
+        pixbuf = self.fetch_or_download_maplet(filename)
+        return pixbuf, filename
 
     def get_maplet(self, longitude, latitude):
         """Fetch or queue download for the maplet containing the
@@ -266,6 +308,14 @@ class OSMMapCollection(TiledMapCollection):
             print(e)
             on_disk = False
             needs_download = True
+
+        if self.mapwin.controller.Debug > 1:
+            if on_disk:
+                print("fetch_or_download", path, ": got it")
+            elif needs_download:
+                print("fetch_or_download", path, ": needs download")
+            else:
+                print("fetch_or_download", path, ": eek")
 
         if not on_disk and not needs_download:
             print("Eek: Not on disk but can't download: %s" % path)
