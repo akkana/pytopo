@@ -155,10 +155,11 @@ class OSMMapCollection(TiledMapCollection):
         # Negative because y increases downward in screen coordinates
 
         # Position relative to window center
-        x = dx_pixels + (winwidth / 2)
-        y = dy_pixels + (winheight / 2)
+        x = int(dx_pixels + (winwidth / 2))
+        y = int(dy_pixels + (winheight / 2))
 
-        return int(x), int(y)
+        # print("latlon2xy:", lat, lon, "-->", x, y)
+        return x, y
 
     def zoom_to(self, newzoom, latitude=45):
         """Zoom to a specific zoom level, updating scales accordingly.

@@ -463,8 +463,7 @@ but if you want to, contact me and I'll help you figure it out.)
                     15, 40, color=self.yellow_color)
                 point_x, point_y = self.coords2xy(
                     self.trackpoints.points[self.selected_trackpoint].lon,
-                    self.trackpoints.points[self.selected_trackpoint].lat,
-                    self.win_width, self.win_height)
+                    self.trackpoints.points[self.selected_trackpoint].lat)
             except IndexError:
                 # I'm not sure why this happens, but I've seen it once
                 # from right-clicking on a trackpoint to "delete points after"
@@ -477,18 +476,15 @@ but if you want to, contact me and I'll help you figure it out.)
         self.collection.draw_attribution(self)
 
         # draw pin
-        pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat,
-                                      self.win_width, self.win_height)
+        pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat)
 
         if self.pin:
-            self.draw_pixbuf(self.pin, 0, 0, pin_x + self.pin_xoff,
-                             pin_y + self.pin_yoff, -1, -1)
+            self.draw_pixbuf(self.pin, 0, 0, pin_x, pin_y, -1, -1)
 
         # draw GPS location
         if self.last_gpsd and self.last_gpsd.fix:
             gps_x, gps_y = self.coords2xy(self.last_gpsd.fix.longitude,
-                                          self.last_gpsd.fix.latitude,
-                                          self.win_width, self.win_height)
+                                          self.last_gpsd.fix.latitude)
 
             self.draw_circle(True, gps_x, gps_y, GPS_MARKER_RADIUS,
                              self.blue_color)
@@ -751,8 +747,7 @@ but if you want to, contact me and I'll help you figure it out.)
             """Return distance from pt to x, y --
                but only if it's smaller than sm_dist.
             """
-            tx, ty = self.coords2xy(pt.lon, pt.lat,
-                                    self.win_width, self.win_height)
+            tx, ty = self.coords2xy(pt.lon, pt.lat)
 
             # if abs(x - tx) > CLOSE or abs(y - ty) > CLOSE:
             #     return None
@@ -765,8 +760,7 @@ but if you want to, contact me and I'll help you figure it out.)
             # # line between the point and the last point?
             # if lastpt and self.trackpoints.is_start(lastpt) and \
             #    not self.trackpoints.is_attributes(lastpt):
-            #     ltx, lty = self.coords2xy(lastpt.lon, lastpt.lat,
-            #                               self.win_width, self.win_height)
+            #     ltx, lty = self.coords2xy(lastpt.lon, lastpt.lat)
             #     m = float(y-lty) / float(x-ltx)
             #     y1 = m * x + lty  # Predicted position
 
@@ -815,8 +809,7 @@ but if you want to, contact me and I'll help you figure it out.)
                         enclosing_polygons)
             enclosing_polygons = []
         for poly in self.trackpoints.polygons:
-            wincoords = [ self.coords2xy(*pair,
-                                         self.win_width, self.win_height)
+            wincoords = [ self.coords2xy(*pair)
                           for pair in poly["coordinates"] ]
             point = Point(x, y)
             polygon = Polygon(wincoords)
@@ -909,8 +902,7 @@ but if you want to, contact me and I'll help you figure it out.)
                         list(self.first_track_color) + [self.polygon_opacity]
             self.cr.set_source_rgba(*self.polygon_colors[polyclass])
             for coords in poly["coordinates"]:
-                pt = self.coords2xy(coords[0], coords[1],
-                                    self.win_width, self.win_height)
+                pt = self.coords2xy(coords[0], coords[1])
                 self.cr.line_to(*pt)
             self.cr.close_path()
             self.cr.fill()
@@ -1089,8 +1081,7 @@ but if you want to, contact me and I'll help you figure it out.)
         if not self.last_gpsd or not self.last_gpsd.fix:
             return False
         gps_x, gps_y = self.coords2xy(self.last_gpsd.fix.longitude,
-                                      self.last_gpsd.fix.latitude,
-                                      self.win_width, self.win_height)
+                                      self.last_gpsd.fix.latitude)
         return (abs(event_x - gps_x) < GPS_MARKER_RADIUS and
                 abs(event_y - gps_y) < GPS_MARKER_RADIUS)
 
@@ -2516,21 +2507,11 @@ but if you want to, contact me and I'll help you figure it out.)
                 self.center_lat +
                 float(self.win_height / 2 - y) / yscale)
 
-    def coords2xy(self, lon, lat, win_width=None, win_height=None,
-                  xscale=None, yscale=None):
+    def coords2xy(self, lon, lat):
         """Convert lon/lat to pixels."""
-        if not win_width:
-            win_width = self.win_width
-        if not win_height:
-            win_height = self.win_height
-        if not xscale:
-            xscale = self.collection.xscale
-        if not yscale:
-            yscale = self.collection.yscale
-        return (int((lon - self.center_lon) * xscale
-                    + win_width / 2),
-                int((self.center_lat - lat) * yscale
-                    + win_height / 2))
+        return self.collection.latlon2xy(lat, lon,
+                                         self.center_lat, self.center_lon,
+                                         self.win_width, self.win_height)
 
     def drag_event(self, widget, event):
         """Move the map as the user drags."""

@@ -101,6 +101,60 @@ TiledMapCollection classes must implement:
         else:
             self.reload_tiles = False
 
+    def find_tile_window_geometry(self, mapwin):
+        """
+           For given center coordinates and the current zoom level and
+           window size, calculate the tile X and Y for the center,
+           the offset at which to draw the tiles,
+           and the number of tiles spanned in each direction.
+           Return: center_tile_x, center_tile_y,
+                   tile_offset_x, tile_offset_y,
+                   tiles_left, tiles_right, tiles_up, tiles_down
+        """
+        # Find the tile that contains the center
+        center_tile_x = int(self.powzoom * (mapwin.center_lon + 180) / 360)
+        center_lat_rad = math.radians(mapwin.center_lat)
+        center_tile_y = int(self.powzoom * (
+            1 - math.log(math.tan(center_lat_rad)
+                         + 1/math.cos(center_lat_rad)) / math.pi) / 2)
+
+        # Convert center to Mercator and then to tile coordinates
+        center_merc_x, center_merc_y = MapUtils.latlon_to_mercator(
+            mapwin.center_lat, mapwin.center_lon)
+
+        # Get Mercator coords of the center tile's top-left corner
+        tile_lon = center_tile_x / self.powzoom * 360 - 180
+        tile_y_rad = math.atan(math.sinh(
+            math.pi * (1 - 2 * center_tile_y / self.powzoom)))
+        tile_lat = math.degrees(tile_y_rad)
+        tile_merc_x, tile_merc_y = MapUtils.latlon_to_mercator(tile_lat, tile_lon)
+
+        # Calculate resolution (meters per pixel)
+        resolution = 2 * math.pi * 6378137.0 / 256.0 / self.powzoom
+
+        # Offset of the center point from the top, left of its tile (pixels)
+        tile_offset_x = int((center_merc_x - tile_merc_x) / resolution)
+        tile_offset_y = int((tile_merc_y - center_merc_y) / resolution)
+
+        center_tile_draw_x = mapwin.win_width / 2 - tile_offset_x
+        center_tile_draw_y = mapwin.win_height / 2 - tile_offset_y
+
+        # Determine range of tiles needed
+        tiles_left = int(math.ceil(-center_tile_draw_x / self.img_width)) - 1
+        tiles_right = int(math.ceil((mapwin.win_width - center_tile_draw_x)
+                                    / self.img_width))
+        tiles_up = int(math.ceil(-center_tile_draw_y / self.img_height)) - 1
+        tiles_down = int(math.ceil((mapwin.win_height - center_tile_draw_y)
+                                   / self.img_height))
+
+        # print("find_tile_window_geometry: Returning",
+        #       center_tile_x, center_tile_y,
+        #       tile_offset_x, tile_offset_y,
+        #       tiles_left, tiles_right, tiles_up, tiles_down)
+        return (center_tile_x, center_tile_y,
+                tile_offset_x, tile_offset_y,
+                tiles_left, tiles_right, tiles_up, tiles_down)
+
     def draw_map(self, center_lon, center_lat, mapwin):
         # In case the mapwin hasn't been initialized yet:
         self.mapwin = mapwin
@@ -108,57 +162,36 @@ TiledMapCollection classes must implement:
         # Call zoom to set the x and y scales accurately for this latitude.
         self.zoom_to(self.zoomlevel, center_lat)
 
-        # Convert center to Mercator and then to tile coordinates
-        center_merc_x, center_merc_y = MapUtils.latlon_to_mercator(center_lat,
-                                                                   center_lon)
-
-        # Calculate resolution (meters per pixel)
-        initial_resolution = 2 * math.pi * 6378137.0 / 256.0
-        resolution = initial_resolution / (2 ** self.zoomlevel)
-
-        # Find the tile that contains the center
-        n = 2 ** self.zoomlevel
-        center_tile_x = int(n * (center_lon + 180) / 360)
-        center_lat_rad = math.radians(center_lat)
-        center_tile_y = int(n * (
-            1 - math.log(math.tan(center_lat_rad)
-                         + 1/math.cos(center_lat_rad)) / math.pi) / 2)
-        if self.mapwin.controller.Debug:
-            print("center tile is", center_tile_x, center_tile_y)
-
-        # Get Mercator coords of the center tile's top-left corner
-        tile_lon = center_tile_x / n * 360 - 180
-        tile_y_rad = math.atan(math.sinh(math.pi * (1 - 2 * center_tile_y / n)))
-        tile_lat = math.degrees(tile_y_rad)
-        tile_merc_x, tile_merc_y = MapUtils.latlon_to_mercator(tile_lat, tile_lon)
-
-        # Offset of center point within its tile (in pixels)
-        center_offset_x = (center_merc_x - tile_merc_x) / resolution
-        center_offset_y = (tile_merc_y - center_merc_y) / resolution
+        (center_tile_x, center_tile_y,
+         center_offset_x, center_offset_y,
+         tiles_left, tiles_right, tiles_up, tiles_down) = \
+             self.find_tile_window_geometry(mapwin)
 
         # Where to draw the center tile so the center pt appears at window center
         center_tile_draw_x = mapwin.win_width / 2 - center_offset_x
         center_tile_draw_y = mapwin.win_height / 2 - center_offset_y
 
-        # Determine range of tiles needed
-        tiles_left = int(math.ceil(-center_tile_draw_x / self.img_width))
-        tiles_right = int(math.ceil((mapwin.win_width - center_tile_draw_x)
-                                    / self.img_width))
-        tiles_up = int(math.ceil(-center_tile_draw_y / self.img_height))
-        tiles_down = int(math.ceil((mapwin.win_height - center_tile_draw_y)
-                                   / self.img_height))
         if self.mapwin.controller.Debug > 1:
             print("tiles left, right, up, down:",
                   tiles_left, tiles_right, tiles_up, tiles_down)
 
         tiles = []
-        for dy in range(tiles_up-1, tiles_down):
-            for dx in range(tiles_left-1, tiles_right):
+        for dy in range(tiles_up, tiles_down):
+            for dx in range(tiles_left, tiles_right):
                 tile_x = center_tile_x + dx
                 tile_y = center_tile_y + dy
 
-                # Skip tiles outside valid range
-                if tile_x < 0 or tile_x >= n or tile_y < 0 or tile_y >= n:
+                # Wrap around in longitude, but not in latitude
+                # because that doesn't work in a Mercator projection
+                if tile_x < 0:
+                    tile_x = int(tile_x + self.powzoom)
+                if tile_x >= self.powzoom:
+                    tile_x = tile_x % self.powzoom
+
+                # Skip tiles outside valid Y range
+                # (though that shouldn't happen)
+                if tile_y < 0 or tile_y >= self.powzoom:
+                    print("Skipping tile %d, %d" % (tile_x, tile_y))
                     continue
 
                 draw_x = int(center_tile_draw_x + dx * self.img_width)
@@ -195,9 +228,9 @@ TiledMapCollection classes must implement:
         return
 
     def draw_tile_at_position(self, pixbuf, mapwin, x, y, x_off, y_off):
-        """Draw a single tile, perhaps after downloading it,
-           at a specified location.
-           Return width, height of the given tile.
+        """Draw a single tile at a specified location,
+           starting at offset x_off, y_off into the tile.
+           Return width, height of how much was drawn of the tile.
         """
         if pixbuf is None:
             if self.mapwin.controller.Debug:
@@ -205,8 +238,15 @@ TiledMapCollection classes must implement:
                       x, y, "offset", x_off, y_off)
             return
 
+        if x < 0:
+            x_off += -x
+            x = 0
+        if y < 0:
+            y_off += -y
+            y = 0
+
         if self.mapwin.controller.Debug >= 2:
-            print("draw_tile_at_position", self, x, y)
+            print("draw_tile_at_position", x, y, x_off, y_off)
 
         w = pixbuf.get_width() - x_off
         h = pixbuf.get_height() - y_off
@@ -280,40 +320,21 @@ TiledMapCollection classes must implement:
         # Calculate x, y, x_offset, y_offset from the tile name.
         # Make sure it's even still visible.
         # Tile name is /path/to/zoom/x/y.ext
-        head, tiley = os.path.split(path)
-        tiley = os.path.splitext(tiley)[0]
-        head, tilex = os.path.split(head)
-        head, tilezoom = os.path.split(head)
         try:
-            tiley = int(tiley)
-            tilex = int(tilex)
+            head, tileynum = os.path.split(path)
+            tileynum = os.path.splitext(tileynum)[0]
+            head, tilexnum = os.path.split(head)
+            head, tilezoom = os.path.split(head)
+            tileynum = int(tileynum)
+            tilexnum = int(tilexnum)
         except ValueError:
             print("Bad tile filename", path)
             return
 
-        # Now, turn tilex and tiley into x, y, x_off, y_off
-        # for the MapWindow's current position.
-        lat_deg, lon_deg = self.num2deg(tilex, tiley)
-
-        # Upper left corner of the map window:
-        min_lon = mapwin.center_lon - mapwin.win_width / self.xscale / 2.
-        max_lat = mapwin.center_lat + mapwin.win_height / self.yscale / 2.
-
-        # Calculate position in the window relative to the upper left maplet
-        dx, dy = self.get_maplet_difference(self.upper_left_maplet_name, path)
-        mapx = dx * self.img_width - self.initial_x_off
-        mapy = dy * self.img_height - self.initial_y_off
-
-        if mapx < 0:
-            x_off = -mapx
-            mapx = 0
-        else:
-            x_off = 0
-        if mapy < 0:
-            y_off = -mapy
-            mapy = 0
-        else:
-            y_off = 0
+        (center_tile_xnum, center_tile_ynum,
+         tile_offset_x, tile_offset_y,
+         tiles_left, tiles_right, tiles_up, tiles_down) = \
+             self.find_tile_window_geometry(mapwin)
 
         try:
             pixbuf = MapWindow.load_image_from_file(path)
@@ -358,8 +379,22 @@ TiledMapCollection classes must implement:
             self.num_failed_downloads += 1
             return
 
-        self.draw_tile_at_position(pixbuf, mapwin, mapx, mapy,
-                                   x_off, y_off)
+        # Calculate the X and Y coordinates of the tile in the map window.
+        if tilexnum == 0:
+            mapx = 0
+            x_off = tile_offset_x
+        else:
+            mapx = tilexnum * self.img_width - tile_offset_x
+            x_off = 0
+        if tileynum == 0:
+            mapy = 0
+            y_off = tile_offset_y
+        else:
+            mapy = tileynum * self.img_height - tile_offset_y
+            y_off = 0
+        if self.mapwin.controller.Debug:
+            print("Drawing single tile at", mapx, mapy, x_off, y_off)
+        self.draw_tile_at_position(pixbuf, mapwin, mapx, mapy, x_off, y_off)
 
     def queue_download(self, url, path):
         """Add a URL to the FuturesSession downloader queue,
@@ -417,7 +452,7 @@ TiledMapCollection classes must implement:
 
     def response_hook(self, response, *args, **kwargs):
         """When the FuturesSession completes downloading a tile,
-           draw it on the map as soon as possible.
+           draw it on the map when possible.
         """
         if response.status_code != 200:
             print("Error: status", response.status_code, "on", response.url)
