@@ -191,7 +191,8 @@ TiledMapCollection classes must implement:
                 # Skip tiles outside valid Y range
                 # (though that shouldn't happen)
                 if tile_y < 0 or tile_y >= self.powzoom:
-                    print("Skipping tile %d, %d" % (tile_x, tile_y))
+                    if self.mapwin.controller.Debug:
+                        print("Skipping tile %d, %d" % (tile_x, tile_y))
                     continue
 
                 draw_x = int(center_tile_draw_x + dx * self.img_width)

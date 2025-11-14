@@ -1099,9 +1099,6 @@ but if you want to, contact me and I'll help you figure it out.)
              MapUtils.dec_deg2deg_min(self.cur_lat)))
 
     def zoom_to(self, zoomlevel):
-        if zoomlevel < 2:
-            print("Can't zoom to less than zoom level 2", file=sys.stderr)
-            return
         try:
             if zoomlevel > self.collection.maxzoom:
                 print("Can't zoom to more than", self.collection.maxzoom,
