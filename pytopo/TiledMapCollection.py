@@ -487,12 +487,9 @@ TiledMapCollection classes must implement:
         with open(tilepath, 'wb') as tilefp:
             content = response.content
             tilefp.write(content)
-            if self.mapwin.controller.Debug > 1:
-                debugname = '/'.join(tilepath.split('/')[-3:])
-                print(debugname, "Wrote", response.url, "to", tilepath)
-                # we're getting to this point, but then later finding
-                # that the file isn't there.
-                print(debugname, "Wrote", len(content), "bytes")
+            if self.mapwin.controller.Debug:
+                print("Wrote", response.url, "to", tilepath,
+                      "(", len(content), "bytes)")
 
             # Remove from the download queue.
             # Don't do this until finished writing the file --
