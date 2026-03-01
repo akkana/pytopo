@@ -456,7 +456,23 @@ TiledMapCollection classes must implement:
            draw it on the map when possible.
         """
         if response.status_code != 200:
+
+            # Handle 301 Moved Permanently and other 300 codes.
+            if response.status_code // 100 == 3:
+                print(response.status_code, "redirect from",
+                      response.url, "to", response.headers['Location'])
+                # requests-futures will automatically try the new location,
+                # but the response url will be the new one, so the entry
+                # in url_to_path needs to be updated.
+                self.url_to_path[response.headers['Location']] = \
+                    self.url_to_path[response.url]
+                del self.url_to_path[response.url]
+                self.urls_queued.remove(response.url)
+                self.urls_queued.append(response.headers['Location'])
+                return
+
             print("Error: status", response.status_code, "on", response.url)
+
             # XXX should check response, and maybe retry
             # in which case it shouldn't go on failed_download_urls
             self.num_failed_downloads += 1
@@ -469,10 +485,9 @@ TiledMapCollection classes must implement:
         # Is the response an image?
         try:
             if not response.headers['Content-Type'].startswith('image/'):
-                if self.mapwin.controller.Debug:
-                    print("%s not an image: Content-Type %s"
-                          % (response.url,
-                             response.headers['Content-Type']))
+                print("%s not an image: Content-Type %s"
+                      % (response.url,
+                         response.headers['Content-Type']))
                 self.num_failed_downloads += 1
                 self.last_failed_download_time = time.time()
                 return
@@ -483,7 +498,12 @@ TiledMapCollection classes must implement:
         # Write to disk
         self.num_failed_downloads = 0
         self.last_failed_download_time = 0
-        tilepath = self.url_to_path[response.url]
+        try:
+            tilepath = self.url_to_path[response.url]
+        except KeyError:
+            print("Can't map", response.url,
+                  "to a path on disk. Maybe a redirect?")
+            return
         with open(tilepath, 'wb') as tilefp:
             content = response.content
             tilefp.write(content)
