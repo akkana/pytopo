@@ -702,9 +702,21 @@ Please specify either a site or a file containing geographic data.""")
         # This must happen before any GTK; a 2024 change in GTK
         # makes the mapwin hang if it's in a subprocess but the
         # selection dialog already came up in the parent process.
-        rc = os.fork()
-        if rc:
-            sys.exit(0)
+        #
+        # Unfortunately, a 2026 change made it worse: now some
+        # things, like dialogs, hang if fork was invoked after even
+        # importing GTK. Delaying importation of GTK turns out to be
+        # extremely difficult: it can't be imported from a function
+        # because then the import only applies within the function,
+        # so arranging to delay importation will require a huge code
+        # redesign, and if that's necessary, it's awfully tempting to just
+        # rewrite the whole program to use a different toolkit and be
+        # done with all this GTK change insanity.
+        # But meanwhile, we can't fork.
+        #
+        # rc = os.fork()
+        # if rc:
+        #     sys.exit(0)
 
         mapwin = MapWindow(self)
 
