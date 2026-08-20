@@ -3,7 +3,7 @@
 '''pytopo module: display tiled maps from a variety of sources,
    along with trackpoints, waypoints and other useful information.
 
-   Copyright 2005-2024 by Akkana Peck.
+   Copyright 2005-2026 by Akkana Peck.
    Feel free to use, distribute or modify this program under the terms
    of the GPL v2 or, at your option, a later GPL version.
    I'd appreciate hearing about it if you make any changes.

@@ -104,8 +104,9 @@ class GeoPoint(object):
             s += " }"
         if self.extensions:
             s += " { "
-            for k in list(self.extensions.keys()):
-                s += "%s: %s, " % (k, self.attrs[k])
+            # for k in list(self.extensions.keys()):
+            for k in self.extensions:
+                s += "%s: %s, " % (k, self.extensions[k])
             # Remove the final comma
             s = s[:-2]
             s += " }"

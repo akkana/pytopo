@@ -58,16 +58,12 @@ setup(name='pytopo',
       include_package_data=True,
 
       entry_points={
-          # This probably should be gui_scripts according to some
-          # pages I've found, but the official documentation
-          # discusses console_scripts and doesn't mention gui_scripts.
-          # On Linux they're the same, but on Windows, console_scripts
-          # bring up a terminal, gui_scripts don't.
           'gui_scripts': [
               'pytopo=pytopo.MapViewer:main',
+              'ellie=pytopo.trackstats:main',
+              'pytopo-chart=pytopo.chart_data:main',
           ],
           'console_scripts': [
-              'ellie=pytopo.trackstats:main',
               'degreeconv=pytopo.MapUtils:main'
           ],
       },

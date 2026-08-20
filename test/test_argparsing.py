@@ -92,6 +92,21 @@ class ArgparseTests(unittest.TestCase):
                           (-106.2534204, 35.8849806,
                            -106.2283611, 35.895508))
 
+    def test_gpx_arg_with_hr(self):
+        args = [ 'pytopo', 'test/files/eastfork-hr.gpx' ]
+
+        mapwin =  MapWindow(self.viewer)
+        self.viewer.parse_args(mapwin, args)
+        hr_points = 0
+        for pt in mapwin.trackpoints.points:
+            try:
+                # print(pt.extensions.keys)
+                if 'hr' in pt.extensions:
+                    hr_points += 1
+            except:
+                pass
+        self.assertEqual(hr_points, 54)
+
     def test_kml_arg(self):
         args = [ 'pytopo', 'test/files/otowi-mesa-arch.kml' ]
 

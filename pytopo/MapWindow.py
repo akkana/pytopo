@@ -22,6 +22,7 @@ from gi.repository import Pango, PangoCairo
 from pytopo import MapUtils
 from pytopo.TrackPoints import TrackPoints, NULL_WP_NAME
 from . import trackstats
+from . import chart_protocol
 
 try:
     from shapely.geometry import Point
@@ -31,6 +32,12 @@ except ModuleNotFoundError:
 
 import os, sys
 import re
+
+from datetime import datetime, timezone
+import json
+import subprocess
+import threading
+import socket
 
 try:
     # Python 3:
@@ -53,6 +60,8 @@ import colorsys
 import traceback
 
 GPS_MARKER_RADIUS=10
+
+GPSTIMEFMT = "%Y-%m-%dT%H:%M:%SZ"
 
 # Track colorization styles
 class TrackColor(Enum):
@@ -258,6 +267,10 @@ but if you want to, contact me and I'll help you figure it out.)
         self.file_save_folder = None
 
         self.draw_functions = []
+
+        # Related to the optional chart window
+        self.client_sock = None
+        self.client_lock = threading.Lock()
 
     def add_title(self, moretitle):
         self.title = "%s %s" % (self.title, os.path.basename(moretitle))
@@ -2802,6 +2815,50 @@ but if you want to, contact me and I'll help you figure it out.)
         # until later. So any function that calls this must be sure
         # to guard against anything like extra map redraws.
 
+    def show_chart(self, key):
+        """Write data for the given key, run the charting process,
+           and set up communication with the chart so they can read mutual clicks.
+           Eventually this should handle multiple keys.
+        """
+        num_hr = 0
+        for pt in self.trackpoints.points:
+            try:
+                if key in pt.extensions:
+                    num_hr += 1
+                    if num_hr > 100:
+                        break
+            except:    # Probably a string instead of a GeoPoint
+                pass
+
+        datadic = { 'chartlabel': key,
+                    'ylabel': key,
+                    'data': {}
+                  }
+        for pt in self.trackpoints.points:
+            try:
+                if key in pt.extensions:
+                    utc_dt = datetime.strptime(pt.timestamp,
+                                               GPSTIMEFMT).replace(
+                                                   tzinfo=timezone.utc)
+                    local_dt = utc_dt.astimezone()  # system-local timezone
+                    datadic['data'][pt.timestamp] = pt.extensions[key]
+            except Exception as e:
+                print("exception:", e)
+                pass
+
+        # Now write as JSON.
+        if datadic['data']:
+            outfilename = "/tmp/data.json"
+            with open(outfilename, 'w') as jsonfp:
+                json.dump(datadic, jsonfp, indent=4)
+                print("Wrote", len(datadic['data']), "points to", outfilename)
+
+            subprocess.Popen([ "pytopo-chart", outfilename, key ])
+            print("Opened the chart")
+
+            self.start_chart_server()
+        elif self.controller.Debug
+            print("No data! datadic:", datadic)
 
     #
     # network communication with the chart window
@@ -2809,9 +2866,9 @@ but if you want to, contact me and I'll help you figure it out.)
     def start_chart_server(self):
         srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        srv.bind(("127.0.0.1", protocol.DEFAULT_PORT))
+        srv.bind(("127.0.0.1", chart_protocol.DEFAULT_PORT))
         srv.listen(1)
-        threading.Thread(target=self._accept_loop, args=(srv,),
+        threading.Thread(target=self.accept_loop, args=(srv,),
                          daemon=True).start()
 
     def accept_loop(self, srv):
@@ -2819,16 +2876,39 @@ but if you want to, contact me and I'll help you figure it out.)
             conn, _ = srv.accept()
             with self.client_lock:
                 self.client_sock = conn
-            protocol.start_recv_thread(conn, self._on_message_bg)
+            chart_protocol.start_recv_thread(conn, self.on_message_bg)
 
     def on_message_bg(self, msg):
         # Called from the socket thread - marshal onto the GTK main loop.
-        GLib.idle_add(self._on_message_main, msg)
+        GLib.idle_add(self.on_message_main, msg)
 
     def on_message_main(self, msg):
-        if msg.get("type") == "cursor":
-            self.cursor_frac = msg.get("frac")
-            self.drawing_area.queue_draw()
+        # print("Got a message:", msg)
+
+        if msg.get("type") != "cursor":
+            return False
+
+        clicktime = datetime.strptime(msg.get('time'), GPSTIMEFMT)
+        nearest_pt = None
+        nearest_diff = 800000
+
+        # Find the nearest trackpoint
+        for pt in self.trackpoints.points:
+            try:
+                pttime = datetime.strptime(pt.timestamp, GPSTIMEFMT)
+            except AttributeError:
+                continue
+            diff = abs((clicktime - pttime).seconds)
+            if diff < nearest_diff:
+                nearest_pt = pt
+                nearest_diff = diff
+
+        if not nearest_pt:
+            return False
+
+        point_x, point_y = self.coords2xy(nearest_pt.lon, nearest_pt.lat)
+        self.draw_marker(point_x, point_y)
+
         return False  # GLib.idle_add one-shot, don't reschedule
 
     def send_to_chart(self, msg):
@@ -2836,7 +2916,7 @@ but if you want to, contact me and I'll help you figure it out.)
             sock = self.client_sock
         if sock:
             try:
-                protocol.send_message(sock, msg)
+                chart_protocol.send_message(sock, msg)
             except OSError:
                 pass
 
