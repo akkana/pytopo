@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Copyright (C) 2009-2023 by Akkana Peck.
+# Copyright (C) 2009-2026 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -14,6 +14,7 @@ from pytopo.MapWindow import MapWindow
 from pytopo import MapUtils
 from pytopo.imggps import gps_from_image
 from pytopo.TrackPoints import TrackPoints, BoundingBox
+from pytopo.trackstats import plot_hr
 
 import pytopo.configfile as configfile
 
@@ -637,8 +638,24 @@ Please specify either a site or a file containing geographic data.""")
         # p = pstats.Stats('fooprof')
         # p.sort_stats('time').print_stats(20)
 
+        # Is there any heart rate data in the trackpoints read in?
+        # That would be in individual points' extensions with key "hr"
+        num_hr = 0
+        for pt in mapwin.trackpoints.points:
+            try:
+                if 'hr' in pt.extensions:
+                    num_hr += 1
+                    if num_hr > 100:
+                        break
+            except:    # Probably a string instead of a GeoPoint
+                pass
+
         # Now that everything is read in, draw the map
         mapwin.draw_map()
+
+        if num_hr > 20:
+            print(num_hr, "points with hr")
+            plot_hr(mapwin.trackpoints.points)
 
     def exec_config_file(self):
         settings = configfile.exec_config_file(self.init_width,
@@ -669,7 +686,6 @@ Please specify either a site or a file containing geographic data.""")
         # pointer to a specific object.
         if 'user_agent' in settings:
             pytopo.user_agent = settings['user_agent']
-
 
     def main(self, pytopo_args):
         """The main execution routine for the pytopo GUI app."""

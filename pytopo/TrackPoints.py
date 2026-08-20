@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2025 by Akkana Peck.
+# Copyright (C) 2009-2026 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -48,15 +48,35 @@ SPEEDRE = re.compile(".*:speed")
 
 class GeoPoint(object):
     """A single track point or waypoint."""
+    #
     # Note: GPX files imported from KML may have no timestamps.
-    # lat and lon are floats; the rest are strings.
+    # lat and lon are floats; ele, speed, name and timestamp are strings.
     # At least from GPX format,
     # ele is a string representing elevation in meters;
     # timestamp is a string like 2014-08-07T01:19:24Z.
     # If you need to add timestamps, see add_bogus_timestamps.
     # attrs is an optional list of other attributes like hdop and speed.
+    # attrs is a dict indicating any other attributes inside the <trkpt> node,
+    # like <hdop>1</hdop>.
+    # extensions is a dict with various strings pulled from <extensions>,
+    # and then simplified, e.g. from GPX,
+    # <extensions>
+    #   <osmand:provider>fused</osmand:provider>
+    #   <gpxtpx:TrackPointExtension>
+    #     <gpxtpx:hr>76</gpxtpx:hr>
+    #   </gpxtpx:TrackPointExtension>
+    #   <osmand:heading>65.0</osmand:heading>
+    # </extensions>
+    # will be mapped to { 'provider': 'fused',
+    #                     'hr': '76',
+    #                     'heading': '65.0' }
+    # No guarantees that all extensions will be correctly parsed.
+    # If you need a particular format that pytopo doesn't handle,
+    # please file a bug with an example data file.
+    #
     def __init__(self, lat, lon, ele=None, speed=None,
-                 name=False, timestamp=None, attrs=None):
+                 name=False, timestamp=None,
+                 attrs=None, extensions=None):
         self.lat = lat
         self.lon = lon
         self.ele = ele
@@ -64,6 +84,7 @@ class GeoPoint(object):
         self.name = name
         self.timestamp = timestamp
         self.attrs = attrs
+        self.extensions = extensions
 
     def __repr__(self):
         if self.ele:
@@ -75,8 +96,15 @@ class GeoPoint(object):
         if self.timestamp:
             s += " [%s]" % self.timestamp
         if self.attrs:
-            s += "{ "
+            s += " { "
             for k in list(self.attrs.keys()):
+                s += "%s: %s, " % (k, self.attrs[k])
+            # Remove the final comma
+            s = s[:-2]
+            s += " }"
+        if self.extensions:
+            s += " { "
+            for k in list(self.extensions.keys()):
                 s += "%s: %s, " % (k, self.attrs[k])
             # Remove the final comma
             s = s[:-2]
@@ -274,7 +302,8 @@ class TrackPoints(object):
         return None
 
     def handle_track_point(self, lat, lon, ele=None, speed=None,
-                           timestamp=None, waypoint_name=False, attrs=None):
+                           timestamp=None, waypoint_name=False,
+                           attrs=None, extensions=None):
         """Add a new trackpoint or waypoint after some basic sanity checks.
            lat and lon are in degrees.
            If waypoint_name, we assume this is a waypoint,
@@ -288,7 +317,7 @@ class TrackPoints(object):
         if timestamp == 0:
             timestamp = self.make_bogus_timestamp()
         point = GeoPoint(lat, lon, ele=ele, speed=speed, timestamp=timestamp,
-                         name=waypoint_name, attrs=attrs)
+                         name=waypoint_name, attrs=attrs, extensions=extensions)
 
         try:
             if point.ele:
@@ -396,12 +425,13 @@ class TrackPoints(object):
                         first_segment_name = self.points[-1]
 
                     for pt in trkpts:
-                        lat, lon, ele, speed, ts, attrs = \
+                        lat, lon, ele, speed, ts, attrs, extensions = \
                             self.GPX_point_coords(pt)
                         self.handle_track_point(lat, lon,
                                                 ele=ele, speed=speed,
                                                 timestamp=ts,
-                                                attrs=attrs)
+                                                attrs=attrs,
+                                                extensions=extensions)
                         bbox.add_point(lat, lon)
 
         handle_track("trkseg", "trkpt")
@@ -413,9 +443,10 @@ class TrackPoints(object):
         first_segment_name = None
         waypts = dom.getElementsByTagName("wpt")
         if waypts:
-            self.waypoints.append(os.path.basename(filename))
+            # self.waypoints.append(os.path.basename(filename))
             for pt in waypts:
-                lat, lon, ele, speed, time, attrs = self.GPX_point_coords(pt)
+                lat, lon, ele, speed, time, attrs, extensions \
+                    = self.GPX_point_coords(pt)
                 name = self.get_DOM_text(pt, "name")
                 if not name:
                     name = NULL_WP_NAME
@@ -477,11 +508,36 @@ class TrackPoints(object):
 
         return None
 
+    @staticmethod
+    def flatten_leaves_iter(node):
+        """Yield (localname, text) for every leaf element under node,
+           depth-first.
+        """
+        for child in node.childNodes:
+            if child.nodeType != child.ELEMENT_NODE:
+                continue
+            has_element_children = any(
+                c.nodeType == c.ELEMENT_NODE for c in child.childNodes
+            )
+            if has_element_children:
+                # container element (e.g. <extensions>) - recurse,
+                # don't yield it
+                yield from TrackPoints.flatten_leaves_iter(child)
+            else:
+                localname = child.tagName.split(':')[-1]
+                text = ''.join(
+                    c.data for c in child.childNodes
+                    if c.nodeType == c.TEXT_NODE
+                ).strip()
+                yield (localname, text)
+
     def GPX_point_coords(self, pointnode):
         """Parse a new trackpoint or waypoint from a GPX node.
            Returns lat (float), lon (float), ele (string or None),
-           speed (string or None),
-           time (string or None), attrs (dict or None).
+                   speed (string or None),
+                   time (string or None),
+                   attrs (dict or None), , extensions (dict or None),
+           Currently attrs other than hdop are ignore.
         """
         lat = float(pointnode.getAttribute("lat"))
         lon = float(pointnode.getAttribute("lon"))
@@ -503,6 +559,14 @@ class TrackPoints(object):
         if hdop:
             attrs['hdop'] = hdop
 
+        extensions = {}
+        exts = pointnode.getElementsByTagName("extensions")
+
+        if exts:
+            for name, val in TrackPoints.flatten_leaves_iter(exts[0]):
+                extensions[name] = val
+                # print("Extension", name, "=", val)
+
         # print("pointnode:", serializeXML(pointnode))
 
         # Old versions of osmand used a <speed> node, but now it's inside
@@ -518,16 +582,17 @@ class TrackPoints(object):
             attrs = None
 
         # For now, keep elevation and time as unchanged strings.
-        return lat, lon, ele, speed, time, attrs
+        return lat, lon, ele, speed, time, attrs, extensions
 
     @staticmethod
     def make_bogus_timestamp(t=None):
+        """Make a timestamp with the given time, or now"""
         if not t:
             t = time.time()
         return time.strftime('%Y-%m-%dT%H:%M:%S', time.gmtime(t))
 
     def add_bogus_timestamps(self):
-        """Add made-up timestamps to every track point."""
+        """Add timestamps to every track point, starting with now."""
         # 2007-10-02T09:22:06Z
         t = time.time()
         # How many seconds will we advance each time?

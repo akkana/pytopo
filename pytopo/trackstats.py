@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Copyright (C) 2009-2023 by Akkana Peck.
+# Copyright (C) 2009-2026 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -266,6 +266,55 @@ def tot_climb(arr):
 
     return tot, lowest, highest
 
+
+def hr_series(points):
+    """Extract (local_time, hr) pairs for points that have hr data."""
+    times = []
+    hrs = []
+    for p in points:
+        try:
+            hr = p.extensions.get("hr")
+        except:
+            continue
+        if hr is None:
+            continue
+        utc_dt = datetime.datetime.strptime(p.timestamp,
+                                            "%Y-%m-%dT%H:%M:%SZ").replace(
+                                                tzinfo=datetime.timezone.utc
+        )
+        local_dt = utc_dt.astimezone()  # converts to system-local timezone
+        times.append(local_dt)
+        hrs.append(int(hr))
+    return times, hrs
+
+
+def plot_hr(points):
+    try:
+        import matplotlib.pyplot as plt
+        import matplotlib.dates as mdates
+    except:
+        print("Couldn't import matplotlib, can't plot heart rate",
+              file=sys.stderr)
+
+    times, hrs = hr_series(points)
+
+    fig, ax = plt.subplots(figsize=(12, 5))
+    ax.bar(times, hrs, width=0.0005, color="crimson")  # width in days (matplotlib date units)
+
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Heart Rate (bpm)")
+    ax.set_title("Heart Rate")
+
+    # Format x-axis as HH:MM in local time
+    local_tz = datetime.datetime.now().astimezone().tzinfo  # get system local tz
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M", tz=local_tz))
+    fig.autofmt_xdate()
+
+    plt.tight_layout()
+    plt.show(block=False)
+    plt.pause(0.1)  # lets the GUI event loop actually draw the window
+
+
 def smooth(vals, halfwin, beta):
     """ Kaiser window smoothing."""
 
@@ -296,7 +345,7 @@ def main():
     except ImportError:
         have_plt = False
         print("plt (matplotlib) isn't installed; "
-              "will print stats only, no plotting")
+              "will print stats only, no plotting", file=sys.stderr)
 
     if 'numpy' not in sys.modules:
         print("Ellie requires the numpy module")

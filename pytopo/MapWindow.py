@@ -907,6 +907,20 @@ but if you want to, contact me and I'll help you figure it out.)
             self.cr.close_path()
             self.cr.fill()
 
+        # To outline each polygon, this works
+        # (but isn't necessarily helpful and adds clutter)
+        # XXX Maybe offer optional outlining ?
+        # for poly in self.trackpoints.polygons:
+        #     # Is it visible on the current map?
+        #     if not is_in_bounds(poly["bounds"], map_bounds):
+        #         continue
+        #     for coords in poly["coordinates"]:
+        #         pt = self.coords2xy(coords[0], coords[1])
+        #         self.cr.line_to(*pt)
+        #     self.cr.set_source_rgba(0, 0, 0, self.polygon_opacity)
+        #     self.cr.set_line_width(1)
+        #     self.cr.stroke()
+
     def draw_map_scale(self):
         """Draw a map scale at the bottom of the map window.
         """
@@ -2787,6 +2801,45 @@ but if you want to, contact me and I'll help you figure it out.)
         # Too bad, because Gtk.main_quit() doesn't actually exit
         # until later. So any function that calls this must be sure
         # to guard against anything like extra map redraws.
+
+
+    #
+    # network communication with the chart window
+    #
+    def start_chart_server(self):
+        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        srv.bind(("127.0.0.1", protocol.DEFAULT_PORT))
+        srv.listen(1)
+        threading.Thread(target=self._accept_loop, args=(srv,),
+                         daemon=True).start()
+
+    def accept_loop(self, srv):
+        while True:
+            conn, _ = srv.accept()
+            with self.client_lock:
+                self.client_sock = conn
+            protocol.start_recv_thread(conn, self._on_message_bg)
+
+    def on_message_bg(self, msg):
+        # Called from the socket thread - marshal onto the GTK main loop.
+        GLib.idle_add(self._on_message_main, msg)
+
+    def on_message_main(self, msg):
+        if msg.get("type") == "cursor":
+            self.cursor_frac = msg.get("frac")
+            self.drawing_area.queue_draw()
+        return False  # GLib.idle_add one-shot, don't reschedule
+
+    def send_to_chart(self, msg):
+        with self.client_lock:
+            sock = self.client_sock
+        if sock:
+            try:
+                protocol.send_message(sock, msg)
+            except OSError:
+                pass
+
 #
 # End of MapWindow class
 #
