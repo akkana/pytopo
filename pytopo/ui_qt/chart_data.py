@@ -22,7 +22,10 @@ import pyqtgraph as pg
 from pyqtgraph.Qt import QtCore, QtWidgets
 from PyQt6.QtGui import QShortcut, QKeySequence
 
-import chart_protocol
+try:
+    import chart_protocol
+except:
+    pass
 
 
 class Bridge(QtCore.QObject):
@@ -50,8 +53,13 @@ class ChartWindow(QtWidgets.QMainWindow):
         self.setWindowTitle(self.chartlabel)
         self.resize(800, 400)
 
-        axis = pg.DateAxisItem(orientation='bottom')
-        self.plot_widget = pg.PlotWidget(axisItems={'bottom': axis})
+        xaxis = pg.DateAxisItem(orientation='bottom')
+        yaxis = pg.AxisItem(orientation='left')
+        # yaxis.setLabel("Heart Rate")
+        yaxis.setGrid(128)
+        yaxis.setTickDensity(3)
+        self.plot_widget = pg.PlotWidget(axisItems={'bottom': xaxis,
+                                                    'left': yaxis})
         self.setCentralWidget(self.plot_widget)
 
         # Quit on Q or Ctrl-Q
@@ -72,6 +80,11 @@ class ChartWindow(QtWidgets.QMainWindow):
 
         bars = pg.BarGraphItem(x=xs, height=self.ys, width=widths, brush="y")
         self.plot_widget.addItem(bars)
+
+        # grid = pg.GridItem()
+        # grid.setTickSpacing(x=[900]*3, y=[5]*3)
+        # grid.setTextPen(0, 0, 0, 0)    # Make the grid labels invisible
+        # self.plot_widget.addItem(grid)
 
         self.vline = pg.InfiniteLine(angle=90, movable=False, pen="r")
         self.vline.setPos(self.xs[0])
