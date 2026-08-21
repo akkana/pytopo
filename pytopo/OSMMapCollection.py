@@ -8,7 +8,6 @@
 """
 
 from pytopo.TiledMapCollection import TiledMapCollection
-from pytopo.MapWindow import MapWindow
 from pytopo import MapUtils
 
 import os
@@ -344,7 +343,7 @@ class OSMMapCollection(TiledMapCollection):
             return None
 
         try:
-            pixbuf = MapWindow.load_image_from_file(path)
+            pixbuf = self.mapwin.load_image_from_file(path)
         except Exception as e:
             if self.mapwin.controller.Debug:
                 print("load_image_from_file(%s) exception: %s" % (path, e))

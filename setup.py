@@ -59,9 +59,9 @@ setup(name='pytopo',
 
       entry_points={
           'gui_scripts': [
-              'pytopo=pytopo.MapViewer:main',
+              'pytopo=pytopo.ui_gtk.MapViewerGTK:main',
               'ellie=pytopo.trackstats:main',
-              'pytopo-chart=pytopo.chart_data:main',
+              'pytopo-chart=pytopo.ui_qt.chart_data:main',
           ],
           'console_scripts': [
               'degreeconv=pytopo.MapUtils:main'
@@ -73,14 +73,15 @@ setup(name='pytopo',
           'Bug Tracker': 'https://github.com/akkana/pytopo/issues',
       },
 
+      # I think this is considerably out of date
       install_requires=["PyGObject", "pycairo",
-                        "requests-futures",
-                        "simplejson"],
+                        "requests-futures"],
 
       # numpy and matplotlib are optional dependencies for ellie,
       # but there doesn't seem to be any way for a user to see this.
       extras_require={
           'elliplots':  ["numpy", "matplotlib"],
+          'qtplots':    ["numpy", "pyqtgraph" ],
       },
 
       keywords=['maps', 'map viewer', 'track files', 'track logs',

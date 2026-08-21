@@ -25,6 +25,11 @@ __init__, get_maplet, draw_map.
         self.name = _name
         self.location = _location
 
+        # Some MapCollections do their own drawing.
+        # To do that, they need a MapWindow object.
+        # Be sure to set this!
+        self.mapwin = None
+
         # Opacity defaults to 1, but some subclasses may define
         # ways of drawing with less than full opacity.
         self.opacity = 1.

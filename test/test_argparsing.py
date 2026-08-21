@@ -7,7 +7,9 @@ import shutil
 sys.path.insert(0, '..')
 
 from .testutils import assertCloseEnough, create_kmz
-from pytopo import MapViewer, MapWindow, ArgParseException, configfile
+from pytopo import configfile
+from pytopo.ui_gtk.MapViewerGTK import MapViewerGTK, ArgParseException
+from pytopo.ui_gtk.MapWindowGTK import MapWindowGTK
 from pytopo import MapUtils
 
 
@@ -39,7 +41,7 @@ class ArgparseTests(unittest.TestCase):
             print("==== setUp:", self.configdir, "already existed")
 
         # A lot of this code mimcs MapViewer.main()
-        self.viewer = MapViewer()
+        self.viewer = MapViewerGTK()
         self.viewer.exec_config_file()
 
         self.viewer.first_saved_site = len(self.viewer.KnownSites)
@@ -81,7 +83,7 @@ class ArgparseTests(unittest.TestCase):
     def test_gpx_arg(self):
         args = [ 'pytopo', 'test/files/otowi-mesa-arch.gpx' ]
 
-        mapwin =  MapWindow(self.viewer)
+        mapwin = MapWindowGTK(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
@@ -95,7 +97,7 @@ class ArgparseTests(unittest.TestCase):
     def test_gpx_arg_with_hr(self):
         args = [ 'pytopo', 'test/files/eastfork-hr.gpx' ]
 
-        mapwin =  MapWindow(self.viewer)
+        mapwin =  MapWindowGTK(self.viewer)
         self.viewer.parse_args(mapwin, args)
         hr_points = 0
         for pt in mapwin.trackpoints.points:
@@ -110,7 +112,7 @@ class ArgparseTests(unittest.TestCase):
     def test_kml_arg(self):
         args = [ 'pytopo', 'test/files/otowi-mesa-arch.kml' ]
 
-        mapwin =  MapWindow(self.viewer)
+        mapwin =  MapWindowGTK(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
@@ -126,7 +128,7 @@ class ArgparseTests(unittest.TestCase):
 
         args = [ 'pytopo', kmzfile ]
 
-        mapwin =  MapWindow(self.viewer)
+        mapwin =  MapWindowGTK(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
@@ -144,7 +146,7 @@ class ArgparseTests(unittest.TestCase):
                  'test/files/surfaceown.geojson',
                  'test/files/otowi-mesa-arch.gpx' ]
 
-        mapwin =  MapWindow(self.viewer)
+        mapwin =  MapWindowGTK(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
@@ -191,7 +193,7 @@ class ArgparseTests(unittest.TestCase):
 
         for argtuple in argslists:
             args, realcoords = argtuple
-            mapwin =  MapWindow(self.viewer)
+            mapwin =  MapWindowGTK(self.viewer)
             self.viewer.parse_args(mapwin, args)
 
             assertCloseEnough(mapwin.center_lat, realcoords[0])
@@ -201,7 +203,7 @@ class ArgparseTests(unittest.TestCase):
         args = [ 'pytopo', '35.85', '-106.4',
                  'test/files/otowi-mesa-arch.gpx' ]
 
-        mapwin =  MapWindow(self.viewer)
+        mapwin =  MapWindowGTK(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
@@ -216,7 +218,7 @@ class ArgparseTests(unittest.TestCase):
         args = [ 'pytopo', '35.85', '-106.4', '-t',
                  'test/files/otowi-mesa-arch.gpx' ]
 
-        mapwin =  MapWindow(self.viewer)
+        mapwin =  MapWindowGTK(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 1265)
@@ -234,7 +236,7 @@ class ArgparseTests(unittest.TestCase):
                    ]
 
         for args in arglists:
-            mapwin =  MapWindow(self.viewer)
+            mapwin =  MapWindowGTK(self.viewer)
 
             try:
                 self.viewer.parse_args(mapwin, args)
@@ -251,7 +253,7 @@ class ArgparseTests(unittest.TestCase):
         sitename, sitelon, sitelat = self.create_config_file()
         args = [ 'pytopo', sitename ]
 
-        mapwin =  MapWindow(self.viewer)
+        mapwin =  MapWindowGTK(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 0)
@@ -266,7 +268,7 @@ class ArgparseTests(unittest.TestCase):
                  'test/files/surfaceown.geojson',
                  sitename ]
 
-        mapwin =  MapWindow(self.viewer)
+        mapwin =  MapWindowGTK(self.viewer)
         self.viewer.parse_args(mapwin, args)
 
         self.assertEqual(len(mapwin.trackpoints.points), 0)

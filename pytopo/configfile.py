@@ -98,10 +98,10 @@ def exec_config_file(init_width, init_height):
 
     # Import the map collection classes automatically:
     execstring = '''
-from pytopo import OSMMapCollection
-from pytopo import Topo1MapCollection
-from pytopo import Topo2MapCollection
-from pytopo import GenericMapCollection
+from pytopo.OSMMapCollection import OSMMapCollection
+from pytopo.TopoMapCollection import Topo1MapCollection
+from pytopo.TopoMapCollection import Topo2MapCollection
+from pytopo.GenericMapCollection import GenericMapCollection
 '''
 
     with open(userfile) as fp:

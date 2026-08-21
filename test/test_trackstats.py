@@ -7,7 +7,7 @@ import sys
 
 sys.path.insert(0, '..')
 
-import pytopo.TrackPoints
+from pytopo.TrackPoints import TrackPoints
 import pytopo.trackstats
 
 class TestTrackStats(unittest.TestCase):
@@ -30,7 +30,7 @@ class TestTrackStats(unittest.TestCase):
         beta = 2
         metric = False
 
-        trackpoints = pytopo.TrackPoints()
+        trackpoints = TrackPoints()
         trackpoints.read_track_file('test/files/otowi-mesa-arch.gpx')
 
         stats = pytopo.trackstats.statistics(trackpoints, halfwin, beta, metric)
@@ -49,7 +49,7 @@ class TestTrackStats(unittest.TestCase):
 
         trackpoints.read_track_file('test/files/otowi-mesa-arch.gpx')
 
-        trackpoints = pytopo.TrackPoints()
+        trackpoints = TrackPoints()
         trackpoints.read_track_file('test/files/potrillo-cyn-loop.gpx')
 
         stats = pytopo.trackstats.statistics(trackpoints, halfwin, beta, metric)

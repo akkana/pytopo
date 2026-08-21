@@ -92,11 +92,8 @@ class ChartWindow(QtWidgets.QMainWindow):
             self.sock = None
 
     def read_data(self, filename='/tmp/data.json'):
-        print("Reading data from", filename)
         with open(filename) as fp:
             jdata = json.load(fp)
-            # from pprint import pprint
-            # pprint(jdata)
 
         self.chartlabel = jdata['chartlabel']
         self.ylabel = jdata['ylabel']
@@ -114,11 +111,8 @@ class ChartWindow(QtWidgets.QMainWindow):
             self.xs.append(utc_dt.timestamp())
             if not self.start_time:
                 self.start_time = utc_dt
-                print("Setting start time to", self.start_time)
             self.ys.append(float(jdata['data'][datekey]))
         self.end_time = utc_dt
-        print("start", self.start_time, "end", self.end_time,
-              "Total points:", len(self.xs), len(self.ys))
 
         self.xs = np.array(self.xs)
         self.ys = np.array(self.ys)

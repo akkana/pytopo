@@ -10,7 +10,7 @@
 
 from __future__ import print_function
 
-from pytopo.MapWindow import MapWindow
+from pytopo.ui_gtk.MapWindowGTK import MapWindowGTK
 from pytopo import MapUtils
 from pytopo.imggps import gps_from_image
 from pytopo.TrackPoints import TrackPoints, BoundingBox
@@ -39,7 +39,7 @@ class ArgParseException(Exception):
     pass
 
 
-class MapViewer(object):
+class MapViewerGTK(object):
 
     """A class to hold the mechanics of running the pytopo program,
     plus some important variables including Collections and KnownSites.
@@ -64,7 +64,7 @@ class MapViewer(object):
 
     @classmethod
     def Usage(cls):
-        print("pytopo", MapViewer.get_version())
+        print("pytopo", MapViewerGTK.get_version())
         print("""
 Usage: pytopo
        pytopo known_site
@@ -121,7 +121,7 @@ to standard output.
         print("===============")
         print(errstr)
         print("===============\n")
-        MapViewer.Usage()
+        MapViewerGTK.Usage()
 
     def append_known_site(self, site):
         """Append the given site to KnownSites."""
@@ -652,8 +652,7 @@ Please specify either a site or a file containing geographic data.""")
             except:    # Probably a string instead of a GeoPoint
                 pass
 
-        if num_hr > 20:
-            print(num_hr, "points with hr")
+        if num_hr > 5:
             mapwin.show_chart('hr')
 
     def exec_config_file(self):
@@ -733,7 +732,7 @@ Please specify either a site or a file containing geographic data.""")
         # if rc:
         #     sys.exit(0)
 
-        mapwin = MapWindow(self)
+        mapwin = MapWindowGTK(self)
 
         # We'll show the window immediately, and then start parsing the
         # arguments, in case there are any huge data files that take
@@ -757,7 +756,7 @@ Please specify either a site or a file containing geographic data.""")
 
 
 def main():
-    viewer = MapViewer()
+    viewer = MapViewerGTK()
     viewer.main(sys.argv)
 
 

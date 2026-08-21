@@ -21,8 +21,6 @@ import math
 
 import os
 
-from gi.repository import GLib
-
 import gc
 
 
