@@ -17,10 +17,14 @@ import sys
 from datetime import datetime, timezone, timedelta
 import json
 
-import numpy as np
-import pyqtgraph as pg
-from pyqtgraph.Qt import QtCore, QtWidgets
-from PyQt6.QtGui import QShortcut, QKeySequence
+try:
+    import numpy as np
+    import pyqtgraph as pg
+    from pyqtgraph.Qt import QtCore, QtWidgets
+    from PyQt6.QtGui import QShortcut, QKeySequence
+except (ImportError, ModuleNotFoundError) as e:
+    print("Missing modules needed for plotting:", e)
+    sys.exit(1)
 
 try:
     import chart_protocol
