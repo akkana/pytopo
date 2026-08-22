@@ -60,7 +60,7 @@ setup(name='pytopo',
       entry_points={
           'gui_scripts': [
               'pytopo=pytopo.ui_gtk.MapViewerGTK:main',
-              'ellie=pytopo.trackstats:main',
+              'ellie=pytopo.ellie_mpl:main',
               'pytopo-chart=pytopo.ui_qt.chart_data:main',
           ],
           'console_scripts': [

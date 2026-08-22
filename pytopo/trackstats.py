@@ -10,17 +10,20 @@
 
 from __future__ import print_function
 
+import argparse
+
 import math
 import datetime
-import argparse
-import sys
+import sys, os
 
 try:
     import numpy
 except ImportError:
     pass
 
-from pytopo import MapUtils
+from pytopo import MapUtils, __version__
+
+from pytopo.TrackPoints import TrackPoints
 
 
 CLIMB_THRESHOLD = 8
@@ -331,52 +334,21 @@ def smooth(vals, halfwin, beta):
     return smoothed[halfwin:len(smoothed) - halfwin]
 
 #
-# main() to gather stats from a file passed in on the commandline
-# and graph them if possible, else just print them.
+# main() to gather stats from a file passed in on the commandline.
 #
-def main():
-    import sys
-    import os
-    from pytopo import TrackPoints, __version__
+def analyze_track(trackfile, args):
 
-    try:
-        import pylab as plt
-        have_plt = True
-    except ImportError:
-        have_plt = False
-        print("plt (matplotlib) isn't installed; "
-              "will print stats only, no plotting", file=sys.stderr)
-
-    if 'numpy' not in sys.modules:
-        print("Ellie requires the numpy module")
-        sys.exit(1)
-
-    progname = os.path.basename(sys.argv[0])
-
-    parser = argparse.ArgumentParser(description='This parses track log files, in gpx format, and gives you a graph and a few statistics. ')
-    parser.add_argument('--version', action='version',
-                        version=__version__)
-    parser.add_argument('-m', action="store_true", default=False,
-                        dest="metric",
-                        help='Use metric rather than US units')
-    parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
-                        help='Kaiser window smoothing beta parameter (default: 2)')
-    parser.add_argument('-w', action="store", default=0, dest="halfwin",
-                        type=int, help='Kaiser window smoothing halfwidth parameter (default: will try to guess a reasonable value)')
-    parser.add_argument('track_file', nargs='+')
-
-    results = parser.parse_args()
-    beta = results.beta
-    halfwin = results.halfwin
-    metric = results.metric
-    track_files = results.track_file
+    progname = os.path.basename(trackfile)
+    beta = args.beta
+    halfwin = args.halfwin
+    metric = args.metric
 
     #
     # Read the trackpoints file:
     #
     trackpoints = TrackPoints()
     try:
-        trackpoints.read_track_file(track_files[0])
+        trackpoints.read_track_file(trackfile)
         # XXX Read more than one file
     except IOError as e:
         print(e)
@@ -388,6 +360,7 @@ def main():
     #
     # Print and plot the results:
     #
+    print("\n====", trackfile)
     climb_units = 'm' if metric else "'"
     dist_units = 'km' if metric else 'mi'
     print("%.1f %s" % (out['Total distance'], dist_units))
@@ -411,69 +384,31 @@ def main():
     # print("\n\n======= Elevations", type(out['Elevations']))
     # print(out['Elevations'])
 
-    if not have_plt:
-        return 0
+    return out
 
-    # Set up the plots. First, will there be a speed plot, or just elevations?
-    if "Speeds" in out or "Calculated Speeds" in out:
-        numplots = 2
-    else:
-        numplots = 1
 
-    fig, axes = plt.subplots(nrows=numplots, ncols=1,
-                             figsize=(8, 3.5 * numplots))
-                             # figsize is  width, height in inches
+def parse_trackstat_args(cmdlineargs):
+    parser = argparse.ArgumentParser(
+        description='This parses track log files, in gpx format, '
+                     'and gives you a graph and a few statistics. ')
+    parser.add_argument('--version', action='version',
+                        version=__version__)
+    parser.add_argument('-m', action="store_true", default=False,
+                        dest="metric",
+                        help='Use metric rather than US units')
+    parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
+                        help='Kaiser window smoothing beta parameter (default: 2)')
+    parser.add_argument('-w', action="store", default=0, dest="halfwin",
+                        type=int,
+                        help='Kaiser window smoothing halfwidth parameter '
+                             '(default: will try to guess a reasonable value)')
+    parser.add_argument('track_files', nargs='+')
 
-    # First plot: elevation profile
-    ax = axes[0]
-    ax.plot(out['Distances'], out['Elevations'],
-               label="GPS elevation data", color="gray")
-    ax.plot(out['Distances'], out['Smoothed elevations'],
-               color="red", label="smoothed (b=%.1f, hw=%d)" % (beta, halfwin))
-
-    if metric:
-        ax.set_xlabel("kilometers")
-        ax.set_ylabel("meters")
-    else:
-        ax.set_xlabel("miles")
-        ax.set_ylabel("feet")
-    ax.grid(True)
-    ax.legend()
-    ax.title.set_text("Elevation profile (%d%s climb in %.1f %s)"
-                      % (out['Smoothed total climb'], climb_units,
-                         out['Distances'][-1], dist_units))
-
-    # Now for the second plot: speeds
-    if len(axes) == 2 and ("Speeds" in out or "Calculated Speeds" in out):
-        ax = axes[1]
-        if "Speeds" in out:
-            ax.plot(out['Speeds'], color="red", label="Speed (from GPX)")
-        if "Calculated Speeds" in out:
-            ax.plot(out['Calculated Speeds'], color="blue",
-                    label="Speed (calculated)")
-        ax.set_xlabel("time (no units)")
-        if metric:
-            ax.set_ylabel("km/hour")
-        else:
-            ax.set_ylabel("mi/hour")
-        ax.grid(True)
-        ax.legend()
-        ax.title.set_text("Speed (average %.1f moving)"
-                          % out["Average moving speed"])
-
-    # Set the window titlebar to something other than "Figure 1"
-    title = "%s: %s" % (progname, track_files[0])
-    try:
-        # gcf stands for "get current figure"
-        # Old way:
-        plt.gcf().canvas.set_window_title(title)
-    except AttributeError:
-        # New (2022-3) way:
-        plt.gcf().canvas.manager.set_window_title(title)
-
-    fig.tight_layout()        # Or equivalently,  "plt.tight_layout()"
-    plt.show()
+    return parser.parse_args(cmdlineargs[1:])
 
 
 if __name__ == '__main__':
-    main()
+    args = parse_trackstat_args(sys.argv)
+
+    for trackfile in args.track_files:
+        analyze_track(trackfile, args)

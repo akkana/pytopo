@@ -26,10 +26,8 @@ except (ImportError, ModuleNotFoundError) as e:
     print("Missing modules needed for plotting:", e)
     sys.exit(1)
 
-try:
-    import chart_protocol
-except:
-    pass
+import chart_protocol
+import trackstats
 
 
 class Bridge(QtCore.QObject):
