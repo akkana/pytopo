@@ -15,6 +15,7 @@ from gi.repository import GLib
 from gi.repository import GObject
 from gi.repository import GdkPixbuf
 from gi.repository import Pango, PangoCairo
+import cairo
 
 from math import pi
 
@@ -33,7 +34,7 @@ BOTTOMMARGIN = 80    # Room for date labels
 
 class ChartWindowGTK:
 
-    def __init__(self, data, label):
+    def __init__(self, data, label, chartqueue=None):
         # data['data'] is a dict of time: value, both as strings
         self.times = []
         self.vals = []
@@ -45,6 +46,12 @@ class ChartWindowGTK:
             self.vals.append(float(data['data'][t]))
 
         self.label = label
+
+        self.chartqueue = chartqueue
+
+        self.vline = None
+
+        self.cached_surface = None
 
         self.win = Gtk.Window()
         self.win.set_name(label)
@@ -59,16 +66,11 @@ class ChartWindowGTK:
         vbox.pack_start(self.drawing_area, True, True, 0)
 
         self.drawing_area.set_events(Gdk.EventMask.EXPOSURE_MASK |
-                                     Gdk.EventMask.SCROLL_MASK |
-                                     # Gdk.EventMask.POINTER_MOTION_MASK |
-                                     Gdk.EventMask.BUTTON1_MOTION_MASK |
-                                     Gdk.EventMask.POINTER_MOTION_HINT_MASK |
-                                     Gdk.EventMask.BUTTON_PRESS_MASK |
-                                     Gdk.EventMask.BUTTON_RELEASE_MASK)
+                                     Gdk.EventMask.BUTTON_PRESS_MASK)
 
         self.drawing_area.connect('draw', self.draw)
 
-        self.drawing_area.connect("button-press-event",   self.mousepress)
+        self.drawing_area.connect("button-press-event", self.mousepress)
         # The default focus in/out handlers on drawing area cause
         # spurious expose events.  Trap the focus events, to block that:
         self.drawing_area.connect("focus-in-event", self.nop)
@@ -77,6 +79,9 @@ class ChartWindowGTK:
         # Handle key presses on the drawing area.
         self.drawing_area.set_property('can-focus', True)
         self.drawing_area.connect("key-press-event", self.key_press_event)
+
+        # Size changes
+        self.drawing_area.connect("configure-event", self.on_configure)
 
         self.win.resize(INIT_WIDTH, INIT_HEIGHT)
 
@@ -95,33 +100,72 @@ class ChartWindowGTK:
 
     def mousepress(self, widget, event):
         """Handle mouse button presses"""
-        print("mousepress")
+        if event.button != 1:
+            return
+
+        self.vline = event.x
+        self.drawing_area.queue_draw()
+
+        # Figure out the time corresponding to where the mouse was pressed
+        timestamp = (event.x - LEFTMARGIN) \
+            * self.secrange / self.chartwidth + self.first_timestamp
+        print("timestamp clicked:", timestamp)
+        self.chartqueue.put(("click", datetime.utcfromtimestamp(timestamp)))
 
     def draw(self, widget, cr):
-        self.bar_chart(widget, cr)
-
-    def bar_chart(self, widget, cr):
-        width, height = self.get_size()
-        print(f"Window size is {width} x {height}")
-        if len(self.vals) > INIT_WIDTH:
-            barwidth = 1
-            width = len(self.vals)
-            self.win.resize(width, INIT_HEIGHT)
+        print("draw()")
+        if self.cached_surface:
+            print("Draw from cached surface")
+            cr.set_source_surface(self.cached_surface, 0, 0)
+            cr.paint()
         else:
-            barwidth = INIT_WIDTH / len(self.vals)
-            width = INIT_WIDTH
-            self.win.resize(INIT_WIDTH, INIT_HEIGHT)
-        chartwidth = width - LEFTMARGIN
-        chartheight = height - TOPMARGIN - BOTTOMMARGIN
-        print(f"Chart size is {chartwidth} x {chartheight}")
+            print("No cached surface")
+
+        if self.vline:
+            print("Drawing the vline")
+            cr.set_source_rgb(1., 0., 0.)
+            cr.set_line_width(2)
+            cr.move_to(self.vline, TOPMARGIN)
+            cr.line_to(self.vline, widget.get_allocated_height() - BOTTOMMARGIN)
+            cr.stroke()
+        else:
+            print("No vline")
+
+        return False
+
+    # Window resize
+    def on_configure(self, widget, cr):
+        print("on_configure")
+        width = widget.get_allocated_width()
+        height = widget.get_allocated_height()
+        self.cached_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32,
+                                                 width, height)
+        self.bar_chart(widget, self.cached_surface)
+
+        self.vline = None
+
+        return False
+
+    def bar_chart(self, widget, surface):
+        print("Redrawing the bar chart")
+        cr = cairo.Context(surface)
+        width, height = self.get_size()
         barwidth = 3
+        print(f"Window size is {width} x {height}")
+        if len(self.vals) * barwidth > width:
+            width = len(self.vals) * barwidth
+            self.win.resize(width, width)
+
+        self.chartwidth = width - LEFTMARGIN
+        self.chartheight = height - TOPMARGIN - BOTTOMMARGIN
+        print(f"Chart size is {self.chartwidth} x {self.chartheight}")
 
         # How many seconds does the chart span?
-        secrange = (self.times[-1] - self.times[0]).seconds
-        first_timestamp = self.times[0].timestamp()
+        self.secrange = (self.times[-1] - self.times[0]).seconds
+        self.first_timestamp = self.times[0].timestamp()
 
         # Get the Y range
-        datamax = max(self.vals)
+        self.datamax = max(self.vals)
 
         def chartx(x):
             return x + LEFTMARGIN
@@ -129,15 +173,15 @@ class ChartWindowGTK:
         def charttime(t):
             """Convert datetime t to x in the window"""
             return LEFTMARGIN + (t.timestamp()
-                                 - first_timestamp) * chartwidth / secrange
+                         - self.first_timestamp) * self.chartwidth / self.secrange
 
         def charty(y):
             """0 at bottom, not top"""
-            return chartheight + TOPMARGIN - y
+            return self.chartheight + TOPMARGIN - y
 
         def chartdata(d):
             """0 at bottom, not top, scaled to data"""
-            return chartheight + TOPMARGIN - (d * chartheight/datamax)
+            return self.chartheight + TOPMARGIN - (d * self.chartheight/self.datamax)
 
         # Fill the background
         cr.set_source_rgb(1., 1., 1.)
@@ -147,7 +191,7 @@ class ChartWindowGTK:
         # Fill the bars
         cr.set_source_rgb(0., 0., 1.)
         for i, d in enumerate(self.vals):
-            barheight = d * (chartheight/datamax)
+            barheight = d * (self.chartheight/self.datamax)
             cr.rectangle(charttime(self.times[i]),
                          charty(barheight),
                          barwidth, barheight)
@@ -157,15 +201,15 @@ class ChartWindowGTK:
         GRIDSPACING = 5
         cr.set_source_rgba(0., 0., 0., .5)
         cr.set_line_width(1)
-        for i in range(0, int(datamax), 5):
+        for i in range(0, int(self.datamax), 5):
             cr.move_to(LEFTMARGIN/2, chartdata(i) + 3)
-            cr.line_to(chartx(chartwidth), chartdata(i))
+            cr.line_to(chartx(self.chartwidth), chartdata(i))
             cr.stroke()
 
         # Labels
         cr.set_source_rgb(0., 0., 0.)
         cr.set_font_size(13)
-        for i in range(0, int(datamax), 10):
+        for i in range(0, int(self.datamax), 10):
             cr.move_to(3, chartdata(i) + 7)
             cr.show_text(str(i))
 
@@ -183,10 +227,9 @@ class ChartWindowGTK:
             cr.set_source_rgba(0., 0., 0., .5)
             x = charttime(t)
             cr.move_to(x, charty(0))
-            cr.line_to(x, charty(chartheight))
+            cr.line_to(x, charty(self.chartheight))
             cr.stroke()
-            print(t)
-            t += timedelta(minutes=5)
+
             # Label it
             cr.set_source_rgb(0., 0., 0.)
             label = t.astimezone().strftime("%H:%M")
@@ -195,6 +238,7 @@ class ChartWindowGTK:
             cr.show_text(label)
             cr.rotate(-ROTATION)
 
+            t += timedelta(minutes=5)
 
     @staticmethod
     def nop(*args):
@@ -206,9 +250,9 @@ class ChartWindowGTK:
 
 
 # For callers to use in a thread
-def open_chart_window(data, label):
+def open_chart_window(data, label, chartqueue):
     print("Opening a chart for", label)
-    win = ChartWindowGTK(data, label)
+    win = ChartWindowGTK(data, label, chartqueue)
 
 
 if __name__ == '__main__':

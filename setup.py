@@ -61,7 +61,6 @@ setup(name='pytopo',
           'gui_scripts': [
               'pytopo=pytopo.ui_gtk.MapViewerGTK:main',
               'ellie=pytopo.ellie_mpl:main',
-              'pytopo-chart=pytopo.ui_qt.chart_data:main',
           ],
           'console_scripts': [
               'degreeconv=pytopo.MapUtils:main'
@@ -81,7 +80,6 @@ setup(name='pytopo',
       # but there doesn't seem to be any way for a user to see this.
       extras_require={
           'elliplots':  ["numpy", "matplotlib"],
-          'qtplots':    ["numpy", "pyqtgraph" ],
       },
 
       keywords=['maps', 'map viewer', 'track files', 'track logs',

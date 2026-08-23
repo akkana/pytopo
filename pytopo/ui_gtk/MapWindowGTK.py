@@ -24,6 +24,7 @@ from pytopo.MapWindow import MapWindow
 from pytopo.TrackPoints import TrackPoints, NULL_WP_NAME
 from pytopo import trackstats
 from pytopo import chart_protocol
+from .ChartWindowGTK import open_chart_window
 
 try:
     from shapely.geometry import Point
@@ -38,7 +39,8 @@ from datetime import datetime, timezone
 import json
 import subprocess
 import threading
-import socket
+# import socket
+import queue
 
 try:
     # Python 3:
@@ -2846,50 +2848,35 @@ but if you want to, contact me and I'll help you figure it out.)
             except Exception as e:
                 pass
 
-        # Now write as JSON.
-        if datadic['data']:
-            outfilename = "/tmp/data.json"
-            with open(outfilename, 'w') as jsonfp:
-                json.dump(datadic, jsonfp, indent=4)
-                if self.controller.Debug:
-                    print("Wrote", len(datadic['data']), "points to",
-                          outfilename)
+        # Set up a queue the child can use to communicate
+        self.chartqueue = queue.Queue()
 
-            subprocess.Popen([ "pytopo-chart", outfilename, key ])
+        print("Starting a chart window thread")
+        t = threading.Thread(target = open_chart_window,
+                             args=(datadic, "Heart Rate", self.chartqueue))
+        t.start()
 
-            self.start_chart_server()
-        elif self.controller.Debug:
-            print("No data! datadic:", datadic)
+        GLib.timeout_add(800, self.read_from_chart_queue)
 
-    #
-    # network communication with the chart window
-    #
-    def start_chart_server(self):
-        srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        srv.bind(("127.0.0.1", chart_protocol.DEFAULT_PORT))
-        srv.listen(1)
-        threading.Thread(target=self.accept_loop, args=(srv,),
-                         daemon=True).start()
+        # t = threading.Thread(target=self.read_from_queue, args=(chartqueue,))
+        # t.start()
 
-    def accept_loop(self, srv):
-        while True:
-            conn, _ = srv.accept()
-            with self.client_lock:
-                self.client_sock = conn
-            chart_protocol.start_recv_thread(conn, self.on_message_bg)
+    def read_from_chart_queue(self):
+        """Listen for messages from a chart window. Upon seeing one,
+           show the nearest trackpoint in the map window.
+        """
+        try:
+            msg = self.chartqueue.get(block=False)
+        except queue.Empty:
+            return True
 
-    def on_message_bg(self, msg):
-        # Called from the socket thread - marshal onto the GTK main loop.
-        GLib.idle_add(self.on_message_main, msg)
+        if msg[0] != 'click':
+            print("Got an unknown message!", msg)
+            return True
 
-    def on_message_main(self, msg):
-        # print("Got a message:", msg)
+        clicktime = msg[1]
+        print("click time:", clicktime)
 
-        if msg.get("type") != "cursor":
-            return False
-
-        clicktime = datetime.strptime(msg.get('time'), GPSTIMEFMT)
         nearest_pt = None
         nearest_diff = 800000    # any big number
 
@@ -2905,21 +2892,12 @@ but if you want to, contact me and I'll help you figure it out.)
                 nearest_diff = diff
 
         if not nearest_pt:
-            return False
+            return True
 
         point_x, point_y = self.coords2xy(nearest_pt.lon, nearest_pt.lat)
         self.draw_marker(point_x, point_y)
 
-        return False  # GLib.idle_add one-shot, don't reschedule
-
-    def send_to_chart(self, msg):
-        with self.client_lock:
-            sock = self.client_sock
-        if sock:
-            try:
-                chart_protocol.send_message(sock, msg)
-            except OSError:
-                pass
+        return True
 
 #
 # End of MapWindow class

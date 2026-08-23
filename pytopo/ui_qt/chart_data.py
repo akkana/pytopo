@@ -113,7 +113,6 @@ class ChartWindow(QtWidgets.QMainWindow):
         self.chartlabel = jdata['chartlabel']
         self.ylabel = jdata['ylabel']
 
-        # Convert GPX UTC dates to local dates/times
         self.xs = []
         self.ys = []
         self.start_time = None
@@ -153,8 +152,9 @@ class ChartWindow(QtWidgets.QMainWindow):
         if not self.sock:
             return
 
-        t = datetime.fromtimestamp(click_seconds,
-                                   tz=timezone.utc).strftime(GPSTIMEFMT)
+        t = datetime.utcfromtimestamp(click_seconds,
+                                      tz=timezone.utc).strftime(GPSTIMEFMT)
+        print("Sending time", t)
         try:
             chart_protocol.send_message(self.sock, {"type": "cursor",
                                                     "time": t})
