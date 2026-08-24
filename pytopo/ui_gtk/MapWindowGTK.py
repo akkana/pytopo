@@ -2859,7 +2859,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.chartqueue = queue.Queue()
 
         self.chartthread = threading.Thread(target = open_chart_window,
-                                            args=(datadic, "Heart Rate",
+                                            args=(datadic,
                                                   self.chartqueue))
         self.chartthread.start()
 

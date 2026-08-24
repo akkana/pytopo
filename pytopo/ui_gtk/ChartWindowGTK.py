@@ -27,14 +27,14 @@ INIT_HEIGHT = 600
 
 GPSTIMEFMT = "%Y-%m-%dT%H:%M:%SZ"
 
-LEFTMARGIN = 35
+LEFTMARGIN = 50
 TOPMARGIN = 35
-BOTTOMMARGIN = 80    # Room for date labels
+BOTTOMMARGIN = 60    # Room for date labels
 
 
 class ChartWindowGTK:
 
-    def __init__(self, data, label, chartqueue=None):
+    def __init__(self, data, title, chartqueue=None):
         # data['data'] is a dict of time: value, both as strings
         self.times = []
         self.vals = []
@@ -45,7 +45,8 @@ class ChartWindowGTK:
             ))
             self.vals.append(float(data['data'][t]))
 
-        self.label = label
+        self.title = data['chartlabel']
+        self.ylabel = data['ylabel']
 
         self.chartqueue = chartqueue
 
@@ -54,8 +55,8 @@ class ChartWindowGTK:
         self.cached_surface = None
 
         self.win = Gtk.Window()
-        self.win.set_name(label)
-        self.win.set_title(label)
+        self.win.set_name(self.title)
+        self.win.set_title(self.title)
         self.win.connect("destroy", self.close_window)
         self.win.set_border_width(5)
 
@@ -184,24 +185,44 @@ class ChartWindowGTK:
             barheight = d * (self.chartheight/self.datamax)
             cr.rectangle(charttime(self.times[i]),
                          charty(barheight),
+                         # XXX charty works out to
+                         # height - BOTTOMMARGIN - barheight
+                         # as it should, but somehow, there are sometimes
+                         # a few pixesl visible below the bottom of the bar.
+                         # Need to figure out why.
                          barwidth, barheight)
             cr.fill()
+
+        # Graph title and axis labels
+        cr.set_source_rgb(0., 0., 0.)
+        cr.set_font_size(15)
+
+        # Title at the top
+        cr.move_to(self.chartwidth/2, TOPMARGIN/2)
+        cr.show_text(self.title)
+
+        # Date on the bottom
+        cr.move_to(chartx(self.chartwidth/2) - 50, height - 5)
+        cr.show_text(self.times[0].strftime("%Y-%m-%d"))
+
+        # Data Y label on the left
+        cr.move_to(0, charty(self.chartheight/2))
+        cr.show_text(self.ylabel)
+
+        # Y Labels
+        cr.set_font_size(14)
+        for i in range(0, int(self.datamax), 10):
+            cr.move_to(LEFTMARGIN - 25, chartdata(i) + 7)
+            cr.show_text(str(i))
 
         # Draw a horizontal grid with vertical spacing of 5
         GRIDSPACING = 5
         cr.set_source_rgba(0., 0., 0., .5)
         cr.set_line_width(1)
         for i in range(0, int(self.datamax), 5):
-            cr.move_to(LEFTMARGIN/2, chartdata(i) + 3)
+            cr.move_to(LEFTMARGIN, chartdata(i) + 3)
             cr.line_to(chartx(self.chartwidth), chartdata(i))
             cr.stroke()
-
-        # Labels
-        cr.set_source_rgb(0., 0., 0.)
-        cr.set_font_size(13)
-        for i in range(0, int(self.datamax), 10):
-            cr.move_to(3, chartdata(i) + 7)
-            cr.show_text(str(i))
 
         # Vertical grid with spacing of 5 min
         # Round up to the next multiple of 5 minutes
@@ -210,6 +231,7 @@ class ChartWindowGTK:
                          minute=self.times[0].minute
                          - (self.times[0].minute % 5) + 5)
 
+        # X axis grid lines and labels
         ROTATION = pi * 1.65
         while True:
             if t > self.times[-1]:
@@ -223,7 +245,7 @@ class ChartWindowGTK:
             # Label it
             cr.set_source_rgb(0., 0., 0.)
             label = t.astimezone().strftime("%H:%M")
-            cr.move_to(x-10, charty(-38))
+            cr.move_to(x-10, charty(-40))
             cr.rotate(ROTATION)
             cr.show_text(label)
             cr.rotate(-ROTATION)
@@ -236,14 +258,21 @@ class ChartWindowGTK:
         return True
 
     def close_window(self, extra=None):
+        # Somehow, this is getting called multiple times, and self.chartqueue
+        # is getting set to null which causes this, and the whole exiting
+        # process, to fail. Guard against that:
+        try:
+            self.chartqueue.put("exiting")
+        except Exception as e:
+            # print("chartqueue is gone:", e)
+            pass
         self.win.destroy()
-        self.chartqueue.put("exiting")
         Gtk.main_quit()
 
 
 # For callers to use in a thread
-def open_chart_window(data, label, chartqueue):
-    win = ChartWindowGTK(data, label, chartqueue)
+def open_chart_window(data, chartqueue):
+    win = ChartWindowGTK(data, chartqueue)
 
 
 if __name__ == '__main__':
