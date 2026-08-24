@@ -2804,6 +2804,13 @@ but if you want to, contact me and I'll help you figure it out.)
         """Clean up the window and exit.
            The "extra" argument is so it can be calld from GTK callbacks.
         """
+        for thread in threading.enumerate():
+            if thread.name != 'MainThread':
+                if thread.is_alive():
+                    print(thread.name, "is alive")
+                else:
+                    print(thread.name, "is dead")
+
         # Try to stop any GPS thread
         if self.gps_poller:
             print("Stopping GPS poller")
@@ -2851,10 +2858,10 @@ but if you want to, contact me and I'll help you figure it out.)
         # Set up a queue the child can use to communicate
         self.chartqueue = queue.Queue()
 
-        print("Starting a chart window thread")
-        t = threading.Thread(target = open_chart_window,
-                             args=(datadic, "Heart Rate", self.chartqueue))
-        t.start()
+        self.chartthread = threading.Thread(target = open_chart_window,
+                                            args=(datadic, "Heart Rate",
+                                                  self.chartqueue))
+        self.chartthread.start()
 
         GLib.timeout_add(800, self.read_from_chart_queue)
 
@@ -2865,17 +2872,23 @@ but if you want to, contact me and I'll help you figure it out.)
         """Listen for messages from a chart window. Upon seeing one,
            show the nearest trackpoint in the map window.
         """
+        if not self.chartthread.is_alive():
+            return False
+
         try:
             msg = self.chartqueue.get(block=False)
         except queue.Empty:
+            # The child didn't write anything
             return True
+
+        if msg == "exiting":
+            return False
 
         if msg[0] != 'click':
             print("Got an unknown message!", msg)
             return True
 
         clicktime = msg[1]
-        print("click time:", clicktime)
 
         nearest_pt = None
         nearest_diff = 800000    # any big number

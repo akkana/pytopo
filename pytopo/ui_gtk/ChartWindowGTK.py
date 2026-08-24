@@ -109,33 +109,26 @@ class ChartWindowGTK:
         # Figure out the time corresponding to where the mouse was pressed
         timestamp = (event.x - LEFTMARGIN) \
             * self.secrange / self.chartwidth + self.first_timestamp
-        print("timestamp clicked:", timestamp)
         self.chartqueue.put(("click", datetime.utcfromtimestamp(timestamp)))
 
     def draw(self, widget, cr):
-        print("draw()")
         if self.cached_surface:
-            print("Draw from cached surface")
             cr.set_source_surface(self.cached_surface, 0, 0)
             cr.paint()
         else:
             print("No cached surface")
 
         if self.vline:
-            print("Drawing the vline")
             cr.set_source_rgb(1., 0., 0.)
             cr.set_line_width(2)
             cr.move_to(self.vline, TOPMARGIN)
             cr.line_to(self.vline, widget.get_allocated_height() - BOTTOMMARGIN)
             cr.stroke()
-        else:
-            print("No vline")
 
         return False
 
     # Window resize
     def on_configure(self, widget, cr):
-        print("on_configure")
         width = widget.get_allocated_width()
         height = widget.get_allocated_height()
         self.cached_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32,
@@ -147,18 +140,15 @@ class ChartWindowGTK:
         return False
 
     def bar_chart(self, widget, surface):
-        print("Redrawing the bar chart")
         cr = cairo.Context(surface)
         width, height = self.get_size()
         barwidth = 3
-        print(f"Window size is {width} x {height}")
         if len(self.vals) * barwidth > width:
             width = len(self.vals) * barwidth
             self.win.resize(width, width)
 
         self.chartwidth = width - LEFTMARGIN
         self.chartheight = height - TOPMARGIN - BOTTOMMARGIN
-        print(f"Chart size is {self.chartwidth} x {self.chartheight}")
 
         # How many seconds does the chart span?
         self.secrange = (self.times[-1] - self.times[0]).seconds
@@ -247,11 +237,12 @@ class ChartWindowGTK:
 
     def close_window(self, extra=None):
         self.win.destroy()
+        self.chartqueue.put("exiting")
+        Gtk.main_quit()
 
 
 # For callers to use in a thread
 def open_chart_window(data, label, chartqueue):
-    print("Opening a chart for", label)
     win = ChartWindowGTK(data, label, chartqueue)
 
 
