@@ -24,7 +24,7 @@ from pytopo.MapWindow import MapWindow
 from pytopo.TrackPoints import TrackPoints, GeoPoint, NULL_WP_NAME
 from pytopo import trackstats
 from pytopo import chart_protocol
-from .ChartWindowGTK import open_chart_window
+from .ChartHandlerGTK import start_chart_handler
 
 try:
     from shapely.geometry import Point
@@ -39,7 +39,6 @@ from datetime import datetime, timezone
 import json
 import subprocess
 import threading
-# import socket
 import queue
 
 try:
@@ -271,11 +270,12 @@ but if you want to, contact me and I'll help you figure it out.)
 
         self.draw_functions = []
 
-        # Related to the optional chart window
+        # Related to the optional chart thread
         self.client_sock = None
         self.client_lock = threading.Lock()
-        self.chartthreads = []
-        self.chartqueue = None
+        self.chartthread = None
+        self.chart2mapqueue = None
+        self.map2chartqueue = None
 
     def add_title(self, moretitle):
         self.title = "%s %s" % (self.title, os.path.basename(moretitle))
@@ -2807,12 +2807,8 @@ but if you want to, contact me and I'll help you figure it out.)
         """Clean up the window and exit.
            The "extra" argument is so it can be calld from GTK callbacks.
         """
-        for thread in threading.enumerate():
-            if thread.name != 'MainThread':
-                if thread.is_alive():
-                    print(thread.name, "is alive")
-                else:
-                    print(thread.name, "is dead")
+        if self.chartthread.is_alive() and self.map2chartqueue:
+            self.map2chartqueue.put("EXIT")
 
         # Try to stop any GPS thread
         if self.gps_poller:
@@ -2829,6 +2825,8 @@ but if you want to, contact me and I'll help you figure it out.)
         # to guard against anything like extra map redraws.
 
     def show_track_charts(self, widget):
+        # First, collect all the data, since there's no point
+        # if there isn't any data to show.
         near_track, near_point, near_waypoint, polygons = \
             self.find_nearest_trackpoint(self.context_x, self.context_y)
 
@@ -2882,15 +2880,21 @@ but if you want to, contact me and I'll help you figure it out.)
             return
 
         # Set up a queue the child can use to communicate
-        if not self.chartqueue:
-            self.chartqueue = queue.Queue()
+        if not self.map2chartqueue:
+            self.map2chartqueue = queue.Queue()
+        if not self.chart2mapqueue:
+            self.chart2mapqueue = queue.Queue()
+
+        # Start the chart thread
+        if not self.chartthread:
+            self.chartthread = threading.Thread(target=start_chart_handler,
+                                                args=(self.map2chartqueue,
+                                                      self.chart2mapqueue))
+            self.chartthread.start()
 
         # Now datadics contains the keys for which we have data.
         for key in datadics:
-            chthread = threading.Thread(target = open_chart_window,
-                                        args=(datadics[key], self.chartqueue))
-            self.chartthreads.append(chthread)
-            chthread.start()
+            self.map2chartqueue.put(datadics[key])
 
         GLib.timeout_add(750, self.read_from_chart_queue)
 
@@ -2898,21 +2902,17 @@ but if you want to, contact me and I'll help you figure it out.)
         """Listen for messages from a chart window. Upon seeing one,
            show the nearest trackpoint in the map window.
         """
-        deadthreads = []
-        for th in self.chartthreads:
-            if not th.is_alive():
-                deadthreads.append(th)
-        if deadthreads:
-            for d in deadthreads:
-                self.chartthreads.remove(d)
+        if not self.chartthread.is_alive():
+            self.chartthread = None
             return False
-        # At least one chart thread is alive
 
         try:
-            msg = self.chartqueue.get(block=False)
+            msg = self.chart2mapqueue.get(block=False)
         except queue.Empty:
             # The child didn't write anything
             return True
+
+        # print("MapWindow read a message:", msg)
 
         if msg == "exiting":
             return False
