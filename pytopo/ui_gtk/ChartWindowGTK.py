@@ -34,7 +34,7 @@ BOTTOMMARGIN = 60    # Room for date labels
 
 class ChartWindowGTK:
 
-    def __init__(self, data, title, chartqueue=None):
+    def __init__(self, data, chartqueue=None):
         # data['data'] is a dict of time: value, both as strings
         self.times = []
         self.vals = []
@@ -47,6 +47,8 @@ class ChartWindowGTK:
 
         self.title = data['chartlabel']
         self.ylabel = data['ylabel']
+
+        self.charttype = data['type']
 
         self.chartqueue = chartqueue
 
@@ -134,13 +136,15 @@ class ChartWindowGTK:
         height = widget.get_allocated_height()
         self.cached_surface = cairo.ImageSurface(cairo.FORMAT_ARGB32,
                                                  width, height)
-        self.bar_chart(widget, self.cached_surface)
+        self.draw_chart(widget, self.cached_surface)
 
         self.vline = None
 
         return False
 
-    def bar_chart(self, widget, surface):
+    def draw_chart(self, widget, surface):
+        """Draw a chart of the given type
+        """
         cr = cairo.Context(surface)
         width, height = self.get_size()
         barwidth = 3
@@ -156,6 +160,7 @@ class ChartWindowGTK:
         self.first_timestamp = self.times[0].timestamp()
 
         # Get the Y range
+        self.datamin = min(self.vals)
         self.datamax = max(self.vals)
 
         def chartx(x):
@@ -172,26 +177,43 @@ class ChartWindowGTK:
 
         def chartdata(d):
             """0 at bottom, not top, scaled to data"""
-            return self.chartheight + TOPMARGIN - (d * self.chartheight/self.datamax)
+            return (self.chartheight + TOPMARGIN
+                    - ((d - self.datamin)
+                       * self.chartheight/(self.datamax-self.datamin)))
 
         # Fill the background
         cr.set_source_rgb(1., 1., 1.)
         cr.rectangle(0.0, 0.0, float(width), float(height))
         cr.fill()
 
-        # Fill the bars
-        cr.set_source_rgb(0., 0., 1.)
-        for i, d in enumerate(self.vals):
-            barheight = d * (self.chartheight/self.datamax)
-            cr.rectangle(charttime(self.times[i]),
-                         charty(barheight),
-                         # XXX charty works out to
-                         # height - BOTTOMMARGIN - barheight
-                         # as it should, but somehow, there are sometimes
-                         # a few pixesl visible below the bottom of the bar.
-                         # Need to figure out why.
-                         barwidth, barheight)
-            cr.fill()
+        if self.charttype == 'bar':
+            # Fill the bars
+            cr.set_source_rgb(0., 0., 1.)
+            for i, d in enumerate(self.vals):
+                barheight = d * (self.chartheight/self.datamax)
+                cr.rectangle(charttime(self.times[i]),
+                             charty(barheight),
+                             # XXX charty works out to
+                             # height - BOTTOMMARGIN - barheight
+                             # as it should, but somehow, there are sometimes
+                             # a few pixesl visible below the bottom of the bar.
+                             # Need to figure out why.
+                             barwidth, barheight)
+                cr.fill()
+        elif self.charttype == 'line':
+            cr.set_source_rgba(0., 0., 1., 1.)
+            cr.set_line_width(2)
+            lastx = 0
+            lasty = 0
+            for i, d in enumerate(self.vals):
+                x = charttime(self.times[i])
+                y = chartdata(d)
+                if lastx and lasty:
+                    cr.move_to(lastx, lasty)
+                    cr.line_to(x, y)
+                    cr.stroke()
+                lastx = x
+                lasty = y
 
         # Graph title and axis labels
         cr.set_source_rgb(0., 0., 0.)
@@ -206,20 +228,27 @@ class ChartWindowGTK:
         cr.show_text(self.times[0].strftime("%Y-%m-%d"))
 
         # Data Y label on the left
-        cr.move_to(0, charty(self.chartheight/2))
+        cr.move_to(8, charty(self.chartheight/2))
+        cr.rotate(-pi/2)
         cr.show_text(self.ylabel)
+        cr.rotate(pi/2)
 
         # Y Labels
         cr.set_font_size(14)
         for i in range(0, int(self.datamax), 10):
+            if i < self.datamin:
+                continue
             cr.move_to(LEFTMARGIN - 25, chartdata(i) + 7)
             cr.show_text(str(i))
 
-        # Draw a horizontal grid with vertical spacing of 5
+        # Draw horizontal grid lines with vertical spacing of 5
+        # XXX adjust spacing to data
         GRIDSPACING = 5
         cr.set_source_rgba(0., 0., 0., .5)
         cr.set_line_width(1)
         for i in range(0, int(self.datamax), 5):
+            if i < self.datamin:
+                continue
             cr.move_to(LEFTMARGIN, chartdata(i) + 3)
             cr.line_to(chartx(self.chartwidth), chartdata(i))
             cr.stroke()

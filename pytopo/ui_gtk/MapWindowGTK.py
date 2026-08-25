@@ -21,7 +21,7 @@ from gi.repository import Pango, PangoCairo
 
 from pytopo import MapUtils
 from pytopo.MapWindow import MapWindow
-from pytopo.TrackPoints import TrackPoints, NULL_WP_NAME
+from pytopo.TrackPoints import TrackPoints, GeoPoint, NULL_WP_NAME
 from pytopo import trackstats
 from pytopo import chart_protocol
 from .ChartWindowGTK import open_chart_window
@@ -274,6 +274,8 @@ but if you want to, contact me and I'll help you figure it out.)
         # Related to the optional chart window
         self.client_sock = None
         self.client_lock = threading.Lock()
+        self.chartthreads = []
+        self.chartqueue = None
 
     def add_title(self, moretitle):
         self.title = "%s %s" % (self.title, os.path.basename(moretitle))
@@ -432,14 +434,13 @@ but if you want to, contact me and I'll help you figure it out.)
         if self.selected_track is not None:
             halfwin = 0
             beta = 2
-            metric = False
             stats = trackstats.statistics(self.trackpoints,
-                                          halfwin, beta, metric,
+                                          halfwin, beta, self.use_metric,
                                           startpt=self.selected_track,
                                           onetrack=True)
 
-            climb_units = 'm' if metric else "'"
-            dist_units = 'km' if metric else 'mi'
+            climb_units = 'm' if self.use_metric else "'"
+            dist_units = 'km' if self.use_metric else 'mi'
             label = "Track: " + self.trackpoints.points[self.selected_track]
             if stats:
                 label += "\n%.1f %s" % (stats['Total distance'], dist_units)
@@ -738,7 +739,7 @@ but if you want to, contact me and I'll help you figure it out.)
            set center_lat and center_lon after a mouse click.
            Also check to see whether the click is inside any known polygons.
 
-           @return: (nearest_track,      Starting point of the nearest track
+           @return: (nearest_track,      Starting index of the nearest track
                      nearest_point,      Index of nearest point on that track
                      nearest_waypoint,   Nearest waypoint
                      enclosing_polygons) Polygons containing the point, if any
@@ -757,6 +758,7 @@ but if you want to, contact me and I'll help you figure it out.)
         CLOSE = 7    # pixels
 
         if not self.trackpoints:
+            print("No trackpoints")
             return None, None, None, None
 
         def closer_dist(pt, sm_dist, lastpt=None):
@@ -1244,6 +1246,7 @@ but if you want to, contact me and I'll help you figure it out.)
             ("Save pin location...", self.save_location),
 
             ("Track Editing", SEPARATOR),
+            ("Show Charts for Track", self.show_track_charts),
             ("Add waypoint...", self.add_waypoint_by_mouse),
             ("Edit/Remove waypoint", self.edit_waypoint),
             ("Split track here", self.split_track_by_mouse),
@@ -2825,55 +2828,85 @@ but if you want to, contact me and I'll help you figure it out.)
         # until later. So any function that calls this must be sure
         # to guard against anything like extra map redraws.
 
-    def show_chart(self, key):
-        """Write data for the given key, run the charting process,
-           and set up communication with the chart so they can read mutual clicks.
-           Eventually this should handle multiple keys.
-        """
-        num_hr = 0
-        for pt in self.trackpoints.points:
+    def show_track_charts(self, widget):
+        near_track, near_point, near_waypoint, polygons = \
+            self.find_nearest_trackpoint(self.context_x, self.context_y)
+
+        # near_track is an index and can be zero, so test against None
+        if near_track is None:
+            print("Which track?", file=sys.stderr)
+            return
+        i = near_track
+        if type(self.trackpoints.points[i]) is not GeoPoint:
+            i += 1
+
+        # Build up data dictionaries for the charts we know about:
+        # elevation, heart rate
+        datadics = {}
+        while True:
             try:
-                if key in pt.extensions:
-                    num_hr += 1
-                    if num_hr > 100:
-                        break
-            except:    # Probably a string instead of a GeoPoint
+                pt = self.trackpoints.points[i]
+                if type(self.trackpoints.points[i]) is not GeoPoint:
+                    break
+                if pt.ele:
+                    if 'elevation' not in datadics:
+                        datadics['elevation'] = { 'chartlabel': 'Elevation',
+                                                  'ylabel': 'elevation',
+                                                  'data': {},
+                                                  'type': 'line',
+                                                 }
+                    if self.use_metric:
+                        val = float(pt.ele)
+                    else:
+                        val = float(pt.ele) * 3.2808399
+                    datadics['elevation']['data'][pt.timestamp] = val
+
+                if 'hr' in pt.extensions:
+                    if 'hr' not in datadics:
+                        datadics['hr'] = { 'chartlabel': 'Heart Rate',
+                                           'ylabel': 'hr',
+                                           'data': {},
+                                           'type': 'bar',
+                                          }
+                    datadics['hr']['data'][pt.timestamp] = pt.extensions['hr']
+
+            except IndexError:    # done with the list
+                break
+            except Exception as e:
+                # print("Exception", e)
                 pass
 
-        datadic = { 'chartlabel': key,
-                    'ylabel': key,
-                    'data': {}
-                  }
-        for pt in self.trackpoints.points:
-            try:
-                if key in pt.extensions:
-                    utc_dt = datetime.strptime(pt.timestamp,
-                                               GPSTIMEFMT).replace(
-                                                   tzinfo=timezone.utc)
-                    local_dt = utc_dt.astimezone()  # system-local timezone
-                    datadic['data'][pt.timestamp] = pt.extensions[key]
-            except Exception as e:
-                pass
+            i += 1
+
+        if not datadics:
+            return
 
         # Set up a queue the child can use to communicate
-        self.chartqueue = queue.Queue()
+        if not self.chartqueue:
+            self.chartqueue = queue.Queue()
 
-        self.chartthread = threading.Thread(target = open_chart_window,
-                                            args=(datadic,
-                                                  self.chartqueue))
-        self.chartthread.start()
+        # Now datadics contains the keys for which we have data.
+        for key in datadics:
+            chthread = threading.Thread(target = open_chart_window,
+                                        args=(datadics[key], self.chartqueue))
+            self.chartthreads.append(chthread)
+            chthread.start()
 
-        GLib.timeout_add(800, self.read_from_chart_queue)
-
-        # t = threading.Thread(target=self.read_from_queue, args=(chartqueue,))
-        # t.start()
+        GLib.timeout_add(750, self.read_from_chart_queue)
 
     def read_from_chart_queue(self):
         """Listen for messages from a chart window. Upon seeing one,
            show the nearest trackpoint in the map window.
         """
-        if not self.chartthread.is_alive():
+        deadthreads = []
+        for th in self.chartthreads:
+            if not th.is_alive():
+                deadthreads.append(th)
+        if deadthreads:
+            for d in deadthreads:
+                self.chartthreads.remove(d)
             return False
+        # At least one chart thread is alive
 
         try:
             msg = self.chartqueue.get(block=False)

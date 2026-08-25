@@ -640,6 +640,7 @@ Please specify either a site or a file containing geographic data.""")
         # Now that everything is read in, draw the map
         mapwin.draw_map()
 
+        '''
         # Is there any heart rate data in the trackpoints read in?
         # That would be in individual points' extensions with key "hr"
         num_hr = 0
@@ -653,7 +654,9 @@ Please specify either a site or a file containing geographic data.""")
                 pass
 
         if num_hr > 5:
-            mapwin.show_chart('hr')
+            mapwin.show_chart('hr', 'bar')
+            mapwin.show_chart('elevation', 'line')
+        '''
 
     def exec_config_file(self):
         settings = configfile.exec_config_file(self.init_width,
