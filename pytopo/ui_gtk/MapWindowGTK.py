@@ -2807,7 +2807,8 @@ but if you want to, contact me and I'll help you figure it out.)
         """Clean up the window and exit.
            The "extra" argument is so it can be calld from GTK callbacks.
         """
-        if self.chartthread.is_alive() and self.map2chartqueue:
+        if self.chartthread and self.chartthread.is_alive() \
+           and self.map2chartqueue:
             self.map2chartqueue.put("EXIT")
 
         # Try to stop any GPS thread
