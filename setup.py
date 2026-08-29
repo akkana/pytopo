@@ -30,6 +30,7 @@ def get_version():
 
 long_description = file_contents("README.rst")
 
+
 class CleanCommand(Command):
     """Custom clean command to tidy up the project root."""
     user_options = []
@@ -38,7 +39,8 @@ class CleanCommand(Command):
     def finalize_options(self):
         pass
     def run(self):
-        os.system('rm -vrf ./build ./dist ./*.pyc ./*.tgz ./*.egg-info ./docs/sphinxdoc/_build')
+        os.system('rm -vrf ./build ./dist ./*.pyc ./*.tgz ./*.egg-info ./docs/sphinxdoc/_build __pycache__ */__pycache__ */*/__pycache__')
+
 
 setup(name='pytopo',
       packages=['pytopo'],
