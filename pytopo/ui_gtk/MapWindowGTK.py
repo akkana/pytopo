@@ -23,7 +23,6 @@ from pytopo import MapUtils
 from pytopo.MapWindow import MapWindow
 from pytopo.TrackPoints import TrackPoints, GeoPoint, NULL_WP_NAME
 from pytopo import trackstats
-from pytopo import chart_protocol
 from .ChartHandlerGTK import start_chart_handler
 
 try:
@@ -2849,8 +2848,13 @@ but if you want to, contact me and I'll help you figure it out.)
                     break
                 if pt.ele:
                     if 'elevation' not in datadics:
+                        if self.use_metric:
+                            units = 'meters'
+                        else:
+                            units = 'feet'
                         datadics['elevation'] = { 'chartlabel': 'Elevation',
-                                                  'ylabel': 'elevation',
+                                                  'ylabel':
+                                                    f'elevation ({units})',
                                                   'data': {},
                                                   'type': 'line',
                                                  }
