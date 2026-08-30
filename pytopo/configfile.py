@@ -178,7 +178,8 @@ def parse_saved_site_line(line):
         if ret and len(ret) >= 3:
             NEED_SAVED_SITE_REWRITE = True
 
-    if type(ret) is not list:
+    # Hopefully it's a list, or at least list-like:
+    if not hasattr(ret, "__getitem__"):
         print(f"Couldn't parse line: '{ line }'", file=sys.stderr)
         return None
     if len(ret) < 3:

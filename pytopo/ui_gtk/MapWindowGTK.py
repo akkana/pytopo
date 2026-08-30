@@ -704,7 +704,7 @@ but if you want to, contact me and I'll help you figure it out.)
                    self.trackpoints.is_attributes(pt):
                     if pt in track_colors:
                         wpcolor = track_colors[pt]
-                    elif type(pt) is str:
+                    elif self.trackpoints.is_start(pt):
                         if wpcolor:
                             wpcolor = self.contrasting_color(wpcolor)
                         else:
@@ -2835,7 +2835,7 @@ but if you want to, contact me and I'll help you figure it out.)
             print("Which track?", file=sys.stderr)
             return
         i = near_track
-        if type(self.trackpoints.points[i]) is not GeoPoint:
+        if not isinstance(self.trackpoints.points[i], GeoPoint):
             i += 1
 
         # Build up data dictionaries for the charts we know about:
@@ -2844,7 +2844,7 @@ but if you want to, contact me and I'll help you figure it out.)
         while True:
             try:
                 pt = self.trackpoints.points[i]
-                if type(self.trackpoints.points[i]) is not GeoPoint:
+                if not isinstance(self.trackpoints.points[i], GeoPoint):
                     break
                 if pt.ele:
                     if 'elevation' not in datadics:

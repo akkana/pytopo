@@ -114,20 +114,19 @@ def to_decimal_degrees(coord, degformat="DD", report_chars_matched=False):
     try:
         coord = float(coord)
 
-        if type(coord) is float or type(coord) is int:
-            if degformat == "DD":
-                pass
-            elif degformat == "DMS":
-                coord = deg_min_sec2dec_deg(coord)
-            elif degformat == "DM":
-                coord = deg_min2dec_deg(coord)
-            else:
-                print("Error: unknown coordinate format %s" % degformat)
-                coord = None
+        if degformat == "DD":
+            pass
+        elif degformat == "DMS":
+            coord = deg_min_sec2dec_deg(coord)
+        elif degformat == "DM":
+            coord = deg_min2dec_deg(coord)
+        else:
+            print("Error: unknown coordinate format %s" % degformat)
+            coord = None
 
-            if report_chars_matched:
-                return (coord, 0)
-            return coord
+        if report_chars_matched:
+            return (coord, 0)
+        return coord
     except:
         pass
 

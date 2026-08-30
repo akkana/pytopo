@@ -271,7 +271,6 @@ class TrackPoints(object):
         """Is this the start of a new track segment?
            If so, it's a string (or unicode), the name of the track section.
         """
-        # Apparently there's no good way in Python
         return not isinstance(point, GeoPoint)
 
     def get_bounds(self):
@@ -349,7 +348,7 @@ class TrackPoints(object):
            it should use some sort of "close enough" metric.
         """
         for wp in self.waypoints:
-            if type(wp) is str:
+            if self.is_start(wp):
                 continue
             if wp.lat == point.lat and wp.lon == point.lon:
                 if point.name != wp.name:
@@ -472,7 +471,7 @@ class TrackPoints(object):
         if nodes:
             return nodes[0]
 
-        if type(childname) is not re.Pattern:
+        if not isinstance(childname, re.Pattern):
             return None
 
         matchnode = None
