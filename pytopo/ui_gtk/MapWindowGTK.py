@@ -2,7 +2,7 @@
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
-"""MapWindow: pytopo's GTK-based window for showing tiled maps.
+"""MapWindowGTK: pytopo's GTK-based window for showing tiled maps.
 """
 
 from __future__ import print_function
@@ -1603,7 +1603,7 @@ but if you want to, contact me and I'll help you figure it out.)
         filt = Gtk.FileFilter()
         filt.set_name("GPX/GeoJSON Files")
         filt.add_custom(Gtk.FileFilterFlags.FILENAME,
-                        MapWindow.ignorecasefilter,
+                        MapWindowGTK.ignorecasefilter,
                         [".gpx", ".json", ".geojson"])
         dialog.add_filter(filt)
 
@@ -2951,5 +2951,5 @@ but if you want to, contact me and I'll help you figure it out.)
         return True
 
 #
-# End of MapWindow class
+# End of MapWindowGTK class
 #
