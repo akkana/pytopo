@@ -20,7 +20,7 @@ import cairo
 
 import queue
 
-from math import pi
+from math import pi, log10
 
 from datetime import datetime, timezone, timedelta
 
@@ -239,7 +239,14 @@ class ChartHandlerGTK:
         first_timestamp, secrange = self.get_timestamprange(chartkey)
 
         # Get the Y range
-        datamin = min(vals)
+        # Heart rate data is sparse, and 0 obviously isn't a real value.
+        # Throw out any zeros.
+        # But draw the chart from zero assuming there are zeroes.
+        chartmin = min(vals)
+        if chartkey == 'hr':
+            datamin = min([v for v in vals if v])
+        else:
+            datamin = chartmin
         datamax = max(vals)
 
         def chartx(x):
@@ -257,7 +264,7 @@ class ChartHandlerGTK:
         def chartdata(d):
             """0 at bottom, not top, scaled to data"""
             return (chartheight + TOPMARGIN
-                    - ((d - datamin) * chartheight/(datamax-datamin)))
+                    - ((d - chartmin) * chartheight/(datamax-chartmin)))
 
         # Fill the background
         cr.set_source_rgb(1., 1., 1.)
@@ -299,7 +306,8 @@ class ChartHandlerGTK:
 
         # Title at the top
         cr.move_to(chartwidth/2, TOPMARGIN/2)
-        cr.show_text(self.charts[chartkey]['title'])
+        cr.show_text(self.charts[chartkey]['title']
+                     + ' (max=%d, min=%d)' % (datamax, datamin))
 
         # Date on the bottom
         cr.move_to(chartx(chartwidth/2) - 50, height - 5)
@@ -313,33 +321,53 @@ class ChartHandlerGTK:
 
         # Y Labels
         cr.set_font_size(14)
-        for i in range(0, int(datamax), 10):
-            if i < datamin:
+
+        def roundstep(therange):
+            # Calculate a reasonable spacing, nearest multiple of 10
+            thestep = int(therange / 10)
+            pow10 = int(10 ** round(log10(thestep)))
+            pow10_2 = pow10/2
+            if abs(thestep - pow10_2) < abs(thestep - pow10):
+                return pow10_2
+            else:
+                return pow10
+
+        ystep = roundstep(datamax - chartmin)
+        # XXX it's slightly wasteful to loop up from zero rather than calculating
+        for i in range(0, int(datamax), ystep):
+            if i < chartmin:
                 continue
             cr.move_to(LEFTMARGIN - 25, chartdata(i) + 7)
             cr.show_text(str(i))
 
-        # Draw horizontal grid lines with vertical spacing of 5
-        # XXX adjust spacing to data
-        GRIDSPACING = 5
+        # Draw horizontal grid lines with vertical spacing of ystep or ystep/2
+        if ystep % 2:
+            gridspacing = ystep
+        else:
+            gridspacing = int(ystep / 2)
         cr.set_source_rgba(0., 0., 0., .5)
         cr.set_line_width(1)
-        for i in range(0, int(datamax), 5):
-            if i < datamin:
+        for i in range(0, int(datamax), gridspacing):
+            if i < chartmin:
                 continue
             cr.move_to(LEFTMARGIN, chartdata(i) + 3)
             cr.line_to(chartx(chartwidth), chartdata(i))
             cr.stroke()
 
-        # Vertical grid with spacing of 5 min.
-        # For the first tic, round up to the next multiple of 5 minutes.
+        # Vertical grid for times.
+        # How many minutes does it span?
+        totmins = (times[-1] - times[0]).seconds // 60
+        timestep = roundstep(totmins)
+
+        # For the first tic, round up to the next multiple of the timestep.
         t = times[0]
-        modmin = times[0].minute % 5
+        modmin = times[0].minute % timestep
         if modmin:
-           t  += timedelta(minutes=5-modmin)
+           t  += timedelta(minutes=timestep-modmin)
 
         # X axis grid lines and labels
         ROTATION = pi * 1.65
+
         while True:
             if t > times[-1]:
                 break
@@ -357,7 +385,7 @@ class ChartHandlerGTK:
             cr.show_text(label)
             cr.rotate(-ROTATION)
 
-            t += timedelta(minutes=5)
+            t += timedelta(minutes=timestep)
 
     @staticmethod
     def nop(*args):
