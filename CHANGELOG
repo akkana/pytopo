@@ -1,3 +1,17 @@
+2025-09-10  Akkana Peck <akkana@shallowsky.com>
+	Better labeling on altitude and heart rate charts.
+
+2025-08-23  Akkana Peck <akkana@shallowsky.com>
+	Replace the Qt heart rate chart with a GTK one,
+	so Qt isn't required for plotting heart rate any more.
+	Show an altitude chart too.
+	Pops up on "Show tracks for chart" instead of every time.
+
+2025-08-20  Akkana Peck <akkana@shallowsky.com>
+	Read heart rate extension in GPX and pop up a Qt-based plot.
+	Currently only reads OsmAnd's format; there's no standard format
+	for heart rate in GPX files.
+
 2025-03-06  Akkana Peck <akkana@shallowsky.com>
 	Added waypoint editing, and proper timestamps on waypoints
 	in saved files.
