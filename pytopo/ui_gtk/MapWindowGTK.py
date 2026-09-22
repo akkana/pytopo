@@ -36,6 +36,8 @@ import re
 
 from datetime import datetime, timezone
 import json
+from pathlib import Path
+
 import subprocess
 import threading
 import queue
@@ -572,8 +574,8 @@ but if you want to, contact me and I'll help you figure it out.)
                 return i
             i += 1
 
-            # Skip over dictionaries of attributes
-            if self.trackpoints.is_attributes(pt):
+            # Skip over things that aren't GeoPoints
+            if not isinstance(pt, GeoPoint):
                 continue
 
             # If specified, colorize according to speed or altitude:
@@ -728,7 +730,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
 
     def find_nearest_trackpoint(self, x, y):
-        """Find the indeces of the nearest track,
+        """Find the indices of the beginning of the nearest track,
            the nearest point on that track,
            and the nearest waypoint (if any) to a given x, y point.
            Called on mouse click.
@@ -788,8 +790,7 @@ but if you want to, contact me and I'll help you figure it out.)
             smallest_dist = CLOSE * 8
             lastpt = None
             for i, pt in enumerate(self.trackpoints.waypoints):
-                if self.trackpoints.is_start(pt) or \
-                   self.trackpoints.is_attributes(pt):
+                if not isinstance(pt, GeoPoint):
                     lastpt = None
                     continue
                 d = closer_dist(pt, smallest_dist, lastpt)
@@ -808,7 +809,7 @@ but if you want to, contact me and I'll help you figure it out.)
                     lasty = None
                     continue
 
-                if self.trackpoints.is_attributes(pt):
+                if not isinstance(pt, GeoPoint):
                     continue
 
                 d = closer_dist(pt, smallest_dist)
@@ -2838,8 +2839,8 @@ but if you want to, contact me and I'll help you figure it out.)
         if not isinstance(self.trackpoints.points[i], GeoPoint):
             i += 1
 
-        # Build up data dictionaries for the charts we know about:
-        # elevation, heart rate
+        # Build up data dictionaries for the charts we know about.
+        # elevation, heart rate might be in the GPX:
         datadics = {}
         while True:
             try:
@@ -2880,6 +2881,42 @@ but if you want to, contact me and I'll help you figure it out.)
                 pass
 
             i += 1
+
+        # Does this track have an associated data file?
+        datafile = self.trackpoints.points[near_track+1]
+        if isinstance(datafile, Path) and datafile.suffix.lower() == '.csv':
+            if 'csv' not in sys.modules:
+                import csv
+
+            SPECIALIZED_FIELDS = [ 'gps elevation', 'power', 'cadence' ]
+            # also: gps elevation OR enhanced_altitude OR smoothed_elevation,
+            #       cadence, power, motor_power, ebike_assist_mode, grade
+            with datafile.open() as csvfp:
+                reader = csv.DictReader(csvfp)
+                for row in reader:
+                    if 'timestamp' not in row:
+                        print("No timestamp in data!", file=sys.stderr)
+                        break
+                    for field in SPECIALIZED_FIELDS:
+                        if field not in row:
+                            continue
+                        if not row[field]:
+                            continue
+                        if field not in datadics:
+                            datadics[field] = { 'chartlabel': field,
+                                                'ylabel': field,
+                                                'data': {},
+                                                'type': 'line',
+                                              }
+                        ts = row['timestamp']
+                        if 'elevation' in field:
+                            if self.use_metric:
+                                val = float(row[field])
+                            else:
+                                val = float(row[field]) * 3.2808399
+                            datadics[field]['data'][ts] = val
+                        else:
+                            datadics[field]['data'][ts] = row[field]
 
         if not datadics:
             return

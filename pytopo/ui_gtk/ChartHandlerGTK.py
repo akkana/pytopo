@@ -49,6 +49,14 @@ class ChartHandlerGTK:
         Gtk.main()
 
     def make_chart(self, indata):
+        """Draw a chart with the given data.
+           Expects a dictionary that looks something like:
+           { 'chartlabel': 'Elevation',
+             'ylabel': f'elevation ({units})',
+             'data': { '2026-09-21 19:47:56+00:00': 2725.7, ... },
+             'type': 'line',
+           }
+        """
         # print("Making a new chart of", indata['ylabel'])
 
         # Use the Y label as the key
@@ -334,7 +342,7 @@ class ChartHandlerGTK:
 
         ystep = roundstep(datamax - chartmin)
         # XXX it's slightly wasteful to loop up from zero rather than calculating
-        for i in range(0, int(datamax), ystep):
+        for i in range(0, round(datamax), round(ystep)):
             if i < chartmin:
                 continue
             cr.move_to(LEFTMARGIN - 25, chartdata(i) + 7)

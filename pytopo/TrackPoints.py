@@ -7,12 +7,13 @@
 
 from __future__ import print_function
 
-import os
+import os, sys
 import xml.dom.minidom
 import re
 import zipfile
 import json
 import time
+from pathlib import Path
 
 from pytopo import __version__
 
@@ -271,7 +272,7 @@ class TrackPoints(object):
         """Is this the start of a new track segment?
            If so, it's a string (or unicode), the name of the track section.
         """
-        return not isinstance(point, GeoPoint)
+        return isinstance(point, str)
 
     def get_bounds(self):
         """Return a bounding box:
@@ -348,7 +349,7 @@ class TrackPoints(object):
            it should use some sort of "close enough" metric.
         """
         for wp in self.waypoints:
-            if self.is_start(wp):
+            if not isinstance(wp, GeoPoint):
                 continue
             if wp.lat == point.lat and wp.lon == point.lon:
                 if point.name != wp.name:
@@ -390,7 +391,6 @@ class TrackPoints(object):
             dom = xml.dom.minidom.parse(filename)
         except xml.parsers.expat.ExpatError as e:
             print("Expat error parsing", filename, ":", e)
-            import sys
             sys.exit(1)
 
         bbox = BoundingBox()
@@ -598,7 +598,7 @@ class TrackPoints(object):
         # How many seconds will we advance each time?
         interval = 15
         for pt in self.points:
-            if not self.is_start(pt) and not pt.timestamp:
+            if isinstance(pt, GeoPoint) and not pt.timestamp:
                 pt.timestamp = self.make_bogus_timestamp(t)
                 t += interval
 
@@ -753,7 +753,8 @@ class TrackPoints(object):
 
                     # If it doesn't have lat, lon then it's not a GeoPoint
                     # and can't be added to the track.
-                    # It might be a dict of attributes from a GeoJSON.
+                    # It might be a dict of attributes from a GeoJSON,
+                    # or a Path pointing to a data file.
                     if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
                         continue
 
@@ -793,7 +794,6 @@ class TrackPoints(object):
                 outfp.write(segstr)
 
             outfp.write("</gpx>")
-
 
     def read_track_file_GeoJSON(self, filename):
         """Read a GeoJSON track or polygon file.
@@ -940,7 +940,6 @@ class TrackPoints(object):
                         bbox.add_point(lat, lon)
 
         return bbox
-
 
     def save_geojson(self, filename, boundingbox=None):
         """Save known tracks and waypoints as a GeoJSON file,
@@ -1159,11 +1158,54 @@ class TrackPoints(object):
 
         return ret
 
+    def read_track_file_fit(self, fitfilename):
+        """Read a Specialized .fit file.
+           This could be extended to other types of fit files,
+           but for now, Specialized is the only kind I have.
+        """
+        if 'fitsplit' not in sys.modules:
+            try:
+                import fitsplit
+            except ModuleNotFoundError as e:
+                raise RuntimeError(
+                    "Reading .fit files requires fitsplit and fitdecode,"
+                    " missing %s" % e.name)
+
+        # Save data to files.
+        # It's tempting to write a GPX file that includes all the data
+        # in a form similar to what OsmAnd uses for heart rate or altitude,
+        # but Specialized only samples GPS occasionally, so there's a lot of
+        # extra data in between the points that have GPS coordinates
+        # and it would be a shame to throw that all out.
+        # So make a separate CSV data file.
+        filebase, ext = os.path.splitext(fitfilename)
+        gpx_filename = filebase + '.gpx'
+        csv_filename = filebase + '.csv'
+        if not os.path.exists(gpx_filename):
+            fitsplit.export_fit_file(fitfilename, gpx_filename, csv_filename)
+        else:
+            print("fit already split, using", gpx_filename)
+
+        # Save the current location in the points list,
+        # before any newly added GeoPoints,
+        # to add a pointer to the data file later
+        firstnewpt = len(self.points)
+
+        bbox = self.read_track_file_GPX(gpx_filename)
+
+        # Is there associated data?
+        if os.path.exists(csv_filename) and len(self.points) > firstnewpt+1:
+            self.points.insert(firstnewpt+1, Path(csv_filename))
+
+        return bbox
+
+
     # mappers has to be defined at the end of the class
     # or it won't see the function names like read_track_file_GPX.
     mappers = (
         ( ('gpx',),            read_track_file_GPX ),
         ( ('kml', 'kmz'),      read_track_file_KML ),
-        ( ('json', 'geojson'), read_track_file_GeoJSON )
+        ( ('json', 'geojson'), read_track_file_GeoJSON ),
+        ( ('fit',),            read_track_file_fit ),
     )
     """A list of file extensions recognized, and the functions that read them"""
