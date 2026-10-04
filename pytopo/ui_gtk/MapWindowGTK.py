@@ -64,8 +64,6 @@ import traceback
 
 GPS_MARKER_RADIUS=10
 
-GPSTIMEFMT = "%Y-%m-%dT%H:%M:%SZ"
-
 # Track colorization styles
 class TrackColor(Enum):
     SEPARATE_COLORS  = 1
@@ -200,6 +198,9 @@ but if you want to, contact me and I'll help you figure it out.)
 
         self.click_last_long = 0
         self.click_last_lat = 0
+        self.click_last_time = None
+
+        self.localtz = datetime.now().astimezone().tzinfo
 
         # Context menus don't seem to have any way of passing the location
         # initially clicked. So save x and y on right mouse down.
@@ -292,6 +293,15 @@ but if you want to, contact me and I'll help you figure it out.)
            XXX This isn't currently used, because it blocks the main thread.
         """
         self.draw_functions.append(draw_fcn)
+
+    def time_as_local(self, t):
+        """Show timestamp as a local time (HH:MM).
+           Can take either an ISO format time or a datetime.
+        """
+        if isinstance(t, str):
+            t = datetime.fromisoformat(t)
+        return t.astimezone(self.localtz).strftime('%H:%M')
+
 
     def show_window(self, init_width, init_height):
         """Create the initial window."""
@@ -472,16 +482,20 @@ but if you want to, contact me and I'll help you figure it out.)
                             15, 40, color=self.yellow_color)
         elif self.selected_trackpoint is not None:
             try:
+                selpt = self.trackpoints.points[self.selected_trackpoint]
+                if self.use_metric:
+                    ele = selpt.ele
+                    eleunit = 'm'
+                else:
+                    ele = selpt.ele * 3.2808399
+                    eleunit = "'"
+                # print(f'{x:,}')
                 self.draw_label(
-                    "Track point: (%.2f, %.2f, %.1f)\n%s"
-                    % (self.trackpoints.points[self.selected_trackpoint].lat,
-                       self.trackpoints.points[self.selected_trackpoint].lon,
-                       self.trackpoints.points[self.selected_trackpoint].ele,
-                       self.trackpoints.points[self.selected_trackpoint].timestamp),
-                    15, 40, color=self.yellow_color)
-                point_x, point_y = self.coords2xy(
-                    self.trackpoints.points[self.selected_trackpoint].lon,
-                    self.trackpoints.points[self.selected_trackpoint].lat)
+                    f"Point: {selpt.lat:.2f}, {selpt.lon:.2f}\n"
+                    f"{ele:,.1f}{eleunit}      "
+                    f"{self.time_as_local(selpt.timestamp)}",
+                    75, 15, color=self.yellow_color)
+                point_x, point_y = self.coords2xy(selpt.lon, selpt.lat)
             except IndexError:
                 # I'm not sure why this happens, but I've seen it once
                 # from right-clicking on a trackpoint to "delete points after"
@@ -2720,81 +2734,94 @@ but if you want to, contact me and I'll help you figure it out.)
             self.draw_overlays()
             return True
 
-        if event.button == 1:
-            # If we're drawing a track, everything is different.
-            if self.drawing_track:
-                return self.click_draw(widget, event)
+        if event.button != 1:
+            return False
 
-            zoom = self.was_click_in_zoom(event.x, event.y)
-            if zoom:
-                self.zoom(amount=zoom)
-                if self.controller.Debug and hasattr(self.collection,
-                                                     'zoomlevel'):
-                    print("zoomed to", self.collection.zoomlevel)
-                self.force_redraw()
-                return True
+        # If we're drawing a track, everything is different.
+        if self.drawing_track:
+            return self.click_draw(widget, event)
 
-            # Clicking on the blue GPS circle toggles following GPS,
-            # and recenters on the GPS position if there is one.
-            if  self.was_click_in_gps(event.x, event.y):
-                self.gps_centered = not self.gps_centered
-                if self.gps_centered and self.last_gpsd and self.last_gpsd.fix:
-                    self.center_lon = self.last_gpsd.fix.longitude
-                    self.center_lat = self.last_gpsd.fix.latitude
-                    self.cur_lon = self.center_lon
-                    self.cur_lat = self.center_lat
-                    self.force_redraw()
-                return True
-
-            # Is this needed for anything?
-            # It breaks passing location to context menus.
-            cur_long, cur_lat = self.xy2coords(event.x, event.y)
-
-            if self.controller.Debug:
-                print("Click:", \
-                    MapUtils.dec_deg2dms_str(cur_long), \
-                    MapUtils.dec_deg2dms_str(cur_lat))
-
-            # Find angle and distance since last click.
-            if self.controller.Debug or \
-               event.state & Gdk.ModifierType.SHIFT_MASK:
-                print("Shift click")
-                if self.click_last_long != 0 and self.click_last_lat != 0:
-                    dist = MapUtils.haversine_distance(self.click_last_lat,
-                                                       self.click_last_long,
-                                                       cur_lat, cur_long,
-                                                       metric=self.use_metric)
-                    self.path_distance += dist
-                    if self.use_metric:
-                        print("Distance: %.2f km" % dist)
-                        print("Total distance: %.2f km" % self.path_distance)
-                    else:
-                        print("Distance: %.2f mi" % dist)
-                        print("Total distance: %.2f mi" % self.path_distance)
-
-                    # Now calculate bearing.
-                    angle = MapUtils.bearing(self.click_last_lat,
-                                             self.click_last_long,
-                                             cur_lat, cur_long)
-                    print("Bearing:", angle, "=", \
-                        MapUtils.angle_to_quadrant(angle))
-
-            self.click_last_long = cur_long
-            self.click_last_lat = cur_lat
-
-            # Is the click near a track or waypoint we're displaying?
-            near_track, near_point, near_waypoint, polygons = \
-                self.find_nearest_trackpoint(event.x, event.y)
-            if near_track is not None:
-                self.select_track(near_track)
-            else:
-                self.select_track(None)
-
-            self.selected_trackpoint = near_point
-
-            self.selected_waypoint = near_waypoint
-
+        zoom = self.was_click_in_zoom(event.x, event.y)
+        if zoom:
+            self.zoom(amount=zoom)
+            if self.controller.Debug and hasattr(self.collection,
+                                                 'zoomlevel'):
+                print("zoomed to", self.collection.zoomlevel)
             self.force_redraw()
+            return True
+
+        # Clicking on the blue GPS circle toggles following GPS,
+        # and recenters on the GPS position if there is one.
+        if  self.was_click_in_gps(event.x, event.y):
+            self.gps_centered = not self.gps_centered
+            if self.gps_centered and self.last_gpsd and self.last_gpsd.fix:
+                self.center_lon = self.last_gpsd.fix.longitude
+                self.center_lat = self.last_gpsd.fix.latitude
+                self.cur_lon = self.center_lon
+                self.cur_lat = self.center_lat
+                self.force_redraw()
+            return True
+
+        # Is the click near a track or waypoint we're displaying?
+        near_track, near_point, near_waypoint, polygons = \
+            self.find_nearest_trackpoint(event.x, event.y)
+        if near_track is not None:
+            self.select_track(near_track)
+        else:
+            self.select_track(None)
+
+        self.selected_trackpoint = near_point
+        self.selected_waypoint = near_waypoint
+
+        # On shift-click, find distance and angle since last click,
+        # plus time if the click was near a trackpoint.
+        if self.controller.Debug or \
+           event.state & Gdk.ModifierType.SHIFT_MASK:
+
+            if near_point:
+                near_trackpoint = self.trackpoints.points[near_point]
+                cur_lon = near_trackpoint.lon
+                cur_lat = near_trackpoint.lat
+                cur_time = datetime.fromisoformat(near_trackpoint.timestamp)
+                print("Time: %s" %
+                      self.time_as_local(near_trackpoint.timestamp))
+                if self.click_last_time:
+                    print("Time since last click:",
+                          cur_time - self.click_last_time)
+            else:
+                cur_lon, cur_lat = self.xy2coords(event.x, event.y)
+                cur_time = None
+
+            if self.click_last_long != 0 and self.click_last_lat != 0:
+                if self.controller.Debug:
+                    print("Click:",
+                          MapUtils.dec_deg2dms_str(cur_lon),
+                          MapUtils.dec_deg2dms_str(cur_lat))
+
+                dist = MapUtils.haversine_distance(self.click_last_lat,
+                                                   self.click_last_long,
+                                                   cur_lat, cur_lon,
+                                                   metric=self.use_metric)
+                self.path_distance += dist
+                if self.use_metric:
+                    print("Distance: %.2f km" % dist)
+                    print("Total distance: %.2f km" % self.path_distance)
+                else:
+                    print("Distance: %.2f mi" % dist)
+                    print("Total distance: %.2f mi" % self.path_distance)
+
+                # Now calculate bearing.
+                angle = MapUtils.bearing(self.click_last_lat,
+                                         self.click_last_long,
+                                         cur_lat, cur_lon)
+                print("Bearing:", angle, "=", \
+                    MapUtils.angle_to_quadrant(angle))
+
+            self.click_last_long = cur_lon
+            self.click_last_lat = cur_lat
+            self.click_last_time = cur_time
+
+        self.force_redraw()
 
         return True
 
@@ -2971,7 +2998,7 @@ but if you want to, contact me and I'll help you figure it out.)
         # Find the nearest trackpoint
         for pt in self.trackpoints.points:
             try:
-                pttime = datetime.strptime(pt.timestamp, GPSTIMEFMT)
+                pttime = datetime.fromisoformat(pt.timestamp)
             except AttributeError:
                 continue
             diff = abs((clicktime - pttime).seconds)
