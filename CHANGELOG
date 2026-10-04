@@ -1,20 +1,44 @@
-2025-09-10  Akkana Peck <akkana@shallowsky.com>
+2026-10-04  Akkana Peck <akkana@shallowsky.com>
+	Display local time for points clicked, and time interval for shift-click.
+
+2026-09-22  Akkana Peck <akkana@shallowsky.com>
+	Use fitsplit to read .fit files and split them into GPX and CSV files.
+
+2026-09-10  Akkana Peck <akkana@shallowsky.com>
 	Better labeling on altitude and heart rate charts.
 
-2025-08-23  Akkana Peck <akkana@shallowsky.com>
+2026-08-23  Akkana Peck <akkana@shallowsky.com>
 	Replace the Qt heart rate chart with a GTK one,
 	so Qt isn't required for plotting heart rate any more.
 	Show an altitude chart too.
 	Pops up on "Show tracks for chart" instead of every time.
 
-2025-08-20  Akkana Peck <akkana@shallowsky.com>
+2026-08-20  Akkana Peck <akkana@shallowsky.com>
 	Read heart rate extension in GPX and pop up a Qt-based plot.
 	Currently only reads OsmAnd's format; there's no standard format
 	for heart rate in GPX files.
 
+2026-03-06  Akkana Peck <akkana@shallowsky.com>
+	Update to reflect that GTK3 no longer allows running in the background.
+	Sigh.
+
+2025-11-09  Akkana Peck <akkana@shallowsky.com>
+	Version 1.7.4.
+	Fix Mercator projection for low zoom levels.
+	Add a -z argument to force the initial zoom
+
+2025-08-04  Akkana Peck <akkana@shallowsky.com>
+	When clicking on a track, show info about the trackpoint.
+
+2025-04-12  Akkana Peck <akkana@shallowsky.com>
+	Colorize waypoints from different files differently.
+	Convert from gtkcompat to real GTK3.
+
 2025-03-06  Akkana Peck <akkana@shallowsky.com>
+	Save real timestamps to gpx/json.
 	Added waypoint editing, and proper timestamps on waypoints
 	in saved files.
+	Add an option to hide waypoint names.
 
 2024-11-09  Akkana Peck <akkana@shallowsky.com>
 	Add ability to extract GPS data from image file EXIF.
