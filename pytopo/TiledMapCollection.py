@@ -400,7 +400,7 @@ TiledMapCollection classes must implement:
            and keep a record of what file path it should use.
         """
         if self.mapwin.controller.Debug:
-            print("queue_download", url, path)
+            print("queue_download", url, "->", path)
         now = time.time()
         if self.num_failed_downloads > self.MAX_FAILED_DOWNLOADS:
             if self.last_failed_download_time \
@@ -447,7 +447,7 @@ TiledMapCollection classes must implement:
             print("Appending", url, "to download queue")
         self.urls_queued.append(url)
 
-        self.downloader.get(url)
+        self.downloader.get(url, timeout=20)
 
     def response_hook(self, response, *args, **kwargs):
         """When the FuturesSession completes downloading a tile,

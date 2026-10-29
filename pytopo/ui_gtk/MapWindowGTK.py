@@ -137,7 +137,7 @@ but if you want to, contact me and I'll help you figure it out.)
         self.drawing_track = False
         self.selected_track = None
         self.selected_waypoint = None
-        self.selected_trackpoint = None
+        self.selected_trackpoints = []
 
         # By default, each track is a different colors
         self.track_colorize = TrackColor.SEPARATE_COLORS
@@ -305,14 +305,14 @@ but if you want to, contact me and I'll help you figure it out.)
 
     def show_window(self, init_width, init_height):
         """Create the initial window."""
-        win = Gtk.Window()
-        win.set_name(self.title)
-        win.set_title(self.title)
-        win.connect("destroy", self.graceful_exit)
-        win.set_border_width(5)
+        self.win = Gtk.Window()
+        self.win.set_name(self.title)
+        self.win.set_title(self.title)
+        self.destroy_connect_id = self.win.connect("destroy", self.graceful_exit)
+        self.win.set_border_width(5)
 
         vbox = Gtk.VBox(spacing=3)
-        win.add(vbox)
+        self.win.add(vbox)
 
         self.drawing_area = Gtk.DrawingArea()
         # There doesn't seem to be any way to resize a window below
@@ -346,9 +346,9 @@ but if you want to, contact me and I'll help you figure it out.)
         self.drawing_area.connect("key-press-event", self.key_press_event)
 
         # Resize the window now to the desired initial size:
-        win.resize(init_width, init_height)
+        self.win.resize(init_width, init_height)
 
-        win.show_all()
+        self.win.show_all()
 
         # So the downloader can use threads:
         if self.gps_poller:
@@ -479,38 +479,42 @@ but if you want to, contact me and I'll help you figure it out.)
         if self.selected_waypoint is not None and self.show_waypoints:
             self.draw_label("Waypoint: " +
                       self.trackpoints.waypoints[self.selected_waypoint].name,
-                            15, 40, color=self.yellow_color)
-        elif self.selected_trackpoint is not None:
-            try:
-                selpt = self.trackpoints.points[self.selected_trackpoint]
-                if self.use_metric:
-                    ele = selpt.ele
-                    eleunit = 'm'
-                else:
-                    ele = selpt.ele * 3.2808399
-                    eleunit = "'"
-                # print(f'{x:,}')
-                self.draw_label(
-                    f"Point: {selpt.lat:.2f}, {selpt.lon:.2f}\n"
-                    f"{ele:,.1f}{eleunit}      "
-                    f"{self.time_as_local(selpt.timestamp)}",
-                    75, 15, color=self.yellow_color)
-                point_x, point_y = self.coords2xy(selpt.lon, selpt.lat)
-            except IndexError:
-                # I'm not sure why this happens, but I've seen it once
-                # from right-clicking on a trackpoint to "delete points after"
-                print("Internal error: Selected trackpoint",
-                      self.selected_trackpoint, "is out of range")
-            self.draw_marker(point_x, point_y)
+                            15, 70, color=self.yellow_color)
+            # point_x, point_y = self.coords2xy(
+            #     self.trackpoints.waypoints[self.selected_waypoint].lon,
+            #     self.trackpoints.waypoints[self.selected_waypoint].lat)
+            # self.draw_marker(point_x, point_y, color="orange")
+
+        if self.selected_trackpoints:
+            for ptindex in self.selected_trackpoints:
+                try:
+                    selpt = self.trackpoints.points[ptindex]
+                    if self.use_metric:
+                        ele = selpt.ele
+                        eleunit = 'm'
+                    else:
+                        ele = selpt.ele * 3.2808399
+                        eleunit = "'"
+                    self.draw_label(
+                        f"Point: {selpt.lat:.2f}, {selpt.lon:.2f}\n"
+                        f"{ele:,.1f}{eleunit}      "
+                        f"{self.time_as_local(selpt.timestamp)}",
+                        75, 15, color=self.yellow_color)
+                    point_x, point_y = self.coords2xy(selpt.lon, selpt.lat)
+                except IndexError:
+                    # I'm not sure why this happens, but I've seen it once
+                    # from right-clicking on a trackpoint to "delete points after"
+                    print("Internal error: Selected trackpoint",
+                          ptindex, "is out of range")
+                self.draw_marker(point_x, point_y, color="yellow")
 
         # Copyright info or other attribution
         self.set_color(self.grid_color)
         self.collection.draw_attribution(self)
 
         # draw pin
-        pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat)
-
         if self.pin:
+            pin_x, pin_y = self.coords2xy(self.pin_lon, self.pin_lat)
             self.draw_pixbuf(self.pin, 0, 0, pin_x, pin_y, -1, -1)
 
         # draw GPS location
@@ -715,7 +719,7 @@ but if you want to, contact me and I'll help you figure it out.)
                                          self.red_color, linewidth=6)
 
         if self.show_waypoints and len(self.trackpoints.waypoints) > 0:
-            for pt in self.trackpoints.waypoints:
+            for ptindex, pt in enumerate(self.trackpoints.waypoints):
                 if self.trackpoints.is_start(pt) or \
                    self.trackpoints.is_attributes(pt):
                     if pt in track_colors:
@@ -732,8 +736,10 @@ but if you want to, contact me and I'll help you figure it out.)
                                                  self.win_width, self.win_height)
                 if x >= 0 and x < self.win_width and \
                    y >= 0 and y < self.win_height:
-                    self.draw_marker(x, y,     #x - 8, y - 21,
-                                     color=wpcolor)
+                    if ptindex ==  self.selected_waypoint:
+                        self.draw_marker(x, y, color="magenta")
+                    else:
+                        self.draw_marker(x, y, color=wpcolor)
                     if self.show_labels and \
                        pt.name.strip() and pt.name != NULL_WP_NAME:
                         self.draw_label(pt.name, x, y,
@@ -2770,8 +2776,10 @@ but if you want to, contact me and I'll help you figure it out.)
         else:
             self.select_track(None)
 
-        self.selected_trackpoint = near_point
-        self.selected_waypoint = near_waypoint
+        if near_waypoint:
+            self.selected_waypoint = near_waypoint
+        else:
+            self.selected_trackpoints.append(near_point)
 
         # On shift-click, find distance and angle since last click,
         # plus time if the click was near a trackpoint.
@@ -2834,9 +2842,17 @@ but if you want to, contact me and I'll help you figure it out.)
         """Clean up the window and exit.
            The "extra" argument is so it can be calld from GTK callbacks.
         """
+        # This will get called again upon destroying the window.
+        # Only let it be called once.
+        self.win.disconnect(self.destroy_connect_id)
+
         if self.chartthread and self.chartthread.is_alive() \
            and self.map2chartqueue:
+            if self.controller.Debug:
+                print("chart thread is alive")
             self.map2chartqueue.put("EXIT")
+        elif self.controller.Debug:
+            print("No chart thread")
 
         # Try to stop any GPS thread
         if self.gps_poller:
@@ -2845,12 +2861,62 @@ but if you want to, contact me and I'll help you figure it out.)
 
         self.controller.save_sites()    # save any new sites/tracks
 
-        Gtk.main_quit()
-        # The python profilers don't work if you call sys.exit here.
+        #
+        # Now begin the difficult and fraught process of actually quitting.
+        # If there are threads active, like if there are any downloads hung,
+        # Gtk.main_quit() doesn't work, and neither does sys.exit().
+        # os._exit works; but first, try to exit more gracefully than
+        # that, closing the window but waiting a while for the threads
+        # to finish so Grk.main_quit can exit cleanly.
+        # If that fails, call os._exit after a timeout.
+        #
 
-        # Too bad, because Gtk.main_quit() doesn't actually exit
-        # until later. So any function that calls this must be sure
+        if self.controller.Debug:
+            print("Attempting to quit")
+            print("Active count:", threading.active_count())
+            print("Current thread:", threading.current_thread())
+            for thread in threading.enumerate():
+                print("  thread:", thread, "alive?", thread.is_alive())
+
+            print("Closing window ...")
+
+        self.win.destroy()
+        # close() doesn't close the window, but destroy seems to work.
+        # Other possibilities: hide, iconify, unmap.
+
+        # This should depend on the chart thread, but it turns out there
+        # can be active threads even if they're not self.chartthread.
+        if threading.active_count() > 1:
+            print("Waiting a few minutes for pending downloads ...")
+
+        # The python profilers don't work if you call sys.exit here.
+        if self.controller.Debug:
+            print("Calling Gtk.main_quit")
+        Gtk.main_quit()
+
+        # Despite the short timeout, ungraceful_exit won't actually be called
+        # if Gtk.main_quit() worked; apparently main_quit cancels timeouts.
+        GLib.timeout_add(100, self.ungraceful_exit)
+
+    def ungraceful_exit(self):
+        """Hopefully this won't be called; it's a fallback in case
+           Gtk.main_quit doesn't work, which sometimes happens.
+        """
+        # Too bad, because Gtk.main_quit() doesn't always exit
+        # until later, or sometimes not at all.
+        # So any function that calls this must be sure
         # to guard against anything like extra map redraws.
+
+        # If we get here, that means Gtk.main_quit didn't,
+        # probably because are ThreadPoolExecutor threads still
+        # trying to download files.
+        # Give them a few minutes, then brutally kill the process.
+        from time import sleep
+        print("Will kill pytopo process in two minutes")
+        sleep(120)
+        print("pytopo process exiting")
+        os._exit(0)
+        # If this fails, a stronger option is os.kill(os.getpid(), 9)
 
     def show_track_charts(self, widget):
         # First, collect all the data, since there's no point
