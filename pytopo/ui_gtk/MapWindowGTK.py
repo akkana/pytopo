@@ -118,6 +118,8 @@ but if you want to, contact me and I'll help you figure it out.)
         # We'll need it to change locations, collections etc.
         self.controller = _controller
 
+        self.exiting = False
+
         # Default title, can be changed later.
         self.title = "PyTopo "
 
@@ -2842,6 +2844,9 @@ but if you want to, contact me and I'll help you figure it out.)
         """Clean up the window and exit.
            The "extra" argument is so it can be calld from GTK callbacks.
         """
+        # The downloader can check this
+        self.exiting = True
+
         # This will get called again upon destroying the window.
         # Only let it be called once.
         self.win.disconnect(self.destroy_connect_id)
@@ -2871,9 +2876,10 @@ but if you want to, contact me and I'll help you figure it out.)
         # If that fails, call os._exit after a timeout.
         #
 
+        active_threads = threading.active_count()
         if self.controller.Debug:
             print("Attempting to quit")
-            print("Active count:", threading.active_count())
+            print("Active threads:", active_threads)
             print("Current thread:", threading.current_thread())
             for thread in threading.enumerate():
                 print("  thread:", thread, "alive?", thread.is_alive())
@@ -2886,17 +2892,22 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # This should depend on the chart thread, but it turns out there
         # can be active threads even if they're not self.chartthread.
-        if threading.active_count() > 1:
-            print("Waiting a few minutes for pending downloads ...")
+        if active_threads > 1:
+            print("Waiting a little while for", active_threads-1,
+                  "pending download(s) ...")
+
+            # GLib.timeout_add doesn't work here, because apparently
+            # Gtk.main_quit cancels timeouts even when it doesn't actually quit.
+            # The timeouts on the downloader in TiledMapCollection help a bit,
+            # but we can have many downloads queued
+            import signal
+            signal.signal(signal.SIGALRM, lambda a, b: self.ungraceful_exit())
+            signal.alarm(100)
 
         # The python profilers don't work if you call sys.exit here.
         if self.controller.Debug:
             print("Calling Gtk.main_quit")
         Gtk.main_quit()
-
-        # Despite the short timeout, ungraceful_exit won't actually be called
-        # if Gtk.main_quit() worked; apparently main_quit cancels timeouts.
-        GLib.timeout_add(100, self.ungraceful_exit)
 
     def ungraceful_exit(self):
         """Hopefully this won't be called; it's a fallback in case
@@ -2911,9 +2922,6 @@ but if you want to, contact me and I'll help you figure it out.)
         # probably because are ThreadPoolExecutor threads still
         # trying to download files.
         # Give them a few minutes, then brutally kill the process.
-        from time import sleep
-        print("Will kill pytopo process in two minutes")
-        sleep(120)
         print("pytopo process exiting")
         os._exit(0)
         # If this fails, a stronger option is os.kill(os.getpid(), 9)
