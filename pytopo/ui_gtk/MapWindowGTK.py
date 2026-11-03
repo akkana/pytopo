@@ -499,7 +499,7 @@ but if you want to, contact me and I'll help you figure it out.)
                         eleunit = "'"
                     self.draw_label(
                         f"Point: {selpt.lat:.2f}, {selpt.lon:.2f}\n"
-                        f"{ele:,.1f}{eleunit}      "
+                        f"{ele:,.1f}{eleunit}      \n"
                         f"{self.time_as_local(selpt.timestamp)}",
                         75, 15, color=self.yellow_color)
                     point_x, point_y = self.coords2xy(selpt.lon, selpt.lat)
@@ -2742,6 +2742,7 @@ but if you want to, contact me and I'll help you figure it out.)
             self.draw_overlays()
             return True
 
+        # This function only handles left click
         if event.button != 1:
             return False
 
@@ -2780,7 +2781,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
         if near_waypoint:
             self.selected_waypoint = near_waypoint
-        else:
+        elif near_point:
             self.selected_trackpoints.append(near_point)
 
         # On shift-click, find distance and angle since last click,
@@ -2814,11 +2815,21 @@ but if you want to, contact me and I'll help you figure it out.)
                                                    metric=self.use_metric)
                 self.path_distance += dist
                 if self.use_metric:
-                    print("Distance: %.2f km" % dist)
+                    print("Distance from last point: %.2f km" % dist)
                     print("Total distance: %.2f km" % self.path_distance)
                 else:
-                    print("Distance: %.2f mi" % dist)
-                    print("Total distance: %.2f mi" % self.path_distance)
+                    # Distance is in miles. If it's less than a mile,
+                    # print as feet.
+                    if dist < 1:
+                        print("Distance from last point: %d ft" %
+                              (dist * 5280))
+                    else:
+                        print("Distance from last point: %.2f mi" % dist)
+                    if self.path_distance < 1:
+                        print("Total distance: %d ft" %
+                              (self.path_distance * 5280))
+                    else:
+                        print("Total distance: %.2f mi" % self.path_distance)
 
                 # Now calculate bearing.
                 angle = MapUtils.bearing(self.click_last_lat,
