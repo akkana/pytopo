@@ -22,7 +22,7 @@ import queue
 
 from math import pi, log10
 
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, UTC
 
 import sys
 
@@ -74,7 +74,7 @@ class ChartHandlerGTK:
             # UTC datetime
             self.charts[chartkey]['times'].append(
                 datetime.strptime(t, GPSTIMEFMT).replace(
-                tzinfo=timezone.utc
+                tzinfo=UTC
             ))
             self.charts[chartkey]['vals'].append(float(indata['data'][t]))
 
@@ -165,7 +165,7 @@ class ChartHandlerGTK:
         # Figure out the time corresponding to where the mouse was pressed
         timestamp = (event.x - LEFTMARGIN) \
             * secrange / chartwidth + first_timestamp
-        self.chart2mapqueue.put(("click", datetime.utcfromtimestamp(timestamp)))
+        self.chart2mapqueue.put(("click", datetime.fromtimestamp(timestamp, UTC)))
 
         self.vline = timestamp
 
