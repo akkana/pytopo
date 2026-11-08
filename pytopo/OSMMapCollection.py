@@ -13,7 +13,6 @@ from pytopo import MapUtils
 import os
 import time
 import math
-import gobject
 
 
 class OSMMapCollection(TiledMapCollection):

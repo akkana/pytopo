@@ -41,6 +41,7 @@ from pathlib import Path
 import subprocess
 import threading
 import queue
+import signal
 
 try:
     # Python 3:
@@ -310,7 +311,8 @@ but if you want to, contact me and I'll help you figure it out.)
         self.win = Gtk.Window()
         self.win.set_name(self.title)
         self.win.set_title(self.title)
-        self.destroy_connect_id = self.win.connect("destroy", self.graceful_exit)
+        self.destroy_connect_id = self.win.connect("destroy",
+                                                   self.graceful_exit)
         self.win.set_border_width(5)
 
         vbox = Gtk.VBox(spacing=3)
@@ -355,6 +357,11 @@ but if you want to, contact me and I'll help you figure it out.)
         # So the downloader can use threads:
         if self.gps_poller:
             GObject.threads_init()
+
+        # Quit on SIGUSR1. This is mostly used by the timeout unittest,
+        # but could be useful in other contexts too.
+        GLib.unix_signal_add(GLib.PRIORITY_HIGH, signal.SIGUSR1,
+                             self.on_quit_signal)
 
         Gtk.main()
 
@@ -2936,6 +2943,11 @@ but if you want to, contact me and I'll help you figure it out.)
         print("pytopo process exiting")
         os._exit(0)
         # If this fails, a stronger option is os.kill(os.getpid(), 9)
+
+    def on_quit_signal(self):
+        """Called from SIGUSR1: calls graceful_exit"""
+        self.graceful_exit()
+        return GLib.SOURCE_REMOVE
 
     def show_track_charts(self, widget):
         # First, collect all the data, since there's no point

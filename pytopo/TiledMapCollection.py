@@ -165,7 +165,7 @@ TiledMapCollection classes must implement:
          tiles_left, tiles_right, tiles_up, tiles_down) = \
              self.find_tile_window_geometry(mapwin)
 
-        # Where to draw the center tile so the center pt appears at window center
+        # Where to draw the center tile so the center pt appears at win center
         center_tile_draw_x = mapwin.win_width / 2 - center_offset_x
         center_tile_draw_y = mapwin.win_height / 2 - center_offset_y
 
@@ -453,12 +453,17 @@ TiledMapCollection classes must implement:
         """When the FuturesSession completes downloading a tile,
            draw it on the map when possible.
         """
+        if self.mapwin.controller.Debug:
+            print("response_hook", response.status_code)
         if response.status_code != 200:
+            if self.mapwin.controller.Debug:
+                print("Response was", response.status_code, "on", response.url)
 
             # Handle 301 Moved Permanently and other 300 codes.
             if response.status_code // 100 == 3:
-                print(response.status_code, "redirect from",
-                      response.url, "to", response.headers['Location'])
+                if self.mapwin.controller.Debug:
+                    print(response.status_code, "redirect from",
+                          response.url, "to", response.headers['Location'])
                 # requests-futures will automatically try the new location,
                 # but the response url will be the new one, so the entry
                 # in url_to_path needs to be updated.
@@ -478,6 +483,11 @@ TiledMapCollection classes must implement:
             self.failed_download_urls[response.url] = \
                 self.last_failed_download_time
             self.urls_queued.remove(response.url)
+
+            if self.mapwin.exiting:
+                print("Map window is exiting! Clearing downloads after failure")
+                self.urls_queued = []
+
             return
 
         # Is the response an image?
@@ -541,3 +551,8 @@ TiledMapCollection classes must implement:
             if self.mapwin.controller.Debug > 1:
                 print("Schedule drawing of single tile", tilepath)
             GLib.idle_add(self.draw_single_tile, tilepath, self.mapwin)
+
+
+        if self.mapwin.exiting:
+            print("Map window is exiting! Clearing downloads")
+            self.urls_queued = []
