@@ -15,3 +15,10 @@ class MapWindow(object):
     def load_image_from_file(path):
         print("Sorry, load_image_from_file isn't defined in base MapWindow",
               file=sys.stderr)
+
+    def idle_add(fcn, *args):
+        """Call a function at the next convenient opportunity.
+           GUI subclasses will need to implement this using an
+           appropriate idle function; see MapWindowGTK.
+        """
+        fcn(*args)

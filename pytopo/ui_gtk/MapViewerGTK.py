@@ -165,8 +165,6 @@ to standard output.
                 if (self.Debug):
                     print("Found the collection", coll.name)
                 return coll
-            elif self.Debug:
-                print(f"'{collname}' Didn't match '{coll.name}'")
 
         return None
 

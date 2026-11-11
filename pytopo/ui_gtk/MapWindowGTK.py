@@ -379,6 +379,16 @@ but if you want to, contact me and I'll help you figure it out.)
             return
         self.drawing_area.queue_draw()
 
+    def idle_add(self, fcn, *args):
+        def run_once():
+            try:
+                fcn(*args)
+            except Exception:
+                print("idle callback %s failed",
+                      getattr(fcn, "__name__", fcn), file=sys.stderr)
+            return False
+        return GLib.idle_add(run_once)
+
     def gpsd_callback(self, gpsd):
         """Update the map given the GPS location"""
         # gpsd.fix.mode is 1 if no fix, 2 for a 2d fix, 3 for a 3d fix.

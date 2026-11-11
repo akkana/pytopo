@@ -14,7 +14,6 @@ from pytopo import MapUtils
 # For downloading tiles:
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
-# import threading
 
 import time
 import math
@@ -22,6 +21,19 @@ import math
 import os
 
 import gc
+
+import logging
+
+# requests-futures can silently swallow exceptions that happen
+# during the response hook. Adding this as a done_callback makes
+# those errors visible in case they happen.
+def _report(future):
+    # Don't log downloads that were deliberately cancelled:
+    if future.cancelled():
+        return
+    exc = future.exception()   # returns immediately; the future is done
+    if exc:
+        logging.error("download failed", exc_info=exc)
 
 
 class TiledMapCollection(MapCollection):
@@ -196,10 +208,10 @@ TiledMapCollection classes must implement:
                 draw_x = int(center_tile_draw_x + dx * self.img_width)
                 draw_y = int(center_tile_draw_y + dy * self.img_height)
 
+                pixbuf, filename = self.get_maplet_by_number(tile_x, tile_y)
                 if self.mapwin.controller.Debug:
                     print(f"Tile ({tile_x}, {tile_y}) -> draw at"
-                          f"({draw_x}, {draw_y})")
-                pixbuf, filename = self.get_maplet_by_number(tile_x, tile_y)
+                          f"({draw_x}, {draw_y})", filename)
                 x_off, y_off = 0, 0
                 self.draw_tile_at_position(pixbuf, mapwin,
                                            draw_x, draw_y, x_off, y_off)
@@ -340,7 +352,8 @@ TiledMapCollection classes must implement:
 
         except Exception as e:
             # This used to look for glib.GError, but I don't know what
-            # errors the GTK3 load_image_from_file might raise.
+            # errors the GTK3 load_image_from_file might raise,
+            # and we can't depend on GTK in this class.
             print("Error loading image from file", e)
             url = self.path_to_url[path]
             if url in self.urls_queued:
@@ -447,7 +460,10 @@ TiledMapCollection classes must implement:
             print("Appending", url, "to download queue")
         self.urls_queued.append(url)
 
-        self.downloader.get(url, timeout=20)
+        future = self.downloader.get(url, timeout=20)
+        # Flag any errors that happen during the download:
+        # otherwise, exceptions can be silently swallowed by requests-futures.
+        future.add_done_callback(_report)
 
     def response_hook(self, response, *args, **kwargs):
         """When the FuturesSession completes downloading a tile,
@@ -529,7 +545,7 @@ TiledMapCollection classes must implement:
                 self.urls_queued.remove(response.url)
             except:
                 print("Yikes, downloaded a URL not in the queue:",
-                      response.url)
+                      response.url, file=sys.stderr)
 
         # Schedule a redraw for this tile.
         # If this is the basemap (opacity=1), do this as soon as possible.
@@ -544,14 +560,15 @@ TiledMapCollection classes must implement:
                 if self.mapwin.controller.Debug:
                     print("All tiles downloaded for", self,
                           ": scheduling redraw")
-                GLib.idle_add(self.mapwin.draw_map)
-            # elif self.mapwin.controller.Debug:
-            #     print("downloaded", tilepath, "but still tiles to download")
+                self.mapwin.idle_add(self.mapwin.draw_map)
+            elif self.mapwin.controller.Debug:
+                print("downloaded", tilepath, "but still",
+                      len(self.urls_queued), "tiles to download")
         else:
             if self.mapwin.controller.Debug > 1:
-                print("Schedule drawing of single tile", tilepath)
-            GLib.idle_add(self.draw_single_tile, tilepath, self.mapwin)
-
+                print("Scheduling draw of single tile", tilepath)
+            self.mapwin.idle_add(self.draw_single_tile,
+                                 tilepath, self.mapwin)
 
         if self.mapwin.exiting:
             print("Map window is exiting! Clearing downloads")
