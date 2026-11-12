@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 import time
 import math
 
-import os
+import os, sys
 
 import gc
 
@@ -348,19 +348,21 @@ TiledMapCollection classes must implement:
              self.find_tile_window_geometry(mapwin)
 
         try:
-            pixbuf = MapWindow.load_image_from_file(path)
+            pixbuf = self.mapwin.load_image_from_file(path)
 
         except Exception as e:
             # This used to look for glib.GError, but I don't know what
             # errors the GTK3 load_image_from_file might raise,
             # and we can't depend on GTK in this class.
-            print("Error loading image from file", e)
+            print("Error loading image from file:", e, "path was", path,
+                  file=sys.stderr)
             url = self.path_to_url[path]
             if url in self.urls_queued:
                 if self.mapwin.controller.Debug:
                     # I've never actually seen this message,
                     # but if it ever happens, I'd like to know.
-                    print("draw_single_tile with", url, "still queued")
+                    print("draw_single_tile with", url, "still queued",
+                          file=sys.stderr)
                 return
 
             # XXX When the load fails with No such file or directory,

@@ -7,6 +7,8 @@
    which a GUI class must define.
 """
 
+import sys
+
 
 class MapWindow(object):
     def __init__(self, _controller):
