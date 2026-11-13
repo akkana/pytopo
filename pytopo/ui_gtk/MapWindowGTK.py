@@ -478,6 +478,9 @@ but if you want to, contact me and I'll help you figure it out.)
                    stats['Smoothed total climb']:
                     label += "\nClimb: %d%s" % (stats['Smoothed total climb'],
                                                 climb_units)
+                if 'Max speed' in stats:
+                    label += "\nMax speed: %.1f %s/hr" % (stats['Max speed'],
+                                                          dist_units)
                 # If numpy isn't installed, we won't have smoothed climb,
                 # but still have Raw total climb. But that's so
                 # crazily inaccurate it's not even worth showing.

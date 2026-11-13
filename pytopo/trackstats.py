@@ -67,6 +67,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     moving_time = datetime.timedelta(0)
     stopped_time = datetime.timedelta(0)
 
+    max_speed = 0
+
     def accumulate_climb(ele):
         global total_climb, this_climb, this_climb_start, lastele
 
@@ -128,17 +130,17 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         # If there's a GPS speed recorded, use that and the
         # time interval for distance calculations,
         # but also try calculating the speed, to see how close they are.
+        dist = 0
         calcdist = MapUtils.haversine_distance(lat, lon,
                                                lastlat, lastlon, metric)
-        dist = 0
         if delta_t:
             calcspeed = calcdist * 3600 / delta_t.total_seconds()
             calcspeeds.append(calcspeed)
         else:
             calcspeeds.append(0)
 
-        if pt.attrs and 'speed' in pt.attrs:
-            speed = float(pt.attrs['speed'])    # in m/s
+        if pt.speed:
+            speed = float(pt.speed)    # in m/s
 
             # This is in meters/s. Convert to mi/hr or km/hr
             if metric:
@@ -148,12 +150,18 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
                 speed *= 2.2369363
                 # dist /= 1609.344
 
+            # print("Speed %.2f calculated, %.2f in GPX" % (calcspeed, speed))
+
             if delta_t:
-                dist = speed * delta_t.seconds
+                # speed is in mi/hr or km/hr, so convert from seconds
+                dist = speed * delta_t.seconds/3600
+
+            max_speed = max(max_speed, speed)
+
         else:
             dist = calcdist
             if delta_t:
-                speed = dist / delta_t.seconds * 60 * 60   # miles (or km) / hr
+                speed = calcspeed   # miles (or km) / hr
             else:
                 speed = 0
 
@@ -189,7 +197,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     # If halfwin wasn't supplied, try to guess a good value.
     # XXX TO DO: figure out a way to guess.
     if not halfwin:
-        # print(len(eles), "points", ", average distance per step", total_dist / len(eles))
+        # print(len(eles), "points", ", average distance per step",
+        #       total_dist / len(eles))
         halfwin = 15
 
     # Smoothing eles will fail if there are no eles.
@@ -203,6 +212,7 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
 
     out = {}
     out['Total distance'] = total_dist
+    out['Max speed'] = max_speed
     if len(eles):
         out['Raw total climb'] = total_climb
 

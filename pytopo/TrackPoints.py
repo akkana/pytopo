@@ -572,9 +572,16 @@ class TrackPoints(object):
         # Old versions of osmand used a <speed> node, but now it's inside
         # <extensions><osmand:speed>.
         speed = self.get_DOM_text(pointnode, SPEEDRE)
-        try:
-            speed = float(speed)
-        except:
+        if not speed and 'speed' in extensions:
+            speed = extensions['speed']
+        if speed:
+            try:
+                speed = float(speed)
+            except (ValueError, TypeError):
+                if self.Debug:
+                    print("Couldn't parse speed '%s'" % speed)
+                speed = None
+        else:
             speed = None
 
         # If there were no extra attributes, pass None, not an empty dict.
