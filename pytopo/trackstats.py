@@ -30,7 +30,7 @@ CLIMB_THRESHOLD = 8
 
 # How fast do we have to be moving, in miles/hour,
 # to count toward the total distance and the moving average speed?
-SPEED_THRESHOLD = .2
+SPEED_THRESHOLD = .3
 
 # Variables that need to be global, because statistics() and
 # accumulate_climb() need to share them, and python 2.7 doesn't
@@ -63,9 +63,13 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     lastlon = 0
     total_dist = 0
 
+    start_time = None
+    end_time = None
+
     lasttime = None
     moving_time = datetime.timedelta(0)
     stopped_time = datetime.timedelta(0)
+    tot_time = datetime.timedelta(0)
 
     max_speed = 0
 
@@ -102,6 +106,10 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
 
         try:
             t = datetime.datetime.strptime(t, '%Y-%m-%dT%H:%M:%SZ')
+
+            if not start_time:
+                start_time = t
+            end_time = t
         except:
             t = None
             missing_times = True
@@ -114,7 +122,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
             else:
                 ele = round(float(ele) * 3.2808399, 2)    # convert meters->feet
 
-        if not lastlat or not lastlon:
+        # First point with coordinates?
+        if not lastlat or not lastlon or not lasttime:
             lastlat = lat
             lastlon = lon
             lasttime = t
@@ -124,6 +133,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
             delta_t = t - lasttime   # a datetime.timedelta object
         else:
             delta_t = datetime.timedelta(0)
+
+        tot_time += delta_t
 
         # This speed and distance calculation isn't terribly accurate,
         # since small position errors accumulate.
@@ -170,20 +181,22 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
 
         speeds.append(speed)
 
-        if speed > SPEED_THRESHOLD or not delta_t:
-            total_dist += dist
-            moving_time += delta_t
+        if delta_t:
+            if speed > SPEED_THRESHOLD:
+                total_dist += dist
+                moving_time += delta_t
 
-            lasttime = t
-            lastlat = lat
-            lastlon = lon
+                lastlat = lat
+                lastlon = lon
 
-            accumulate_climb(ele)
+                accumulate_climb(ele)
 
-        else:
-            # If we're considered stopped, don't update lastlat/lastlon.
-            # We'll calculate distance from the first stopped point.
-            stopped_time += delta_t
+            else:
+                # If we're considered stopped, don't update lastlat/lastlon.
+                # We'll calculate distance from the first stopped point.
+                stopped_time += delta_t
+
+        lasttime = t
 
         # print(total_dist, ele, "\t", time, lat, lon, "\t", total_climb)
         # print(total_dist, ele, "\t", time, total_climb)
@@ -211,6 +224,12 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     #     print("Some points don't have times! Can't calculate speed")
 
     out = {}
+    if start_time:
+        out['Start time'] = start_time
+    if end_time:
+        out['End time'] = end_time
+    if tot_time:
+        out['Total time'] = tot_time
     out['Total distance'] = total_dist
     out['Max speed'] = max_speed
     if len(eles):
@@ -357,13 +376,7 @@ def analyze_track(trackfile, args):
     # Read the trackpoints file:
     #
     trackpoints = TrackPoints()
-    try:
-        trackpoints.read_track_file(trackfile)
-        # XXX Read more than one file
-    except IOError as e:
-        print(e)
-        #print(dir(e))
-        return e.errno
+    trackpoints.read_track_file(trackfile)    # Might raise IOError
 
     out = statistics(trackpoints, halfwin, beta, metric)
 
@@ -388,6 +401,13 @@ def analyze_track(trackfile, args):
     if 'Average moving speed' in out:
         print("Average speed moving: %.1f %s/h" % (out['Average moving speed'],
                                                    dist_units))
+    if 'Start time' in out:
+        print("Start time:", out['Start time'])
+    if 'End time' in out:
+        print("End time:", out['End time'])
+    if 'Start time' in out and 'End time' in out:
+        tot_time = out['End time'] - out['Start time']
+        print("Total time:", tot_time, "(%d minutes)" % (tot_time.seconds / 60))
 
     # print("======= Distances", type(out['Distances']))
     # print(out['Distances'])

@@ -35,16 +35,19 @@ class TestTrackStats(unittest.TestCase):
 
         stats = pytopo.trackstats.statistics(trackpoints, halfwin, beta, metric)
 
-        self.assertAlmostEqual(stats['Total distance'], 3.5755, places=4)
-        self.assertAlmostEqual(stats['Raw total climb'], 1164.68, places=4)
+        from pprint import pprint
+        print("Stats for Otowi Mesa Arch:")
+        pprint(stats)
+
+        self.assertAlmostEqual(stats['Total distance'], 3.80683, places=4)
+        self.assertAlmostEqual(stats['Raw total climb'], 1377.92, places=4)
         self.assertAlmostEqual(stats['Smoothed total climb'], 781.1629,
                                places=4)
         self.assertAlmostEqual(stats['Lowest'], 6698.2772, places=4)
         self.assertAlmostEqual(stats['Highest'], 7070.2771, places=4)
-        self.assertAlmostEqual(stats['Moving time'], 13126)
-        self.assertAlmostEqual(stats['Stopped time'], 9920)
-        self.assertAlmostEqual(stats['Average moving speed'], 0.9806,
-                               places=4)
+        self.assertAlmostEqual(stats['Moving time'], 9121)
+        self.assertAlmostEqual(stats['Stopped time'], 4258)
+        self.assertAlmostEqual(stats['Average moving speed'], 1.5025, places=4)
         self.assertEqual(len(stats['Distances']), 1263)
 
         trackpoints.read_track_file('test/files/otowi-mesa-arch.gpx')
@@ -55,14 +58,13 @@ class TestTrackStats(unittest.TestCase):
         stats = pytopo.trackstats.statistics(trackpoints, halfwin, beta, metric)
 
         from pprint import pprint
-        self.assertAlmostEqual(stats['Total distance'], 4.2699, places=4)
-        self.assertAlmostEqual(stats['Raw total climb'], 1752.9500, places=4)
+        self.assertAlmostEqual(stats['Total distance'], 4.1467, places=4)
+        self.assertAlmostEqual(stats['Raw total climb'], 2040.98, places=4)
         self.assertAlmostEqual(stats['Smoothed total climb'], 202.5349,
                                places=4)
         self.assertAlmostEqual(stats['Lowest'], 6236.3346, places=4)
         self.assertAlmostEqual(stats['Highest'], 6443.9083, places=4)
-        self.assertAlmostEqual(stats['Moving time'], 2849)
-        self.assertAlmostEqual(stats['Stopped time'], 9506)
-        self.assertAlmostEqual(stats['Average moving speed'], 5.3954,
-                               places=4)
+        self.assertAlmostEqual(stats['Moving time'], 2761)
+        self.assertAlmostEqual(stats['Stopped time'], 1076)
+        self.assertAlmostEqual(stats['Average moving speed'], 5.4068, places=4)
         self.assertEqual(len(stats['Distances']), 710)

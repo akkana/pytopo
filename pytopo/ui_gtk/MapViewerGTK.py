@@ -63,6 +63,11 @@ class MapViewerGTK(object):
         return pytopo.__version__
 
     @classmethod
+    def miniUsage(cls):
+        print("See pytopo -h for usage details")
+        sys.exit(1)
+
+    @classmethod
     def Usage(cls):
         print("pytopo", MapViewerGTK.get_version())
         print("""
@@ -121,7 +126,7 @@ to standard output.
         print("===============")
         print(errstr)
         print("===============\n")
-        MapViewerGTK.Usage()
+        MapViewerGTK.miniUsage()
 
     def append_known_site(self, site):
         """Append the given site to KnownSites."""
@@ -312,7 +317,7 @@ to standard output.
                     # Specify a collection:
                     if len(args) < 2:
                         print("-c must specify collection")
-                        self.Usage()
+                        self.miniUsage()
                     window.add_title(args[1])
                     mapwin.collection = self.find_collection(args[1])
                     if mapwin.collection is None:
@@ -324,7 +329,7 @@ to standard output.
                     # Specify an overlay collection:
                     if len(args) < 2:
                         print("-c must specify overlay collection")
-                        self.Usage()
+                        self.miniUsage()
                     window.add_title("(%s)" % args[1])
                     overlay = self.find_collection(args[1])
                     if overlay is None:
@@ -355,7 +360,7 @@ to standard output.
                 elif args[0] == "-k":
                     if len(args) < 2:
                         print("-k must include a comma-separated list of field names")
-                        self.Usage()
+                        self.miniUsage()
                     mapwin.trackpoints.fieldnames = args[1].split(',')
                     args = args[1:]
 
@@ -507,12 +512,12 @@ to standard output.
 
             except ValueError:
                 print("Couldn't parse coordinates")
-                self.Usage()
+                self.miniUsage()
 
             # If we get here, we still have an argument but it doesn't
             # match anything we know: flag, collection, site or coordinate.
             print("Problem parsing arguments. Remaining args:", args)
-            self.Usage()
+            self.miniUsage()
 
         # Now we've parsed all the arguments.
         # If we didn't get a collection, use the default, if any:
