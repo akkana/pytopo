@@ -35,10 +35,6 @@ class TestTrackStats(unittest.TestCase):
 
         stats = pytopo.trackstats.statistics(trackpoints, halfwin, beta, metric)
 
-        from pprint import pprint
-        print("Stats for Otowi Mesa Arch:")
-        pprint(stats)
-
         self.assertAlmostEqual(stats['Total distance'], 3.80683, places=4)
         self.assertAlmostEqual(stats['Raw total climb'], 1377.92, places=4)
         self.assertAlmostEqual(stats['Smoothed total climb'], 781.1629,
@@ -57,7 +53,6 @@ class TestTrackStats(unittest.TestCase):
 
         stats = pytopo.trackstats.statistics(trackpoints, halfwin, beta, metric)
 
-        from pprint import pprint
         self.assertAlmostEqual(stats['Total distance'], 4.1467, places=4)
         self.assertAlmostEqual(stats['Raw total climb'], 2040.98, places=4)
         self.assertAlmostEqual(stats['Smoothed total climb'], 202.5349,

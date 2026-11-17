@@ -329,10 +329,8 @@ class TrackPoints(object):
         except:
             pass
 
-        try:
+        if speed:
             self.max_speed = max(self.max_speed, float(speed))
-        except:
-            pass
 
         if waypoint_name:
             self.add_waypoint(point)

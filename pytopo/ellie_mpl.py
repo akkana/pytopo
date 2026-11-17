@@ -21,7 +21,7 @@ if 'numpy' not in sys.modules:
 
 def plot_track(trackfile, out, args):
     # Set up the plots. First, will there be a speed plot, or just elevations?
-    if "Speeds" in out or "Calculated Speeds" in out:
+    if "Speeds" in out or "GPX Speeds" in out or "Calculated Speeds" in out:
         numplots = 2
     else:
         numplots = 1
@@ -55,10 +55,13 @@ def plot_track(trackfile, out, args):
                          out['Distances'][-1], dist_units))
 
     # Now for the second plot: speeds
-    if len(axes) == 2 and ("Speeds" in out or "Calculated Speeds" in out):
+    if len(axes) == 2 and ("Speeds" in out or "GPX Speeds" in out
+                           or "Calculated Speeds" in out):
         ax = axes[1]
         if "Speeds" in out:
-            ax.plot(out['Speeds'], color="red", label="Speed (from GPX)")
+            ax.plot(out['Speeds'], color="red", label="Speed")
+        if "GPS Speeds" in out:
+            ax.plot(out['GPS Speeds'], color="cyan", label="Speed (from GPX)")
         if "Calculated Speeds" in out:
             ax.plot(out['Calculated Speeds'], color="blue",
                     label="Speed (calculated)")

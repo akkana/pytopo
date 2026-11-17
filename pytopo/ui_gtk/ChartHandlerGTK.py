@@ -20,7 +20,7 @@ import cairo
 
 import queue
 
-from math import pi, log10
+from math import pi, log10, ceil
 
 from datetime import datetime, timedelta, UTC
 
@@ -35,6 +35,13 @@ GPSTIMEFMT = "%Y-%m-%dT%H:%M:%SZ"
 LEFTMARGIN = 50
 TOPMARGIN = 35
 BOTTOMMARGIN = 60    # Room for date labels
+
+# Text alignment
+ALIGN_LEFT = -1
+ALIGN_RIGHT = 1
+ALIGN_TOP = 1
+ALIGN_BOTTOM = -1
+ALIGN_CENTER = 0
 
 
 class ChartHandlerGTK:
@@ -51,32 +58,21 @@ class ChartHandlerGTK:
     def make_chart(self, indata):
         """Draw a chart with the given data.
            Expects a dictionary that looks something like:
-           { 'chartlabel': 'Elevation',
-             'ylabel': f'elevation ({units})',
-             'data': { '2026-09-21 19:47:56+00:00': 2725.7, ... },
+           {
+             'chartlabel': 'Speed profile',
+             'ylabel': 'Speed',
+             'times': [ datetime, datetime, ... ],
+             'keys': [ 'GPX speed', 'Calculated speed' ],
+             'vals: { 'GPX speed': [ 1.1, 3.4, ...],
+                      'Calculated speed': [ 1.1, 3.4, ...] },
              'type': 'line',
            }
         """
-        # print("Making a new chart of", indata['ylabel'])
 
         # Use the Y label as the key
         chartkey = indata['ylabel']
 
-        self.charts[chartkey] = {}
-
-        self.charts[chartkey]['title'] = indata['chartlabel']
-        self.charts[chartkey]['charttype'] = indata['type']
-
-        # data['data'] is a dict of time: value, both as strings
-        self.charts[chartkey]['times'] = []
-        self.charts[chartkey]['vals'] = []
-        for t in indata['data']:
-            # UTC datetime
-            self.charts[chartkey]['times'].append(
-                datetime.strptime(t, GPSTIMEFMT).replace(
-                tzinfo=UTC
-            ))
-            self.charts[chartkey]['vals'].append(float(indata['data'][t]))
+        self.charts[chartkey] = indata
 
         self.vline = None
 
@@ -85,8 +81,8 @@ class ChartHandlerGTK:
         win = Gtk.Window()
         self.charts[chartkey]['win'] = win
 
-        win.set_name(self.charts[chartkey]['title'])
-        win.set_title(self.charts[chartkey]['title'])
+        win.set_name(self.charts[chartkey]['chartlabel'])
+        win.set_title(self.charts[chartkey]['chartlabel'])
         win.connect("destroy", self.close_window)
         win.set_border_width(5)
 
@@ -163,9 +159,9 @@ class ChartHandlerGTK:
         first_timestamp, secrange = self.get_timestamprange(chartkey)
 
         # Figure out the time corresponding to where the mouse was pressed
-        timestamp = (event.x - LEFTMARGIN) \
-            * secrange / chartwidth + first_timestamp
-        self.chart2mapqueue.put(("click", datetime.fromtimestamp(timestamp, UTC)))
+        timestamp = first_timestamp \
+            + timedelta(seconds=(event.x - LEFTMARGIN) * secrange / chartwidth)
+        self.chart2mapqueue.put(("click", timestamp, UTC))
 
         self.vline = timestamp
 
@@ -181,13 +177,9 @@ class ChartHandlerGTK:
             print("No cached surface")
 
         if self.vline:
-            first_timestamp, ts_range = self.get_timestamprange(chartkey)
-            da_width, da_height, chart_width, chart_height = \
-                self.get_da_and_chart_size(widget)
-            cr.set_source_rgb(1., 0., 0.)
+            cr.set_source_rgb(1., .7, 0.)
             cr.set_line_width(2)
-            x = LEFTMARGIN \
-                + (self.vline - first_timestamp) * chart_width / ts_range
+            x = self.timestamp_to_x(self.vline, chartkey)
             cr.move_to(x, TOPMARGIN)
             cr.line_to(x, widget.get_allocated_height() - BOTTOMMARGIN)
             cr.stroke()
@@ -215,13 +207,21 @@ class ChartHandlerGTK:
                 width - LEFTMARGIN, height - TOPMARGIN - BOTTOMMARGIN)
 
     def get_timestamprange(self, key):
-        """Return first timestamp and range of timestamps (end - start)"""
-        return (self.charts[key]['times'][0].timestamp(),
+        """Return first timestamp and end - start in seconds"""
+        return (self.charts[key]['times'][0],
                 (self.charts[key]['times'][-1]
                  - self.charts[key]['times'][0]).seconds)
 
+    def timestamp_to_x(self, timestamp, chartkey):
+        """Translate a timestamp to an X coordinate in the window"""
+        first_timestamp, ts_range = self.get_timestamprange(chartkey)
+        da_width, da_height, chart_width, chart_height = \
+            self.get_da_and_chart_size(self.charts[chartkey]['drawingarea'])
+        return (LEFTMARGIN
+                + (self.vline - first_timestamp).seconds * chart_width / ts_range)
+
     def draw_chart(self, widget, surface):
-        """Draw a chart of the given type
+        """Draw a chart of the given type.
         """
         # Get the containing GTK window:
         win = widget.get_toplevel()
@@ -230,39 +230,51 @@ class ChartHandlerGTK:
         if not isinstance(win, Gtk.Window):
             print("Eek, win isn't a Gtk.Window")
 
+        cr = cairo.Context(surface)
+        winwidth, winheight, chartwidth, chartheight = \
+            self.get_da_and_chart_size(widget)
+        barwidth = 3
+
         chartkey = win.ylabel
         chart = self.charts[chartkey]
         times = chart['times']
-        vals = chart['vals']
 
-        cr = cairo.Context(surface)
-        width, height, chartwidth, chartheight = \
-            self.get_da_and_chart_size(widget)
-        barwidth = 3
-        if len(vals) * barwidth > width:
-            width = len(vals) * barwidth
-            win.resize(width, width)
+        # Wow, named or HTML-style colors in cairo are a huge PITA!
+        rgba = Gdk.RGBA()
+        COLORS = []
+        # matplotlib’s color-blind-friendly tab10 hex values:
+        # for color in [ '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+        #                '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf' ]:
+        # They're not very contrasty, though. Revisit this issue.
+        for color in [ 'blue', 'red', 'green', 'purple', 'cyan' ]:
+            if rgba.parse(color):
+                COLORS.append((rgba.red, rgba.green, rgba.blue))
 
-        # How many seconds does the chart span?
-        first_timestamp, secrange = self.get_timestamprange(chartkey)
+        # Fill the background
+        cr.set_source_rgb(1., 1., 1.)
+        cr.rectangle(0.0, 0.0, float(winwidth), float(winheight))
+        cr.fill()
 
-        # Get the Y range
-        # Heart rate data is sparse, and 0 obviously isn't a real value.
-        # Throw out any zeros.
-        # But draw the chart from zero assuming there are zeroes.
-        chartmin = min(vals)
-        if chartkey == 'hr':
-            datamin = min([v for v in vals if v])
-        else:
-            datamin = chartmin
-        datamax = max(vals)
+        # Find the min/max of everything being plotted in this chart
+        datamin = 1.e10;
+        datamax = 0.
+        for key in chart['vals'].keys():
+            # Heart rate data is sparse, and 0 obviously isn't a real value.
+            # Throw out any zeros.
+            # But draw the chart from zero.
+            chartmin = min(datamin, min(chart['vals'][key]))
+            if key == 'hr':
+                datamin = min([v for v in chart['vals'][key] if v])
+            else:
+                datamin = chartmin
+            datamax = max(datamax, max(chart['vals'][key]))
 
         def chartx(x):
             return x + LEFTMARGIN
 
         def charttime(t):
             """Convert datetime t to x in the window"""
-            return (LEFTMARGIN + (t.timestamp() - first_timestamp)
+            return (LEFTMARGIN + (t - first_timestamp).seconds
                     * chartwidth / secrange)
 
         def charty(y):
@@ -274,54 +286,65 @@ class ChartHandlerGTK:
             return (chartheight + TOPMARGIN
                     - ((d - chartmin) * chartheight/(datamax-chartmin)))
 
-        # Fill the background
-        cr.set_source_rgb(1., 1., 1.)
-        cr.rectangle(0.0, 0.0, float(width), float(height))
-        cr.fill()
+        for valnum, key in enumerate(chart['vals'].keys()):
+            vals = chart['vals'][key]
+            color = COLORS[valnum]
 
-        if self.charts[chartkey]['charttype'] == 'bar':
-            # Fill the bars
-            cr.set_source_rgb(0., 0., 1.)
-            for i, d in enumerate(vals):
-                barheight = d * (chartheight/datamax)
-                cr.rectangle(charttime(times[i]),
-                             charty(barheight),
-                             # XXX charty works out to
-                             # height - BOTTOMMARGIN - barheight
-                             # as it should, but somehow, there are sometimes
-                             # a few pixesl visible below the bottom of the bar.
-                             # Need to figure out why.
-                             barwidth, barheight)
-                cr.fill()
-        elif self.charts[chartkey]['charttype'] == 'line':
-            cr.set_source_rgba(0., 0., 1., 1.)
-            cr.set_line_width(2)
-            lastx = 0
-            lasty = 0
-            for i, d in enumerate(vals):
-                x = charttime(times[i])
-                y = chartdata(d)
-                if lastx and lasty:
-                    cr.move_to(lastx, lasty)
-                    cr.line_to(x, y)
-                    cr.stroke()
-                lastx = x
-                lasty = y
+            # How many seconds does the chart span?
+            first_timestamp, secrange = self.get_timestamprange(chartkey)
+
+            cr.set_source_rgb(*color)
+
+            if self.charts[chartkey]['charttype'] == 'bar':
+                if len(vals) * barwidth > chartwidth:
+                    if len(vals) < chartwidth:
+                        barwidth = int(chartwidth/vals)
+                    else:
+                        print("Eek, chart isn't wide enough for the full bar graph")
+
+                # Fill the bars
+                cr.set_source_rgb(0., 0., 1.)
+                for i, d in enumerate(vals):
+                    barheight = int(d * (float(chartheight/datamax)))
+                    cr.rectangle(charttime(times[i]),
+                                 charty(barheight),
+                                 # XXX charty works out to
+                                 # height - BOTTOMMARGIN - barheight
+                                 # as it should, but somehow, there are sometimes
+                                 # a few pixels visible below the bottom of the bar.
+                                 # Also chartdata(d) for barheight is too high.
+                                 # Need to figure out why.
+                                 barwidth, barheight)
+                    cr.fill()
+
+            elif self.charts[chartkey]['charttype'] == 'line':
+                cr.set_line_width(2)
+                lastx = 0
+                lasty = 0
+                for i, d in enumerate(vals):
+                    x = charttime(times[i])
+                    y = chartdata(d)
+                    if lastx and lasty:
+                        cr.move_to(lastx, lasty)
+                        cr.line_to(x, y)
+                        cr.stroke()
+                    lastx = x
+                    lasty = y
 
         # Graph title and axis labels
         cr.set_source_rgb(0., 0., 0.)
         cr.set_font_size(15)
 
-        # Title at the top
-        cr.move_to(chartwidth/2, TOPMARGIN/2)
-        cr.show_text(self.charts[chartkey]['title']
-                     + ' (max=%d, min=%d)' % (datamax, datamin))
+        # Title at the top, centered
+        self.show_text(self.charts[chartkey]['chartlabel']
+                       + ' (max=%.2f, min=%.2f)' % (datamax, datamin),
+                       chartwidth/2, TOPMARGIN/2, cr, ALIGN_CENTER, ALIGN_CENTER)
 
         # Date on the bottom
-        cr.move_to(chartx(chartwidth/2) - 50, height - 5)
-        cr.show_text(times[0].strftime("%Y-%m-%d"))
+        self.show_text(times[0].strftime("%Y-%m-%d"),
+                       chartwidth/2, winheight, cr, ALIGN_CENTER, ALIGN_CENTER)
 
-        # Data Y label on the left
+        # Data Y label on the left. self.show_text doesn't handle rotation yet.
         cr.move_to(11, charty(chartheight/2))
         cr.rotate(-pi/2)
         cr.show_text(chartkey)
@@ -345,24 +368,23 @@ class ChartHandlerGTK:
         for i in range(0, round(datamax), round(ystep)):
             if i < chartmin:
                 continue
-            cr.move_to(LEFTMARGIN - 25, chartdata(i) + 7)
-            cr.show_text(str(i))
+            self.show_text(str(i), LEFTMARGIN-3, chartdata(i) + 7, cr,
+                           ALIGN_RIGHT, ALIGN_CENTER)
 
         # Draw horizontal grid lines with vertical spacing of ystep or ystep/2
         if ystep % 2:
-            gridspacing = ystep
+            gridspacing = int(ystep)
         else:
             gridspacing = int(ystep / 2)
         cr.set_source_rgba(0., 0., 0., .5)
         cr.set_line_width(1)
-        for i in range(0, int(datamax), gridspacing):
+        for i in range(0, ceil(datamax), gridspacing):
             if i < chartmin:
                 continue
             cr.move_to(LEFTMARGIN, chartdata(i) + 3)
             cr.line_to(chartx(chartwidth), chartdata(i))
             cr.stroke()
 
-        # Vertical grid for times.
         # How many minutes does it span?
         totmins = (times[-1] - times[0]).seconds // 60
         timestep = roundstep(totmins)
@@ -394,6 +416,72 @@ class ChartHandlerGTK:
             cr.rotate(-ROTATION)
 
             t += timedelta(minutes=timestep)
+
+        if len(chart['vals'].keys()) > 1:
+            LINEHEIGHT = 1.2   # multiplier
+            BOXMARGIN = 8      # pixels
+
+            cr.set_font_size(13)
+            keys = list(chart['vals'].keys())
+            # font_extents gives one consistent height for every line,
+            # unlike text_extents, which varies with the letters (p, d, etc.)
+            ascent, descent, fheight, _, _ = cr.font_extents()
+            lineheight = fheight * LINEHEIGHT
+            maxtwidth = max(cr.text_extents(k).x_advance for k in keys)
+
+            rightedge = winwidth - ascent/2
+            leftedge = rightedge - maxtwidth - BOXMARGIN*2
+            topedge = ascent/2
+            bottomedge = topedge + len(keys) * lineheight + BOXMARGIN
+            bottomedge = topedge + BOXMARGIN*2 \
+                + (len(keys) - 1) * lineheight + ascent
+
+            # Fill
+            cr.set_source_rgb(1, 1, .9)
+            cr.rectangle(leftedge, topedge,
+                         rightedge - leftedge, bottomedge - topedge)
+            cr.fill()
+
+            # Outline (rectangle() makes a closed path, so all 4 sides draw)
+            cr.set_source_rgb(0, 0, 0)
+            cr.set_line_width(3)
+            cr.rectangle(leftedge, topedge,
+                         rightedge - leftedge, bottomedge - topedge)
+            cr.stroke()
+
+            # Labels: y is the baseline, so start at top + padding + ascent
+            for valnum, key in enumerate(keys):
+                cr.set_source_rgb(*COLORS[valnum])
+                self.show_text(key, rightedge - BOXMARGIN,
+                               topedge + BOXMARGIN + valnum * lineheight,
+                               cr, ALIGN_RIGHT, ALIGN_TOP)
+
+    def show_text(self, text, x, y, cr,
+                  halign=ALIGN_LEFT, valign=ALIGN_BOTTOM):
+        # FOR DEBUGGING: draw an X at x, y
+        # CROSSSIZE = 6
+        # cr.set_line_width(1)
+        # cr.move_to(x-CROSSSIZE, y-CROSSSIZE)
+        # cr.line_to(x+CROSSSIZE, y+CROSSSIZE)
+        # cr.move_to(x-CROSSSIZE, y+CROSSSIZE)
+        # cr.line_to(x+CROSSSIZE, y-CROSSSIZE)
+        # cr.stroke()
+
+        xbearing, ybearing, width, height, xadv, yadv = cr.text_extents(text)
+
+        if halign == ALIGN_CENTER:
+            x -= xadv / 2
+        elif halign == ALIGN_RIGHT:
+            x -= xadv
+
+        if valign == ALIGN_TOP:
+            y -= ybearing
+        elif valign == ALIGN_CENTER:
+            y -= ybearing + height / 2
+        # VAlign.BOTTOM: y is already the baseline
+
+        cr.move_to(x, y)
+        cr.show_text(text)
 
     @staticmethod
     def nop(*args):

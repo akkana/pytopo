@@ -5,8 +5,6 @@
 """MapWindowGTK: pytopo's GTK-based window for showing tiled maps.
 """
 
-from __future__ import print_function
-
 import gi
 gi.require_version('Gtk', '3.0')
 gi.require_version('Gdk', '3.0')
@@ -463,7 +461,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
         if self.selected_track is not None:
             halfwin = 0
-            beta = 2
+            beta = 80
             stats = trackstats.statistics(self.trackpoints,
                                           halfwin, beta, self.use_metric,
                                           startpt=self.selected_track,
@@ -2908,6 +2906,9 @@ but if you want to, contact me and I'll help you figure it out.)
         #
 
         active_threads = threading.active_count()
+        active_threads -= 1    # Don't count the main thread
+        if self.chartthread and self.chartthread.is_alive():
+            active_threads -= 1
         if self.controller.Debug:
             print("Attempting to quit")
             print("Active threads:", active_threads)
@@ -2923,8 +2924,13 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # This should depend on the chart thread, but it turns out there
         # can be active threads even if they're not self.chartthread.
-        if active_threads > 1:
-            print("Waiting a little while for", active_threads-1,
+        if active_threads > 0:
+            # print("Threads:")
+            # for thread in threading.enumerate():
+            #     if 'chart_handler' in thread.name:
+            #         active_threads -= 1
+            #     print(thread.name)
+            print("Waiting a little while for", active_threads,
                   "pending download(s) ...")
 
             # GLib.timeout_add doesn't work here, because apparently
@@ -2977,39 +2983,58 @@ but if you want to, contact me and I'll help you figure it out.)
             i += 1
 
         # Build up data dictionaries for the charts we know about.
-        # elevation, heart rate might be in the GPX:
+        # elevation, heart rate might be in the GPX,
+        # speed is available from trackstats.
+        # Data dics [key] look like:
+        # {
+        #   'chartlabel': 'Speed profile',
+        #   'ylabel': 'Speed',
+        #   'times': [ datetime, datetime, ... ],
+        #   'keys': [ 'GPX speed', 'Calculated speed' ],
+        #   'vals: { 'GPX speed': [ 1.1, 3.4, ...],
+        #            'Calculated speed': [ 1.1, 3.4, ...] },
+        #   'type': 'line',
+        # }
         datadics = {}
+        times = []
         while True:
             try:
                 pt = self.trackpoints.points[i]
                 if not isinstance(self.trackpoints.points[i], GeoPoint):
                     break
+                times.append(datetime.fromisoformat(pt.timestamp))
                 if pt.ele:
                     if 'elevation' not in datadics:
                         if self.use_metric:
                             units = 'meters'
                         else:
                             units = 'feet'
-                        datadics['elevation'] = { 'chartlabel': 'Elevation',
-                                                  'ylabel':
-                                                    f'elevation ({units})',
-                                                  'data': {},
-                                                  'type': 'line',
-                                                 }
+                        datadics['elevation'] = {
+                            'chartlabel': 'Elevation',
+                            'ylabel': f'elevation ({units})',
+                            'charttype': 'line',
+                            'vals': { 'elevation': [] },
+                        }
                     if self.use_metric:
                         val = float(pt.ele)
                     else:
                         val = float(pt.ele) * 3.2808399
-                    datadics['elevation']['data'][pt.timestamp] = val
-
+                    try:
+                        datadics['elevation']['vals']['elevation'].append(val)
+                    except Exception as e:
+                        print("Exception!", e)
                 if 'hr' in pt.extensions:
                     if 'hr' not in datadics:
                         datadics['hr'] = { 'chartlabel': 'Heart Rate',
                                            'ylabel': 'hr',
                                            'data': {},
-                                           'type': 'bar',
+                                           'charttype': 'bar',
+                                           'times': [],
+                                           'vals': { 'hr': [] },
                                           }
-                    datadics['hr']['data'][pt.timestamp] = pt.extensions['hr']
+                    datadics['hr']['times'].append(times[-1])
+                    datadics['hr']['vals']['hr'].append(
+                        float(pt.extensions['hr']))
 
             except IndexError:    # done with the list
                 break
@@ -3017,8 +3042,48 @@ but if you want to, contact me and I'll help you figure it out.)
                 # print("Exception", e)
                 pass
 
-            i += 1
+            i += 1    # Next trackpoint
 
+        # Now we have all the times too.
+        # Don't use them for the next section, though; separate data files
+        # may have their own list of times.
+        datadics['elevation']['times'] = times
+
+        # Speeds, from trackstats.
+        stats = trackstats.statistics(self.trackpoints,
+                                      0, 80, self.use_metric,
+                                      startpt=self.selected_track,
+                                      onetrack=True)
+        if 'Calculated Speeds' in stats or 'GPS Speeds' in stats:
+            datadics['Speed'] = {
+                'chartlabel': 'Speed',
+                'ylabel': 'speed',
+                'times': times,
+                'vals': {},
+                'charttype': 'line'
+            }
+            if 'Calculated Speeds' in stats:
+                datadics['Speed']['vals']['Calculated Speeds'] = \
+                    stats['Calculated Speeds']
+            if 'GPS Speeds' in stats:
+                datadics['Speed']['vals']['GPS Speeds'] = \
+                    stats['GPS Speeds']
+        if 'Calculated Speeds (raw)' in stats:
+            datadics['Raw Speed'] = {
+                'chartlabel': 'Raw Speed',
+                'ylabel': 'raw speed',
+                'times': times,
+                'vals': {},
+                'charttype': 'line'
+            }
+            if 'Calculated Speeds (raw)' in stats:
+                datadics['Raw Speed']['vals']['Calculated Speeds (raw)'] = \
+                    stats['Calculated Speeds (raw)']
+            if 'GPS Speeds (raw)' in stats:
+                datadics['Raw Speed']['vals']['GPS Speeds (raw)'] = \
+                    stats['GPS Speeds (raw)']
+
+        '''
         # Does this track have an associated data file?
         datafile = self.trackpoints.points[near_track+1]
         if isinstance(datafile, Path) and datafile.suffix.lower() == '.csv':
@@ -3054,8 +3119,10 @@ but if you want to, contact me and I'll help you figure it out.)
                             datadics[field]['data'][ts] = val
                         else:
                             datadics[field]['data'][ts] = row[field]
+        '''
 
         if not datadics:
+            print("no datadics")
             return
 
         # Set up a queue the child can use to communicate
@@ -3081,7 +3148,7 @@ but if you want to, contact me and I'll help you figure it out.)
         """Listen for messages from a chart window. Upon seeing one,
            show the nearest trackpoint in the map window.
         """
-        if not self.chartthread.is_alive():
+        if not self.chartthread or not self.chartthread.is_alive():
             self.chartthread = None
             return False
 

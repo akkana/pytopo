@@ -17,7 +17,8 @@ import datetime
 import sys, os
 
 try:
-    import numpy
+    import numpy as np
+    from numpy.lib.stride_tricks import sliding_window_view
 except ImportError:
     pass
 
@@ -53,7 +54,7 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     eles = []
     sparse_eles = []
     distances = []
-    speeds = []
+    gpxspeeds = []
     calcspeeds = []
 
     missing_times = False
@@ -70,8 +71,6 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     moving_time = datetime.timedelta(0)
     stopped_time = datetime.timedelta(0)
     tot_time = datetime.timedelta(0)
-
-    max_speed = 0
 
     def accumulate_climb(ele):
         global total_climb, this_climb, this_climb_start, lastele
@@ -141,6 +140,7 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         # If there's a GPS speed recorded, use that and the
         # time interval for distance calculations,
         # but also try calculating the speed, to see how close they are.
+        # Sometimes they're way off.
         dist = 0
         calcdist = MapUtils.haversine_distance(lat, lon,
                                                lastlat, lastlon, metric)
@@ -149,6 +149,23 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
             calcspeeds.append(calcspeed)
         else:
             calcspeeds.append(0)
+
+        '''
+        XXX
+        A maybe better way of estimating speed from positions:
+def speed_from_positions(t, lat, lon, k=2):
+    """Central-difference speed over points i-k..i+k. t in seconds (float array)."""
+    R = 3958.8  # miles; use 6371.0 for km
+    lat_r, lon_r = np.radians(lat), np.radians(lon)
+    i0 = np.clip(np.arange(len(t)) - k, 0, len(t) - 1)
+    i1 = np.clip(np.arange(len(t)) + k, 0, len(t) - 1)
+    dlat = lat_r[i1] - lat_r[i0]
+    dlon = lon_r[i1] - lon_r[i0]
+    a = np.sin(dlat/2)**2 + np.cos(lat_r[i0]) * np.cos(lat_r[i1]) * np.sin(dlon/2)**2
+    dist = 2 * R * np.arcsin(np.sqrt(a))
+    dt = t[i1] - t[i0]
+    return np.where(dt > 0, dist / dt * 3600, np.nan)  # mi/hr
+        '''
 
         if pt.speed:
             speed = float(pt.speed)    # in m/s
@@ -161,15 +178,22 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
                 speed *= 2.2369363
                 # dist /= 1609.344
 
-            # print("Speed %.2f calculated, %.2f in GPX" % (calcspeed, speed))
+            # print("Speed %.2f calculated (%.2f/%.2f sec), %.2f in GPX"
+            #       % (calcspeed, calcdist, delta_t.total_seconds(), speed))
+
+            gpxspeeds.append(speed)
 
             if delta_t:
                 # speed is in mi/hr or km/hr, so convert from seconds
                 dist = speed * delta_t.seconds/3600
 
-            max_speed = max(max_speed, speed)
-
         else:
+            # It looks like places where the GPX speed disappears are mostly
+            # places where the speed went to zero or near-zero; at least,
+            # they coincide with places where the calculated speed is zero.
+            # If that turns out not to be true, maybe use np.nan
+            # though that will require changes in algorithms like hampel_despike.
+            gpxspeeds.append(0)
             dist = calcdist
             if delta_t:
                 speed = calcspeed   # miles (or km) / hr
@@ -178,8 +202,6 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
 
         if not dist:
             dist = calcdist
-
-        speeds.append(speed)
 
         if delta_t:
             if speed > SPEED_THRESHOLD:
@@ -214,10 +236,10 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         #       total_dist / len(eles))
         halfwin = 15
 
-    # Smoothing eles will fail if there are no eles.
+    # Smoothing eles will fail if there are no eles or if numpy isn't there.
     try:
         smoothed_eles = smooth(eles, halfwin, beta)
-    except TypeError:
+    except (TypeError, NameError):
         smoothed_eles = []
 
     # if missing_times:
@@ -231,7 +253,6 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     if tot_time:
         out['Total time'] = tot_time
     out['Total distance'] = total_dist
-    out['Max speed'] = max_speed
     if len(eles):
         out['Raw total climb'] = total_climb
 
@@ -257,10 +278,49 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         out['Elevations'] = eles
         if smoothed_eles is not None and len(smoothed_eles):
             out['Smoothed elevations'] = smoothed_eles
-    if sum(speeds):
-        out['Speeds'] = speeds
+
+    if sum(gpxspeeds):
+        try:
+            out['GPS Speeds'], mask = hampel_despike(gpxspeeds)
+            out['Max speed'] = max(out['GPS Speeds'])
+        except NameError:
+            # Will print an error later when failing to despike calc speeds
+            pass
+    else:
+        print("No GPX speeds")
+
     if sum(calcspeeds):
-        out['Calculated Speeds'] = calcspeeds
+        # Calculated speeds need to be smoothed: they're prone to
+        # outlandish spikes.
+        # A halfwin of 1 gives a much closer fit to the GPX data
+        # than the 15 used for elevation,
+        # though it makes the smoothed calcspeeds lag significantly
+        # behind the GPX speeds. Beta doesn't seem to make much difference,
+        # at least between 1 and 50.
+        try:
+            out['Calculated Speeds'], mask = hampel_despike(calcspeeds)
+            good = ~mask
+            out['Calculated Speeds'] = np.interp(
+                np.arange(len(out['Calculated Speeds'])),
+                np.flatnonzero(good), out['Calculated Speeds'][good])
+        except:
+            print("Couldn't despike speed data, maybe numpy is missing?",
+                  file=sys.stderr)
+
+        # Save the raw, non-despiked speeds too
+        out['Calculated Speeds (raw)'] = calcspeeds
+        out['GPS Speeds (raw)'] = gpxspeeds
+
+        # Only set the max speed to a calculated value if there
+        # were no GPX speeds
+        if 'Max speed' not in out:
+            try:
+                out['Max speed'] = max(out['Calculated Speeds'])
+            except KeyError:
+                try:
+                    out['Max speed'] = max(out['Calculated Speeds (raw)'])
+                except:
+                    pass
 
     return out
 
@@ -349,18 +409,34 @@ def plot_hr(points):
 
 def smooth(vals, halfwin, beta):
     """ Kaiser window smoothing."""
-
-    # Smoothing requires numpy
-    if 'numpy' not in sys.modules:
-        return None
-
     window_len = 2 * halfwin + 1
     # extending the data at beginning and at the end
     # to apply the window at the borders
-    s = numpy.r_[vals[window_len-1:0:-1], vals, vals[-1:-window_len:-1]]
-    w = numpy.kaiser(window_len, beta)
-    smoothed = numpy.convolve(w/w.sum(), s, mode='valid')
+    s = np.r_[vals[window_len-1:0:-1], vals, vals[-1:-window_len:-1]]
+    w = np.kaiser(window_len, beta)
+    smoothed = np.convolve(w/w.sum(), s, mode='valid')
     return smoothed[halfwin:len(smoothed) - halfwin]
+
+
+def hampel_despike(x, half_window=3, n_sigmas=3.0, min_dev=0.0):
+    """Replace spikes with the local median; leave everything else untouched.
+
+       x            : 1-D array of speeds
+       half_window  : neighbors on each side (window = 2*half_window + 1)
+       n_sigmas     : threshold in robust standard deviations
+       min_dev      : absolute floor on the threshold (same units as x)
+       Returns (cleaned, mask_of_replaced_points)
+    """
+    x = np.asarray(x, dtype=float)
+    w = 2 * half_window + 1
+    padded = np.pad(x, half_window, mode='reflect')
+    win = sliding_window_view(padded, w)
+    med = np.median(win, axis=1)
+    mad = 1.4826 * np.median(np.abs(win - med[:, None]), axis=1)
+    thresh = np.maximum(n_sigmas * mad, min_dev)
+    mask = np.abs(x - med) > thresh
+    return np.where(mask, med, x), mask
+
 
 #
 # main() to gather stats from a file passed in on the commandline.
@@ -426,8 +502,8 @@ def parse_trackstat_args(cmdlineargs):
     parser.add_argument('-m', action="store_true", default=False,
                         dest="metric",
                         help='Use metric rather than US units')
-    parser.add_argument('-b', action="store", default=2, dest="beta", type=int,
-                        help='Kaiser window smoothing beta parameter (default: 2)')
+    parser.add_argument('-b', action="store", default=80, dest="beta", type=int,
+                        help='Kaiser window smoothing beta parameter (default: 80)')
     parser.add_argument('-w', action="store", default=0, dest="halfwin",
                         type=int,
                         help='Kaiser window smoothing halfwidth parameter '
