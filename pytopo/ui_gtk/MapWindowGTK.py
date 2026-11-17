@@ -3001,7 +3001,8 @@ but if you want to, contact me and I'll help you figure it out.)
             try:
                 pt = self.trackpoints.points[i]
                 if not isinstance(self.trackpoints.points[i], GeoPoint):
-                    break
+                    i += 1    # Next trackpoint
+                    continue
                 times.append(datetime.fromisoformat(pt.timestamp))
                 if pt.ele:
                     if 'elevation' not in datadics:
@@ -3029,6 +3030,7 @@ but if you want to, contact me and I'll help you figure it out.)
                                            'ylabel': 'hr',
                                            'data': {},
                                            'charttype': 'bar',
+                                           # hr has its own sparse times
                                            'times': [],
                                            'vals': { 'hr': [] },
                                           }
@@ -3045,9 +3047,11 @@ but if you want to, contact me and I'll help you figure it out.)
             i += 1    # Next trackpoint
 
         # Now we have all the times too.
-        # Don't use them for the next section, though; separate data files
-        # may have their own list of times.
-        datadics['elevation']['times'] = times
+        if 'elevation' in datadics:
+            datadics['elevation']['times'] = times
+
+        # Don't use these times for the next section, though; separate data files
+        # may have their own list of times separate from the ones in the GPX.
 
         # Speeds, from trackstats.
         stats = trackstats.statistics(self.trackpoints,
@@ -3083,43 +3087,64 @@ but if you want to, contact me and I'll help you figure it out.)
                 datadics['Raw Speed']['vals']['GPS Speeds (raw)'] = \
                     stats['GPS Speeds (raw)']
 
-        '''
         # Does this track have an associated data file?
         datafile = self.trackpoints.points[near_track+1]
         if isinstance(datafile, Path) and datafile.suffix.lower() == '.csv':
             if 'csv' not in sys.modules:
                 import csv
 
-            SPECIALIZED_FIELDS = [ 'gps elevation', 'power', 'cadence' ]
+            SPECIALIZED_FIELDS = [ 'gps elevation',
+                                   # 'enhanced_altitude', 'smoothed elevation',
+                                   # 'speed',
+                                   'cadence',
+                                   # 'power',
+                                   'motor_power',
+                                   'grade',
+                                 ]
             # also: gps elevation OR enhanced_altitude OR smoothed_elevation,
             #       cadence, power, motor_power, ebike_assist_mode, grade
+            times = []
+            csvfields = []
             with datafile.open() as csvfp:
                 reader = csv.DictReader(csvfp)
                 for row in reader:
                     if 'timestamp' not in row:
                         print("No timestamp in data!", file=sys.stderr)
                         break
+                    times.append(datetime.fromisoformat(row['timestamp']))
                     for field in SPECIALIZED_FIELDS:
+                        if 'elevation' in field:
+                            datafield = 'elevation'
+                        else:
+                            datafield = field
                         if field not in row:
                             continue
-                        if not row[field]:
-                            continue
-                        if field not in datadics:
-                            datadics[field] = { 'chartlabel': field,
-                                                'ylabel': field,
-                                                'data': {},
-                                                'type': 'line',
-                                              }
-                        ts = row['timestamp']
+                        if datafield not in datadics:
+                            datadics[datafield] = { 'chartlabel': field,
+                                                    'ylabel': field,
+                                                    'vals': { datafield: [] },
+                                                    'charttype': 'line',
+                                                   }
+                            csvfields.append(datafield)
                         if 'elevation' in field:
-                            if self.use_metric:
+                            if not row[field]:
+                                val = 0.
+                            elif self.use_metric:
                                 val = float(row[field])
                             else:
                                 val = float(row[field]) * 3.2808399
-                            datadics[field]['data'][ts] = val
+                                datadics['elevation']['vals']['elevation'].append(
+                                    val)
+                        elif not row[field]:
+                            datadics[datafield]['vals'][datafield].append(0)
+                                # or nan
                         else:
-                            datadics[field]['data'][ts] = row[field]
-        '''
+                            datadics[datafield]['vals'][field].append(
+                                float(row[field]))
+
+            # All the times have been collected. Add them to each dataset.
+            for field in csvfields:
+                datadics[field]['times'] = times
 
         if not datadics:
             print("no datadics")

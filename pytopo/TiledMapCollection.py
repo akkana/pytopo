@@ -500,7 +500,10 @@ TiledMapCollection classes must implement:
             self.last_failed_download_time = time.time()
             self.failed_download_urls[response.url] = \
                 self.last_failed_download_time
-            self.urls_queued.remove(response.url)
+            try:
+                self.urls_queued.remove(response.url)
+            except ValueError:
+                pass
 
             if self.mapwin.exiting:
                 print("Map window is exiting! Clearing downloads after failure")

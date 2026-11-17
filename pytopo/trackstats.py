@@ -24,7 +24,7 @@ except ImportError:
 
 from pytopo import MapUtils, __version__
 
-from pytopo.TrackPoints import TrackPoints
+from pytopo.TrackPoints import TrackPoints, GeoPoint
 
 
 CLIMB_THRESHOLD = 8
@@ -100,6 +100,8 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
                 break
             else:
                 continue
+        if not isinstance(pt, GeoPoint):
+            continue
 
         lat, lon, ele, t = pt.lat, pt.lon, pt.ele, pt.timestamp
 
