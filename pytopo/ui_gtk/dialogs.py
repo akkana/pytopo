@@ -30,20 +30,20 @@ def prompt(prompt, comment="", name="", show_delete=False):
 
         prompt_dialog_prompt = Gtk.Label(prompt)
         prompt_dialog.vbox.pack_start(prompt_dialog_prompt,
-                                           False, True, 0)
+                                      False, True, 0)
 
         prompt_dialog_del_btn = Gtk.ToggleButton("Delete")
         prompt_dialog.vbox.pack_start(prompt_dialog_del_btn,
-                                           False, True, 0)
+                                      False, True, 0)
 
         prompt_dialog_text = Gtk.Entry()
         prompt_dialog_text.set_activates_default(True)
         prompt_dialog.vbox.pack_start(prompt_dialog_text,
-                                           True, True, 0)
+                                      True, True, 0)
 
         prompt_dialog_comment = Gtk.Label("")
         prompt_dialog.vbox.pack_start(prompt_dialog_comment,
-                                           False, True, 0)
+                                      False, True, 0)
 
         prompt_dialog.show_all()
 
@@ -318,6 +318,35 @@ def prompt_for_file(title=None, filter_name=None, filter_exts=None):
     infile = dialog.get_filename()
     dialog.destroy()
     return infile
+
+
+def chart_chooser_dialog(keys_available):
+    """Let the user choose which charts they want to see.
+       Return keys_chosen.
+    """
+    dialog = Gtk.Dialog("Choose a starting point",
+                        transient_for=None, flags=0)
+    dialog.add_buttons(Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL,
+                       Gtk.STOCK_OK, Gtk.ResponseType.OK)
+
+    dialog.vbox.pack_start(Gtk.Label("Show charts:"), False, True, 0)
+    buttons = []
+    for key in keys_available:
+        buttons.append(Gtk.CheckButton(label=key))
+        dialog.vbox.pack_start(buttons[-1], False, True, 0)
+    dialog.show_all()
+
+    response = dialog.run()
+    ret = []
+    if response == Gtk.ResponseType.OK:
+        for button in buttons:
+            if button.get_active():
+                ret.append(button.get_label())
+    else:
+        ret = None
+
+    dialog.destroy()
+    return ret
 
 
 if __name__ == '__main__':

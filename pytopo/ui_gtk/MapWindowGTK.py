@@ -22,7 +22,8 @@ from pytopo.MapWindow import MapWindow
 from pytopo.TrackPoints import TrackPoints, GeoPoint, NULL_WP_NAME
 from pytopo import trackstats
 
-from .dialogs import prompt, known_site_chooser, prompt_for_file, ignorecasefilter
+from .dialogs import prompt, known_site_chooser, prompt_for_file, \
+    chart_chooser_dialog, ignorecasefilter
 from .ChartHandlerGTK import start_chart_handler
 
 try:
@@ -2843,6 +2844,10 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # Now give the user a choice of what data they want to see
         # for key in datadics:
+        chosen_keys = chart_chooser_dialog(datadics.keys())
+        delkeys = set(datadics.keys()) - set(chosen_keys)
+        for key in delkeys:
+            del datadics[key]
 
         # Set up a queue the child can use to communicate
         if not self.map2chartqueue:
