@@ -37,7 +37,6 @@ import re
 
 from datetime import datetime, timezone
 import json
-from pathlib import Path
 
 import subprocess
 import threading
@@ -2670,173 +2669,12 @@ but if you want to, contact me and I'll help you figure it out.)
         if near_track is None:
             print("Which track?", file=sys.stderr)
             return
-        i = near_track
-        if not isinstance(self.trackpoints.points[i], GeoPoint):
-            i += 1
 
-        # Build up data dictionaries for the charts we know about.
-        # elevation, heart rate might be in the GPX,
-        # speed is available from trackstats.
-        # Data dics [key] look like:
-        # {
-        #   'chartlabel': 'Speed profile',
-        #   'ylabel': 'Speed',
-        #   'times': [ datetime, datetime, ... ],
-        #   'keys': [ 'GPX speed', 'Calculated speed' ],
-        #   'vals: { 'GPX speed': [ 1.1, 3.4, ...],
-        #            'Calculated speed': [ 1.1, 3.4, ...] },
-        #   'type': 'line',
-        # }
-        datadics = {}
-        times = []
-        while True:
-            try:
-                pt = self.trackpoints.points[i]
-                if not isinstance(self.trackpoints.points[i], GeoPoint):
-                    i += 1    # Next trackpoint
-                    continue
-                times.append(datetime.fromisoformat(pt.timestamp))
-                if pt.ele:
-                    if 'elevation' not in datadics:
-                        if self.use_metric:
-                            units = 'meters'
-                        else:
-                            units = 'feet'
-                        datadics['elevation'] = {
-                            'chartlabel': 'Elevation',
-                            'ylabel': f'elevation ({units})',
-                            'charttype': 'line',
-                            'vals': { 'elevation': [] },
-                        }
-                    if self.use_metric:
-                        val = float(pt.ele)
-                    else:
-                        val = float(pt.ele) * 3.2808399
-                    try:
-                        datadics['elevation']['vals']['elevation'].append(val)
-                    except Exception as e:
-                        print("Exception!", e)
-                if 'hr' in pt.extensions:
-                    if 'hr' not in datadics:
-                        datadics['hr'] = { 'chartlabel': 'Heart Rate',
-                                           'ylabel': 'hr',
-                                           'data': {},
-                                           'charttype': 'bar',
-                                           # hr has its own sparse times
-                                           'times': [],
-                                           'vals': { 'hr': [] },
-                                          }
-                    datadics['hr']['times'].append(times[-1])
-                    datadics['hr']['vals']['hr'].append(
-                        float(pt.extensions['hr']))
+        if not isinstance(self.trackpoints.points[near_track], GeoPoint):
+            near_track += 1
 
-            except IndexError:    # done with the list
-                break
-            except Exception as e:
-                # print("Exception", e)
-                pass
-
-            i += 1    # Next trackpoint
-
-        # Now we have all the times too.
-        if 'elevation' in datadics:
-            datadics['elevation']['times'] = times
-
-        # Don't use these times for the next section, though; separate data files
-        # may have their own list of times separate from the ones in the GPX.
-
-        # Speeds, from trackstats.
-        stats = trackstats.statistics(self.trackpoints,
-                                      0, 80, self.use_metric,
-                                      startpt=self.selected_track,
-                                      onetrack=True)
-        if 'Calculated Speeds' in stats or 'GPS Speeds' in stats:
-            datadics['Speed'] = {
-                'chartlabel': 'Speed',
-                'ylabel': 'speed',
-                'times': times,
-                'vals': {},
-                'charttype': 'line'
-            }
-            if 'Calculated Speeds' in stats:
-                datadics['Speed']['vals']['Calculated Speeds'] = \
-                    stats['Calculated Speeds']
-            if 'GPS Speeds' in stats:
-                datadics['Speed']['vals']['GPS Speeds'] = \
-                    stats['GPS Speeds']
-        if 'Calculated Speeds (raw)' in stats:
-            datadics['Raw Speed'] = {
-                'chartlabel': 'Raw Speed',
-                'ylabel': 'raw speed',
-                'times': times,
-                'vals': {},
-                'charttype': 'line'
-            }
-            if 'Calculated Speeds (raw)' in stats:
-                datadics['Raw Speed']['vals']['Calculated Speeds (raw)'] = \
-                    stats['Calculated Speeds (raw)']
-            if 'GPS Speeds (raw)' in stats:
-                datadics['Raw Speed']['vals']['GPS Speeds (raw)'] = \
-                    stats['GPS Speeds (raw)']
-
-        # Does this track have an associated data file?
-        datafile = self.trackpoints.points[near_track+1]
-        if isinstance(datafile, Path) and datafile.suffix.lower() == '.csv':
-            if 'csv' not in sys.modules:
-                import csv
-
-            SPECIALIZED_FIELDS = [ 'gps elevation',
-                                   # 'enhanced_altitude', 'smoothed elevation',
-                                   # 'speed',
-                                   'cadence',
-                                   # 'power',
-                                   'motor_power',
-                                   'grade',
-                                 ]
-            # also: gps elevation OR enhanced_altitude OR smoothed_elevation,
-            #       cadence, power, motor_power, ebike_assist_mode, grade
-            times = []
-            csvfields = []
-            with datafile.open() as csvfp:
-                reader = csv.DictReader(csvfp)
-                for row in reader:
-                    if 'timestamp' not in row:
-                        print("No timestamp in data!", file=sys.stderr)
-                        break
-                    times.append(datetime.fromisoformat(row['timestamp']))
-                    for field in SPECIALIZED_FIELDS:
-                        if 'elevation' in field:
-                            datafield = 'elevation'
-                        else:
-                            datafield = field
-                        if field not in row:
-                            continue
-                        if datafield not in datadics:
-                            datadics[datafield] = { 'chartlabel': field,
-                                                    'ylabel': field,
-                                                    'vals': { datafield: [] },
-                                                    'charttype': 'line',
-                                                   }
-                            csvfields.append(datafield)
-                        if 'elevation' in field:
-                            if not row[field]:
-                                val = 0.
-                            elif self.use_metric:
-                                val = float(row[field])
-                            else:
-                                val = float(row[field]) * 3.2808399
-                                datadics['elevation']['vals']['elevation'].append(
-                                    val)
-                        elif not row[field]:
-                            datadics[datafield]['vals'][datafield].append(0)
-                                # or nan
-                        else:
-                            datadics[datafield]['vals'][field].append(
-                                float(row[field]))
-
-            # All the times have been collected. Add them to each dataset.
-            for field in csvfields:
-                datadics[field]['times'] = times
+        datadics = trackstats.collect_stats(self.trackpoints, near_track,
+                                            self.use_metric)
 
         if not datadics:
             print("no datadics")
@@ -2845,6 +2683,8 @@ but if you want to, contact me and I'll help you figure it out.)
         # Now give the user a choice of what data they want to see
         # for key in datadics:
         chosen_keys = chart_chooser_dialog(datadics.keys())
+        if not chosen_keys:
+            return
         delkeys = set(datadics.keys()) - set(chosen_keys)
         for key in delkeys:
             del datadics[key]

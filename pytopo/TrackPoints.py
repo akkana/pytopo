@@ -192,8 +192,9 @@ class BoundingBox(object):
 
 class TrackPoints(object):
 
-    """Parsing and handling of GPS track files.
-       Supports GPX, KML, KMZ and GeoJSON.
+    """A list of trackpoints and waypoints.
+       Includes parsing and handling of GPS track files:
+       supports GPX, KML, KMZ and GeoJSON.
        A TrackPoints object can include a track (points[]),
        a list of waypoints, and a list of polygons.
        A MapWindow will have one TrackPoints object.
