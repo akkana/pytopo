@@ -1,3 +1,7 @@
+2026-11-17  Akkana Peck <akkana@shallowsky.com>
+	Plot raw and despiked speeds in the charts for track.
+	Also enable some a few new values for CSV files from Specialized fit.
+
 2026-11-14  Akkana Peck <akkana@shallowsky.com>
 	Include max speed, total time and start/end time for tracks
 	in the trackstats, and include max speed in the UI display.

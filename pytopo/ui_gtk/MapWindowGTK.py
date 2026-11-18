@@ -21,6 +21,8 @@ from pytopo import MapUtils
 from pytopo.MapWindow import MapWindow
 from pytopo.TrackPoints import TrackPoints, GeoPoint, NULL_WP_NAME
 from pytopo import trackstats
+
+from .dialogs import prompt, known_site_chooser, prompt_for_file, ignorecasefilter
 from .ChartHandlerGTK import start_chart_handler
 
 try:
@@ -151,9 +153,6 @@ but if you want to, contact me and I'll help you figure it out.)
         self.win_width = 0
         self.win_height = 0
 
-        self.prompt_dialog = None
-        self.traildialog = None
-
         # Following a GPS device? Not until one is set.
         self.gps_poller = None
         self.last_gpsd = None
@@ -268,7 +267,7 @@ but if you want to, contact me and I'll help you figure it out.)
 
         # Remember the last folder used in GTK file chooser dialogs,
         # separately for reading and saving.
-        self.file_read_folder = None
+        # Should eventually move to dialogs.py.
         self.file_save_folder = None
 
         self.draw_functions = []
@@ -663,49 +662,6 @@ but if you want to, contact me and I'll help you figure it out.)
 
         if not trackindex:
             return
-
-        # Does the selected track have attributes? If so, pop up a dialog.
-        attrs = self.trackpoints.attributes(trackindex)
-        if not attrs:
-            return
-
-        # Pop up a dialog showing attributes.
-        attrstr = '\n'.join(["%s: %s" % (key, attrs[key]) for key in attrs])
-        self.show_traildialog(attrstr)
-
-    def show_traildialog(self, attrstr):
-        """Show a dialog giving information about a selected track."""
-        trailname = self.trackpoints.points[self.selected_track]
-        if not self.traildialog:
-            self.traildialog = Gtk.Dialog(trailname,
-                                          None, 0,
-                                          (Gtk.STOCK_CLOSE,
-                                           Gtk.ResponseType.CANCEL))
-            self.traildialog.set_size_request(400, 300)
-
-            sw = Gtk.ScrolledWindow()
-            sw.set_shadow_type(Gtk.SHADOW_ETCHED_IN)
-            sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-
-            textview = Gtk.TextView()
-            self.attributes_textbuffer = textview.get_buffer()
-            sw.add(textview)
-            sw.show()
-            textview.show()
-            self.traildialog.vbox.pack_start(sw, True, True, 0)
-            self.traildialog.connect("response", self.hide_traildialog)
-
-        else:
-            self.traildialog.set_title(trailname)
-
-        self.attributes_textbuffer.set_text("== %s ==\n%s" % (trailname,
-                                                              attrstr))
-
-        self.traildialog.show_all()
-
-    def hide_traildialog(self, d, responseid=None):
-        """Hide the track dialog"""
-        d.hide()
 
     def draw_trackpoints(self):
         """Draw any trackpoints that are currently visible."""
@@ -1400,225 +1356,27 @@ but if you want to, contact me and I'll help you figure it out.)
         """Show a window that lets the user choose a known starting point.
            Returns True if the user chose a valid site, otherwise False.
         """
-        dialog = Gtk.Dialog("Choose a starting point",
-                            transient_for=None, flags=0)
-        dialog.add_buttons(Gtk.STOCK_CLOSE, Gtk.ResponseType.CANCEL,
-                           Gtk.STOCK_OK, Gtk.ResponseType.OK)
-
-        # dialog.connect('destroy', lambda win: Gtk.main_quit())
-        # Wouldn't it be nice if GTK dialogs would automatically
-        # size to their contents? Sigh. Without this, the dialog
-        # is wide enough for the text box but includes none of the
-        # site list in the scrolled window below it.
-        dialog.set_size_request(600, 400)
-
-        sw = Gtk.ScrolledWindow()
-        sw.set_shadow_type(Gtk.ShadowType.ETCHED_IN)
-        sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-
-        svbox = Gtk.VBox(spacing=10)
-
-        hbox = Gtk.HBox(spacing=6)
-        svbox.pack_start(hbox, False, True, 0)
-
-        hbox.pack_start(Gtk.Label(label="Coordinates:"), False, True, 0)
-
-        # An entry to enter specific coordinates
-        coord_entry = Gtk.Entry()
-        coord_entry.set_width_chars(45)
-        coord_entry.set_activates_default(True)
-        hbox.pack_start(coord_entry, False, True, 0)
-        dialog.coord_entry = coord_entry
-
-        # make OK button the default, so Enter in the entry will trigger OK
-        okButton = dialog.get_widget_for_response(
-            response_id=Gtk.ResponseType.OK)
-        okButton.set_can_default(True)
-        okButton.grab_default()
-
-        # List store will hold name, collection-name and site object
-        store = Gtk.ListStore(str, str, object)
-
-        # Create the list
-        for site in self.controller.KnownSites:
-            if len(site) > 3:
-                coll = site[3]
-            else:
-                coll = ''
-            store.append([site[0], coll, site])
-
-        # http://pyGtk.org/pyGtk2tutorial/ch-TreeViewWidget.html
-        # Make a treeview from the list:
-        treeview = Gtk.TreeView(model=store)
-
-        renderer = Gtk.CellRendererText()
-        column = Gtk.TreeViewColumn("Location", renderer, text=0)
-        # column.pack_start(renderer, True, True, True, 0)
-        # column.set_resizable(True)
-        treeview.append_column(column)
-        renderer = Gtk.CellRendererText()
-        column = Gtk.TreeViewColumn("Collection", renderer, text=1)
-        # column.pack_start(renderer, False, True, 0)
-        treeview.append_column(column)
-
-        # store.set_sort_column_id(0, Gtk.SORT_ASCENDING)
-
-        # Catch middle-mouse pastes over the treeview
-        treeview.connect("button-release-event", self.accept_paste)
-
-        sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
-        svbox.pack_start(treeview, True, True, 0)
-        # sw.add(treeview)
-
-        sw.add(svbox)
-
-        def submit(self, value, widget):
-            # Tell the dialog to give an OK response
-            dialog.response(Gtk.ResponseType.OK)
-
-        treeview.connect("row-activated", submit)
-        # treeview.connect("key-pressed", submit)
-
-        dialog.vbox.pack_start(sw, True, True, 0)
-
-        dialog.show_all()
-
-        while True:
-            response = dialog.run()
-            if response == Gtk.ResponseType.OK:
-                coordtext = coord_entry.get_text()
-                if coordtext:
-                    try:
-                        lat, lon = MapUtils.parse_full_coords(
-                            coord_entry.get_text())
-                        self.controller.use_coordinates(lat, lon, self)
-                    except Exception as e:
-                        print("Oops", e)
-                        continue
-                    dialog.destroy()
-                    return True
-
-                selection = treeview.get_selection()
-                model, it = selection.get_selected()
-                if it:
-                    # locname = store.get_value(it, 0)
-                    # collname = store.get_value(it, 1)
-                    site = store.get_value(it, 2)
-                    self.controller.use_site(site, self)
-                    dialog.destroy()
-                    return True
-            else:
-                dialog.destroy()
-                return False
-
-
-    def accept_paste(self, widget, event):
-        """Handle middlemouse pastes over the site selection dialog.
-           Ideally this would actually submit the dialog and open up
-           the MapWindow.
-        """
-        if event.button != 2:
-            return False
-
-        dialog = widget.get_toplevel()
-
-        # clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
-        selection = Gtk.Clipboard.get(Gdk.SELECTION_PRIMARY)
-        coordstr = selection.wait_for_text()
-
-        dialog.coord_entry.set_text(coordstr)
-
-        '''
-        # Now that the dialog's entry is filled, the goal is to
-        # submit the dialog. But I haven't found any way to do that.
-        # Sending a fake enter key event from the entry doesn't do it,
-        # nor does sending a button press event on the dialog's OK button.
-        # Better would be to send the "clicked" signal to the button,
-        # but there doesn't seem to be a way to manually generate signals.
-        print("Trying to send event ...")
-
-        event = Gdk.Event(Gdk.EventType.KEY_PRESS)
-        event.window = dialog.coord_entry.get_window()
-        display = Gdk.Display().get_default()
-        keymap = Gdk.Keymap().get_for_display(display)
-        key = keymap.get_entries_for_keyval(Gdk.KEY_Return)
-        event.hardware_keycode = key[1][0].keycode
-        event.send_event = True
-        event = Gdk.Event(Gdk.EventType.KEY_RELEASE)
-        dialog.coord_entry.emit('key-release-event', event)
-
-        ok_button = dialog.get_widget_for_response(
-            response_id=Gtk.ResponseType.OK)
-        event = Gdk.Event(Gdk.EventType.BUTTON_PRESS)
-        event.window = dialog.get_window()
-        event.button = 1
-        event.send_event = True
-        ok_button.emit('button-press-event', event)
-        event = Gdk.Event(Gdk.EventType.BUTTON_RELEASE)
-        event.window = dialog.get_window()
-        event.button = 1
-        event.send_event = True
-        ok_button.emit('button-release-event', event)
-        '''
-
-        return True
-
-
-    @staticmethod
-    def ignorecasefilter(filter_info, data):
-        """A GTK GtkFileFilter function that filters for
-           a given set of extensions IGNORING CASE,
-           which GTK, incredibly, does not offer in Gtk.FileFilter.
-           The closest to documentation I could find is at
-           http://www.manpagez.com/html/pyGtk/pyGtk-2.22.0/class-Gtkfilefilter.php#method-Gtkfilefilter--add-custom
-
-           Arguments:
-           data is a list of LOWERCASE file extensions,
-               e.g. [".jpg", ".png"].
-               Pass it in as the third argument of filter.add_custom.
-           filter_info is a Gtk.FileFilterInfo object passed by the
-               FileFilter -- not the 4-tuple described on the manpagez link.
-               It has four parts, typically
-                   filter_info.filename      full pathname of the file
-                   filter_info.url           None
-                   filter_info.display_name  basename of the file
-                   filter_info.mime_type
-               I don't know when url and mime_type might get set;
-               they never have been in my tests.
-        """
-        for file_ext in data:
-            if filter_info.display_name.lower().endswith(file_ext):
+        choice = known_site_chooser(self.controller.KnownSites)
+        # This should either return a list of lon, lat
+        # or a list of name, lon, lat, collectionname, zoom
+        if choice:
+            if len(choice) == 2:
+                self.controller.use_coordinates(choice[0], choice[1], self)
                 return True
+            else:
+                self.controller.use_site(choice, self)
+                return True
+        else:
+            print("Canceled")
         return False
 
     def prompt_for_track_file(self, widget):
-        dialog = Gtk.FileChooserDialog(title="Open track file",
-                               action=Gtk.FileChooserAction.SAVE,
-                               buttons=(Gtk.STOCK_CANCEL,
-                                        Gtk.ResponseType.CANCEL,
-                                        Gtk.STOCK_SAVE,
-                                        Gtk.ResponseType.OK))
-        if self.file_read_folder:
-            dialog.set_current_folder(self.file_read_folder)
-
-        filt = Gtk.FileFilter()
-        filt.set_name("GPX, KML/KMX or GeoJSON Files")
-        filt.add_custom(Gtk.FileFilterFlags.FILENAME,
-                        MapWindow.ignorecasefilter,
-                        [".gpx", ".json", ".geojson", ".kml", ".kmz"])
-        dialog.add_filter(filt)
-
-        response = dialog.run()
-
-        if response != Gtk.ResponseType.OK:
-                dialog.destroy()
-                return
-
-        self.file_read_folder = dialog.get_current_folder()
-        infile = dialog.get_filename()
-        self.trackpoints.read_track_file(infile)
-
-        dialog.destroy()
+        infile = prompt_for_file(title="Open track file",
+                                 filter_name="GPX, GeoJSON, KML, KMZ files",
+                                 filter_exts=[".gpx", ".json", ".geojson",
+                                              ".kml", ".kmz"])
+        if infile:
+            self.trackpoints.read_track_file(infile)
 
     def save_all_tracks_as(self, widget):
         """Prompt for a filename to save all tracks and waypoints."""
@@ -1644,7 +1402,7 @@ but if you want to, contact me and I'll help you figure it out.)
         filt = Gtk.FileFilter()
         filt.set_name("GPX/GeoJSON Files")
         filt.add_custom(Gtk.FileFilterFlags.FILENAME,
-                        MapWindowGTK.ignorecasefilter,
+                        ignorecasefilter,
                         [".gpx", ".json", ".geojson"])
         dialog.add_filter(filt)
 
@@ -1795,7 +1553,7 @@ but if you want to, contact me and I'll help you figure it out.)
                            self.context_x + exsize, self.context_y -exsize)
             return
 
-        newname, delete = self.prompt(
+        newname, delete = prompt(
             "Edit or Delete Waypoint",
             name=self.trackpoints.waypoints[near_waypoint].name,
             show_delete=True)
@@ -1813,7 +1571,7 @@ but if you want to, contact me and I'll help you figure it out.)
     def add_waypoint_by_mouse(self, widget):
         """Set a new waypoint at the current mouse location"""
         # Prompt for a name for the waypoint
-        wpname = self.prompt("New waypoint", name="*")
+        wpname = prompt("New waypoint", name="*")
         if wpname == None:
             return
         if wpname:
@@ -1842,79 +1600,12 @@ but if you want to, contact me and I'll help you figure it out.)
         self.center_lon, self.center_lat = self.pin_lon, self.pin_lat
         self.force_redraw()
 
-    def prompt(self, prompt, comment="", name="", show_delete=False):
-        """Prompt the user for a string, returning the string.
-           Returns None if the user presses CANCEL instead
-           (as opposed to an empty string, which means the
-           user didn't type anything but hit OK).
-           If show_delete is True, also show a Delete toggle button,
-           and return a tuple where the second item is the state of the button.
-        """
-        if not self.prompt_dialog:
-            self.prompt_dialog = Gtk.Dialog("PyTopo: %s" % prompt, None, 0,
-                                            (Gtk.STOCK_CANCEL,
-                                               Gtk.ResponseType.CANCEL,
-                                             Gtk.STOCK_OK,
-                                               Gtk.ResponseType.OK))
-            self.prompt_dialog.set_size_request(200, 150)
-            self.prompt_dialog.vbox.set_spacing(10)
-
-            self.prompt_dialog_prompt = Gtk.Label(prompt)
-            self.prompt_dialog.vbox.pack_start(self.prompt_dialog_prompt,
-                                               False, True, 0)
-
-            self.prompt_dialog_del_btn = Gtk.ToggleButton("Delete")
-            self.prompt_dialog.vbox.pack_start(self.prompt_dialog_del_btn,
-                                               False, True, 0)
-
-            self.prompt_dialog_text = Gtk.Entry()
-            self.prompt_dialog_text.set_activates_default(True)
-            self.prompt_dialog.vbox.pack_start(self.prompt_dialog_text,
-                                               True, True, 0)
-
-            self.prompt_dialog_comment = Gtk.Label("")
-            self.prompt_dialog.vbox.pack_start(self.prompt_dialog_comment,
-                                               False, True, 0)
-
-            self.prompt_dialog.show_all()
-
-        else:
-            self.prompt_dialog_comment.set_text(comment)
-            self.prompt_dialog_prompt.set_text(prompt)
-
-        self.prompt_dialog_del_btn.set_active(False)
-
-        if show_delete:
-            self.prompt_dialog_del_btn.show()
-        else:
-            self.prompt_dialog_del_btn.hide()
-
-        self.prompt_dialog.set_default_response(Gtk.ResponseType.OK)
-        self.prompt_dialog_text.set_text(name)
-        if name:
-            self.prompt_dialog_text.select_region(0, len(name))
-        self.prompt_dialog_text.grab_focus()
-        self.prompt_dialog.show()
-
-        response = self.prompt_dialog.run()
-        if response == Gtk.ResponseType.OK:
-            self.prompt_dialog.hide()
-            retval = self.prompt_dialog_text.get_text()
-        else:
-            self.prompt_dialog.hide()
-            retval = None
-
-        if show_delete:
-            return retval, self.prompt_dialog_del_btn.get_active()
-        else:
-            return retval
-
     def save_location(self, widget):
         """Save the pinned location.
         """
         comment = ""
         while True:
-            name = self.prompt("Save location", comment)
+            name = prompt("Save location", comment)
             # name was empty; repeat the prompt dialog
             if name == None:
                 return
@@ -3149,6 +2840,9 @@ but if you want to, contact me and I'll help you figure it out.)
         if not datadics:
             print("no datadics")
             return
+
+        # Now give the user a choice of what data they want to see
+        # for key in datadics:
 
         # Set up a queue the child can use to communicate
         if not self.map2chartqueue:
