@@ -620,15 +620,31 @@ def collect_stats(trackpoints, near_track, use_metric):
     if datafile:
         import csv
 
+        # And before you ask, yes, Specialized is this inconsistent about
+        # using spaces vs. underscores in keys.
         SPECIALIZED_FIELDS = [ 'gps elevation',
                                'enhanced_altitude',
                                'smoothed elevation',
-                               'speed',
+                               'enhanced_speed',
                                'cadence',
                                'power',
                                'motor_power',
                                'grade',
                              ]
+        # A genfield is the general field containing several more
+        # specific fields which will be plotted on the same graph.
+        genfields = { 'elevation': [ 'gps elevation',
+                                     'enhanced_altitude',
+                                     'smoothed elevation' ],
+                      'power': [ 'power', 'motor_power' ],
+                      # Soeed is probably already in the datadics
+                      # because of calculated speed, but fitsplit doesn't
+                      # put speed into the GPS, so take speed from the CSV.
+                      # HOWEVER: they can't be plotted together because
+                      # the list of times in the CSV probably doesn't
+                      # match the times in the GPX.
+                      # 'speed': [ 'enhanced speed' ],
+                    }
         times = []
         csvfields = []
         with datafile.open() as csvfp:
@@ -641,27 +657,52 @@ def collect_stats(trackpoints, near_track, use_metric):
                 for field in SPECIALIZED_FIELDS:
                     if field not in row:
                         continue
-                    if field not in datadics:
-                        datadics[field] = { 'chartlabel': field,
-                                                'ylabel': field,
-                                                'vals': { field: [] },
-                                                'charttype': 'line',
-                                               }
-                        csvfields.append(field)
-                    if 'elevation' in field:
+
+                    genfield = None
+                    for g in genfields:
+                        for f in genfields[g]:
+                            if field == f:
+                                genfield = g
+                                break
+                        if genfield:
+                            break
+                    if not genfield:
+                        genfield = field
+
+                    if genfield not in datadics:
+                        datadics[genfield] = { 'chartlabel': field,
+                                               'ylabel': field,
+                                               'vals': { field: [] },
+                                               'charttype': 'line',
+                                              }
+                        csvfields.append(genfield)
+                    elif field not in datadics[genfield]['vals']:
+                        datadics[genfield]['vals'][field] = []
+
+                    if 'elevation' in field or 'altitude' in field:
                         if not row[field]:
                             val = 0.
                         elif use_metric:
                             val = float(row[field])
                         else:
                             val = float(row[field]) * 3.2808399
-                        datadics[field]['vals'][field].append(val)
+                        datadics[genfield]['vals'][field].append(val)
+                    elif 'speed' in field:
+                        if not row[field]:
+                            val = 0.
+                        elif use_metric:
+                            val = float(row[field]) * 3.6
+                        else:
+                            val = float(row[field]) * 2.237
+                        datadics[genfield]['vals'][field].append(val)
+
                     # XXX probably also need to convert *speed*
+
                     elif not row[field]:
-                        datadics[field]['vals'][field].append(0)
+                        datadics[genfield]['vals'][field].append(0)
                             # or nan
                     else:
-                        datadics[field]['vals'][field].append(
+                        datadics[genfield]['vals'][field].append(
                             float(row[field]))
 
         # All the times have been collected. Add them to each dataset.

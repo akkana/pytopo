@@ -356,6 +356,8 @@ class ChartHandlerGTK:
         def roundstep(therange):
             # Calculate a reasonable spacing, nearest multiple of 10
             thestep = int(therange / 10)
+            if thestep <= 0:
+                thestep = 1
             pow10 = int(10 ** round(log10(thestep)))
             pow10_2 = pow10/2
             if abs(thestep - pow10_2) < abs(thestep - pow10):
