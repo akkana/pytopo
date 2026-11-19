@@ -342,7 +342,7 @@ class ChartHandlerGTK:
 
         # Date on the bottom
         self.show_text(times[0].strftime("%Y-%m-%d"),
-                       chartwidth/2, winheight, cr, ALIGN_CENTER, ALIGN_CENTER)
+                       chartwidth/2, winheight, cr, ALIGN_CENTER, ALIGN_BOTTOM)
 
         # Data Y label on the left. self.show_text doesn't handle rotation yet.
         cr.move_to(11, charty(chartheight/2))
