@@ -289,8 +289,8 @@ def speed_from_positions(t, lat, lon, k=2):
         except NameError:
             # Will print an error later when failing to despike calc speeds
             pass
-    else:
-        print("No GPX speeds")
+    # else:
+    #     print("No GPX speeds")
 
     if sum(calcspeeds):
         # Calculated speeds need to be smoothed: they're prone to
