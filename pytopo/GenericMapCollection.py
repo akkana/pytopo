@@ -10,6 +10,8 @@
 from __future__ import print_function
 
 import os
+from typing import Any
+
 from pytopo import MapUtils
 from pytopo.MapWindow import MapWindow
 from pytopo.TiledMapCollection import TiledMapCollection
@@ -23,10 +25,10 @@ class GenericMapCollection(TiledMapCollection):
     prefix-nn-mm.ext, with or without the dashes.
     """
 
-    def __init__(self, _name, _location, _prefix, _ext,
-                 _left_long, _top_lat,
-                 _img_width, _img_height, _xscale, _yscale,
-                 _numdigits, _usedash, _latfirst):
+    def __init__(self, _name:str, _location:str, _prefix:str, _ext:str,
+                 _left_long:float, _top_lat:float,
+                 _img_width:int, _img_height:int, _xscale:float, _yscale:float,
+                 _numdigits:int, _usedash:bool, _latfirst:bool):
         """Create a generic map collection.
         Parameters
         ----------
@@ -70,8 +72,9 @@ class GenericMapCollection(TiledMapCollection):
         self.top_latitude = _top_lat        # Top of 00-00 image
         self.xscale = float(_xscale)        # Pixels per degree
         self.yscale = float(_yscale)        # Pixels per degree
+        self.mapwin:MapWindow|None = None
 
-    def get_maplet(self, longitude, latitude):
+    def get_maplet(self, longitude:float, latitude:float):
         """Get the maplet containing the specified coordinates.
         Returns pixbuf, x_offset, y_offset, filename
         where offsets are pixels from top left of the specified coords
@@ -84,7 +87,11 @@ class GenericMapCollection(TiledMapCollection):
             # print("Can't open", filename, "for", longitude, latitude)
             return None, 0, 0, filename
         # print("Opened", filename, "for", longitude, latitude)
-        pixbuf = MapWindow.load_image_from_file(filename)
+
+        if not self.mapwin:
+            return None, 0, 0
+
+        pixbuf = self.mapwin.load_image_from_file(filename)
 
         # Offsets aren't implemented yet:
         x_off = 0
@@ -92,7 +99,8 @@ class GenericMapCollection(TiledMapCollection):
 
         return pixbuf, x_off, y_off, filename
 
-    def get_next_maplet(self, fullpathname, dX, dY):
+    def get_next_maplet(self, fullpathname:str, dX:int, dY:int
+                        ) -> tuple[Any, str]:
         """Given a maplet's pathname, get the next or previous one.
         Does not currently work for jumps more than 1 in any direction.
         Returns pixbuf, newpath (either may be None).
@@ -118,12 +126,13 @@ class GenericMapCollection(TiledMapCollection):
         else:
             newname = self.prefix + newa + newb
         newpath = os.path.join(self.location, newname + ext)
-        if filename is None or not os.access(filename, os.R_OK):
+        if filename is None or not os.access(filename, os.R_OK) \
+           or not self.mapwin:
             return None, newpath
-        pixbuf = MapWindow.load_image_from_file(newpath)
+        pixbuf = self.mapwin.load_image_from_file(newpath)
         return pixbuf, newpath
 
-    def coords_to_filename(self, longitude, latitude):
+    def coords_to_filename(self, longitude:float, latitude:float) -> str|None:
         """Given coordinates in decimal degrees, map to the closest filename"""
         if self.left_longitude > longitude or self.top_latitude < latitude:
             return None

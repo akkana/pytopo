@@ -7,11 +7,14 @@
 
 import math
 import re
+import sys
+
+from typing import Literal, overload
 
 EARTH_RADIUS_MI = 3959.
 EARTH_RADIUS_KM = 6371.
 
-def coord2str_dd(lon, lat):
+def coord2str_dd(lon:float, lat:float) -> str:
     """Convert a longitude, latitude pair into a pretty string,
        in decimal degrees"""
     s = "%.7f E  " % lon
@@ -22,7 +25,7 @@ def coord2str_dd(lon, lat):
     return s
 
 
-def dec_deg2dms(dd):
+def dec_deg2dms(dd:float) -> tuple[int, int, float]:
     """Convert decimal degrees to (degrees, minutes, seconds)"""
     is_positive = dd >= 0
     dd = abs(dd)
@@ -32,13 +35,13 @@ def dec_deg2dms(dd):
     return (int(degrees), int(minutes), seconds)
 
 
-def dec_deg2dms_str(coord):
+def dec_deg2dms_str(coord:float) -> str:
     """Convert decimal degrees to a human-readable degrees/minutes string"""
     deg, mins, secs = dec_deg2dms(coord)
     return "%d° %d' %.4f\"" % (deg, mins, secs)
 
 
-def dec_deg2deg_min(coord):
+def dec_deg2deg_min(coord:float) -> float:
     """Convert decimal degrees to degrees . decimal minutes"""
     if coord < 0:
             sgn = -1
@@ -50,14 +53,14 @@ def dec_deg2deg_min(coord):
     return sgn * (deg + minutes)
 
 
-def deg_min2dec_deg(coord):
+def deg_min2dec_deg(coord:float) -> float:
     """Convert degrees.decimal_minutes to decimal degrees"""
     deg = int_trunc(coord)
     dec = (coord - deg) / .6
     return deg + dec
 
 
-def deg_min_sec2dec_deg(coord):
+def deg_min_sec2dec_deg(coord:float) -> float:
     """Convert degrees.minutes_seconds to decimal degrees"""
     if coord >= 0:
         sign = 1
@@ -72,15 +75,15 @@ def deg_min_sec2dec_deg(coord):
     return (deg + mins/60. + secs/3600.) * sign
 
 
-def parse_full_coords(coordstr, degformat="DD"):
+def parse_full_coords(coordstr:str, degformat:str="DD") -> tuple[float, float]:
     """Parse a full coordinate string, e.g.
        35 deg 53' 30.81" N 106 deg 24' 4.17" W"
        Return a tuple of floats.
        # XXX Needs smarts about which is lat and which is lon.
        Can also parse a single coordinate, in which case returns a 1-tuple.
     """
-    firstcoord, charsmatched = to_decimal_degrees(coordstr, degformat,
-                                                  report_chars_matched=True)
+    firstcoord, charsmatched = to_decimal_degrees_charsmatched(coordstr,
+                                                               degformat)
     if not charsmatched:
         # This can happen in a case like "37.123 -102.456")
         try:
@@ -88,16 +91,27 @@ def parse_full_coords(coordstr, degformat="DD"):
             if len(coordstrings) > 0:
                 return (firstcoord, to_decimal_degrees(coordstrings[1],
                                                        degformat))
-        except:
-            return (firstcoord)
+        # I don't remember which exceptions this was meant to catch,
+        # so disable it by using AssertionError which won't happen.
+        except AssertionError as e:
+            return (0., 0.)
 
     coordstr = coordstr[charsmatched:]
     if not coordstr:
-        return (firstcoord)
+        print("Only one coordinate parsed!", coordstr, file=sys.stderr)
+        return (firstcoord, 0.)
     return ( firstcoord, to_decimal_degrees(coordstr, degformat) )
 
 
-def to_decimal_degrees(coord, degformat="DD", report_chars_matched=False):
+def to_decimal_degrees(coordstr:str, degformat:str="DD",
+                       report_chars_matched:bool=False) \
+                       -> float:
+    coord, chars_matched = to_decimal_degrees_charsmatched(coordstr, degformat)
+    return coord
+
+
+def to_decimal_degrees_charsmatched(coordstr:str, degformat:str="DD") \
+                                    -> tuple[float, int]:
     """Try to parse various different forms of deg-min-sec strings
        as well as floats for a single coordinate (lat or lon, not both).
        Returns float decimal degrees.
@@ -112,7 +126,7 @@ def to_decimal_degrees(coord, degformat="DD", report_chars_matched=False):
     """
     # Is it already a number?
     try:
-        coord = float(coord)
+        coord = float(coordstr)
 
         if degformat == "DD":
             pass
@@ -122,11 +136,9 @@ def to_decimal_degrees(coord, degformat="DD", report_chars_matched=False):
             coord = deg_min2dec_deg(coord)
         else:
             print("Error: unknown coordinate format %s" % degformat)
-            coord = None
+            coord = 0.
 
-        if report_chars_matched:
-            return (coord, 0)
-        return coord
+        return (coord, 0)
     except:
         pass
 
@@ -143,7 +155,7 @@ def to_decimal_degrees(coord, degformat="DD", report_chars_matched=False):
     coord_pat = r"\s*([NSEW])?\s*([+-]?[0-9]{1,3})\s*(?:deg|d|°|\^)" \
         r"\s*([0-9]{1,3})(?:'|m|min)\s*" \
         r"([0-9]{1,3})(.[0-9]+)?\s*(?:\"|s|sec)\s*([NSEW])?"
-    m = re.match(coord_pat, coord)
+    m = re.match(coord_pat, coordstr)
     if not m:
         raise ValueError("Can't parse '%s' as a coordinate" % coord)
 
@@ -161,7 +173,7 @@ def to_decimal_degrees(coord, degformat="DD", report_chars_matched=False):
         sign = -1
     else:
         sign = 1
-    val = int(deg) * sign
+    val = float(int(deg) * sign)
     if val < 0:
         sign = -1
         val = -val
@@ -182,12 +194,10 @@ def to_decimal_degrees(coord, degformat="DD", report_chars_matched=False):
     # Restore the sign
     val *= sign
 
-    if report_chars_matched:
-        return (val, len(m.group(0)))
-    return val
+    return (val, len(m.group(0)))
 
 
-def bearing(lat1, lon1, lat2, lon2):
+def bearing(lat1:float, lon1:float, lat2:float, lon2:float) -> float:
     """Bearing from wp1 to wp2.
        Input angles are degrees; output is also degrees.
     """
@@ -210,7 +220,7 @@ def bearing(lat1, lon1, lat2, lon2):
 
 
 # Convert an angle (degrees) to the appropriate quadrant string, e.g. N 57 E.
-def angle_to_quadrant(angle):
+def angle_to_quadrant(angle:float) -> str:
     if angle > 180:
         angle = angle - 360
     if angle == 0:
@@ -230,12 +240,12 @@ def angle_to_quadrant(angle):
     return "S " + str(180 - angle) + " E"
 
 
-def int_trunc(num):
+def int_trunc(num:float) -> int:
     """Truncate to an integer, but no .999999 stuff"""
     return int(num + .00001)
 
 
-def truncate2frac(num, frac):
+def truncate2frac(num:float, frac:float) -> float:
     """Truncate to a multiple of the given fraction"""
     t = float(int_trunc(num / frac)) * frac
     if num < 0:
@@ -243,13 +253,14 @@ def truncate2frac(num, frac):
     return t
 
 
-def ohstring(num, numdigits):
+def ohstring(num:float, numdigits:int) -> str:
     """Return a zero-prefixed string of the given number of digits."""
     fmt = '%%0%dd' % numdigits
     return fmt % num
 
 
-def haversine_angle(latitude_1, longitude_1, latitude_2, longitude_2):
+def haversine_angle(latitude_1:float, longitude_1:float,
+                    latitude_2:float, longitude_2:float) -> float:
     """
     Haversine angle (in radians) between two points
     specified by coordinates (in degrees).
@@ -269,8 +280,9 @@ def haversine_angle(latitude_1, longitude_1, latitude_2, longitude_2):
     return 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
 
-def haversine_distance(latitude_1, longitude_1,
-                       latitude_2, longitude_2, metric=False):
+def haversine_distance(latitude_1:float, longitude_1:float,
+                       latitude_2:float, longitude_2:float,
+                       metric:bool=False) -> float:
     """
     Haversine distance between two points.
     Returns distance in miles or meters.
@@ -282,28 +294,28 @@ def haversine_distance(latitude_1, longitude_1,
         return EARTH_RADIUS_MI * c
 
 
-def latlon_to_mercator(lat, lon):
+def latlon_to_mercator(lat:float, lon:float) -> tuple[float, float]:
     """
     Convert latitude/longitude to Web Mercator coordinates (meters).
-    
+
     Args:
         lat (float): Latitude in degrees
         lon (float): Longitude in degrees
-    
+
     Returns:
         tuple: (x, y) in Web Mercator meters
     """
     # Earth radius in meters
     R = 6378137.0
-    
+
     # Convert to radians
     lon_rad = math.radians(lon)
     lat_rad = math.radians(lat)
-    
+
     # Web Mercator formulas
     x = R * lon_rad
     y = R * math.log(math.tan(math.pi / 4 + lat_rad / 2))
-    
+
     return x, y
 
 
@@ -316,7 +328,7 @@ def main():
     def Usage():
         import os
         print("Usage: %s [--dm] deg deg deg" % os.path.basename(sys.argv[0]))
-        print("""      --dm enables decimal minutes mode, so floating point 
+        print("""      --dm enables decimal minutes mode, so floating point
       numbers will be interpreted as dd.mmmm.""")
         sys.exit(1)
 

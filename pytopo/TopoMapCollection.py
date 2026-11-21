@@ -22,8 +22,10 @@ class TopoMapCollection(TiledMapCollection):
     Some variants can toggle between more than one scale (series).
     """
 
-    def __init__(self, _name, _location, _series, _tile_w, _tile_h,
-                 _ser7prefix="012t", _ser15prefix="024t", _img_ext=".gif"):
+    def __init__(self, _name:str, _location:str, _series:str,
+                 _tile_w:int, _tile_h:int,
+                 _ser7prefix:str="012t", _ser15prefix:str="024t",
+                 _img_ext:str=".gif"):
         """arguments:
         name        -- user-visible name of the collection
         location    -- directory on disk where the maps reside

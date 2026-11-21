@@ -9,16 +9,30 @@
 
 import sys
 
+# For mypy
+from typing import Any
+
 
 class MapWindow(object):
     def __init__(self, _controller):
         self.controller = _controller
 
-    def load_image_from_file(path):
+        # Variables to keep MyPy happy. Inheritors should define these usefully.
+        self.center_lon:float = 0.
+        self.center_lat:float = 0.
+        self.win_width:int = 800
+        self.win_height:int = 600
+        self.controller:Any = None
+
+    if TYPE_CHECKING:
+        def __getattr__(self, name: str) -> Any:
+            print(name, "doesn't exist in the base MapWindow")
+
+    def load_image_from_file(self, path):
         print("Sorry, load_image_from_file isn't defined in base MapWindow",
               file=sys.stderr)
 
-    def idle_add(fcn, *args):
+    def idle_add(self, fcn, *args):
         """Call a function at the next convenient opportunity.
            GUI subclasses will need to implement this using an
            appropriate idle function; see MapWindowGTK.

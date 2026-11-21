@@ -19,7 +19,7 @@ if 'numpy' not in sys.modules:
     sys.exit(1)
 
 
-def plot_track(trackfile, out, args):
+def plot_track(trackfile:str, out, args):
     # Set up the plots. First, will there be a speed plot, or just elevations?
     if "Speeds" in out or "GPX Speeds" in out or "Calculated Speeds" in out:
         numplots = 2

@@ -1,4 +1,4 @@
-# Copyright (C) 2009-2016 by Akkana Peck.
+# Copyright (C) 2009-2026 by Akkana Peck.
 # You are free to use, share or modify this program under
 # the terms of the GPLv2 or, at your option, any later GPL.
 
@@ -12,8 +12,12 @@ from pytopo.MapWindow import MapWindow
 from pytopo import MapUtils
 
 # For downloading tiles:
+import requests
 from requests_futures.sessions import FuturesSession
 from concurrent.futures import ThreadPoolExecutor
+
+# For mypy
+from typing import Any
 
 import time
 import math
@@ -27,7 +31,7 @@ import logging
 # requests-futures can silently swallow exceptions that happen
 # during the response hook. Adding this as a done_callback makes
 # those errors visible in case they happen.
-def _report(future):
+def _report(future:Any):
     # Don't log downloads that were deliberately cancelled:
     if future.cancelled():
         return
@@ -54,18 +58,24 @@ TiledMapCollection classes must implement:
     MAX_FAILED_DOWNLOADS = 4
     RETRY_DOWNLOADS_AFTER = 300    #seconds
 
-    def __init__(self, _name, _location, _tile_w, _tile_h):
+    def __init__(self, _name:str, _location:str, _tile_w:int, _tile_h:int):
         MapCollection.__init__(self, _name, _location)
-        self.img_width = _tile_w
-        self.img_height = _tile_h
+        self.img_width: int = _tile_w
+        self.img_height: int = _tile_h
 
         # We need to keep a pointer to the map window for redrawing
         # when downloaded tiles come in.
-        self.mapwin = None
+        # Typed as Any because base MapWindow doesn't have a lot of the
+        # attributes derived classes do, which mypy doesn't tolerate.
+        self.mapwin: MapWindow|None = None
 
         # scale, in pixels / degree. Inherited classes must set this.
-        self.xscale = None
-        self.yscale = None
+        self.xscale: float = 0.
+        self.yscale:float = 0.
+
+        self.zoomlevel: int = 6    # Just picking a number
+        self.powzoom: int = int(2.0 ** self.zoomlevel)
+            # to avoid re-re-calculating
 
         self.init_downloader()
         # If it ever becomes needed to run the FuturesSession
@@ -76,33 +86,36 @@ TiledMapCollection classes must implement:
 
         # Keep track of how many downloads have failed.
         # Give up after a certain number -- but not forever.
-        self.num_failed_downloads = 0
-        self.last_failed_download_time = 0
+        self.num_failed_downloads: int = 0
+        self.last_failed_download_time: float = 0.
+
+        self.download_url: str = ''
+        self.reload_tiles: float|bool = False
 
         # Tiles downloading or downloaded but not yet drawn.
-        self.urls_queued = []
+        self.urls_queued: list[str] = []
 
         # Downloads that have failed, with the time they failed,
         # so they can be retried after a while.
-        self.failed_download_urls = {}
+        self.failed_download_url_times: dict[str, float] = {}
 
         # Mapping between paths and URLs. Derived classes may have
         # rules for this, but TiledMapCollection only finds out when
         # queueing tile downloads.
-        self.url_to_path = {}
-        self.path_to_url = {}
+        self.url_to_path: dict[str, str] = {}
+        self.path_to_url: dict[str, str] = {}
 
     def init_downloader(self):
         self.downloader = \
             FuturesSession(executor=ThreadPoolExecutor(max_workers=3))
         self.downloader.hooks['response'] = self.response_hook
 
-    def set_reload_tiles(self, p):
+    def set_reload_tiles(self, p:bool):
         """Set a flag indicating that all map tiles need to be re-downloaded,
            if the collection has a valid download location.
         """
         if p:
-            if 'download_url' in dir(self) and self.download_url:
+            if self.download_url:
                 print("Will re-download all map tiles")
                 self.reload_tiles = p
             else:
@@ -111,7 +124,10 @@ TiledMapCollection classes must implement:
         else:
             self.reload_tiles = False
 
-    def find_tile_window_geometry(self, mapwin):
+    def find_tile_window_geometry(self, mapwin:MapWindow) -> tuple[int, int,
+                                                                   int, int,
+                                                                   int, int,
+                                                                   int, int]:
         """
            For given center coordinates and the current zoom level and
            window size, calculate the tile X and Y for the center,
@@ -165,7 +181,7 @@ TiledMapCollection classes must implement:
                 tile_offset_x, tile_offset_y,
                 tiles_left, tiles_right, tiles_up, tiles_down)
 
-    def draw_map(self, center_lon, center_lat, mapwin):
+    def draw_map(self, center_lon:float, center_lat:float, mapwin:MapWindow):
         # In case the mapwin hasn't been initialized yet:
         self.mapwin = mapwin
 
@@ -224,13 +240,13 @@ TiledMapCollection classes must implement:
         # http://www.daa.com.au/pipermail/pygtk/2003-December/006499.html
         gc.collect()
 
-    def get_next_maplet_name(self, fullpathname, dX, dY):
+    def get_next_maplet_name(self, fullpathname:str, dX:int, dY:int):
         """Starting from a maplet name, get the one a set distance away.
            This needs to be overridden by child classes.
         """
         return
 
-    def get_next_maplet(self, fullpathname, dX, dY):
+    def get_next_maplet(self, fullpathname:str, dX:int, dY:int):
         """Given a maplet's pathname, get the next or previous one.
            May not work for jumps more than 1 in any direction.
            Returns pixbuf, newpath (either may be None).
@@ -238,16 +254,21 @@ TiledMapCollection classes must implement:
         """
         return
 
-    def draw_tile_at_position(self, pixbuf, mapwin, x, y, x_off, y_off):
+    def draw_tile_at_position(self, pixbuf:Any, mapwin:MapWindow,
+                              x:int, y:int, x_off:int, y_off:int) \
+                              -> tuple[int, int]:
         """Draw a single tile at a specified location,
            starting at offset x_off, y_off into the tile.
            Return width, height of how much was drawn of the tile.
         """
+        if not self.mapwin:
+            return 0, 0
+
         if pixbuf is None:
             if self.mapwin.controller.Debug:
                 print("Can't draw_tile_at_position: no pixbuf for",
                       x, y, "offset", x_off, y_off)
-            return
+            return 0, 0
 
         if x < 0:
             x_off += -x
@@ -307,18 +328,21 @@ TiledMapCollection classes must implement:
 
     # Utilities for mapping tiles to/from degrees.
     # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
-    def deg2num(self, lat_deg, lon_deg, zoom=None):
+    def deg2num(self, lat_deg:float, lon_deg:float, zoom:int|None = None):
         """Undefined, must be defined by subclasses"""
         raise RuntimeError("TiledMapCollection subclasses must define deg2num")
 
-    def num2deg(self, xtile, ytile):
+    def num2deg(self, xtile:int, ytile:int):
         """Undefined, must be defined by subclasses"""
         raise RuntimeError("TiledMapCollection subclasses must define num2deg")
 
-    def draw_single_tile(self, path, mapwin):
+    def draw_single_tile(self, path:str, mapwin:MapWindow):
         """After a new tile is downloaded, fetch its pixbuf and draw it
            in the right place for our currently displayed map.
         """
+        if not self.mapwin:
+            return
+
         # Finished downloading all tiles?
         # Then don't bother to draw this one; request a full
         # map redraw, so that overlays will also be drawn.
@@ -332,12 +356,12 @@ TiledMapCollection classes must implement:
         # Make sure it's even still visible.
         # Tile name is /path/to/zoom/x/y.ext
         try:
-            head, tileynum = os.path.split(path)
-            tileynum = os.path.splitext(tileynum)[0]
-            head, tilexnum = os.path.split(head)
+            head, tileynums = os.path.split(path)
+            tileynums = os.path.splitext(tileynums)[0]
+            head, tilexnums = os.path.split(head)
             head, tilezoom = os.path.split(head)
-            tileynum = int(tileynum)
-            tilexnum = int(tilexnum)
+            tileynum = int(tileynums)
+            tilexnum = int(tilexnums)
         except ValueError:
             print("Bad tile filename", path)
             return
@@ -410,10 +434,12 @@ TiledMapCollection classes must implement:
             print("Drawing single tile at", mapx, mapy, x_off, y_off)
         self.draw_tile_at_position(pixbuf, mapwin, mapx, mapy, x_off, y_off)
 
-    def queue_download(self, url, path):
+    def queue_download(self, url:str, path:str):
         """Add a URL to the FuturesSession downloader queue,
            and keep a record of what file path it should use.
         """
+        if not self.mapwin:
+            return
         if self.mapwin.controller.Debug:
             print("queue_download", url, "->", path)
         now = time.time()
@@ -438,14 +464,14 @@ TiledMapCollection classes must implement:
             return
         try:
             # Did it fail earlier? If so, it the timespan to short to retry?
-            if (now - self.failed_download_urls[url]
+            if (now - self.last_failed_download_time
                 < self.RETRY_DOWNLOADS_AFTER):
                 if self.mapwin.controller.Debug:
                     print("Too early to retry", url)
                 return
             if self.mapwin.controller.Debug:
                 print("Retrying download on", url)
-            del self.failed_download_urls[url]
+            del self.failed_download_url_times[url]
         except KeyError:
             # Not in the list of failed tiles, go ahead and download
             pass
@@ -467,19 +493,20 @@ TiledMapCollection classes must implement:
         # otherwise, exceptions can be silently swallowed by requests-futures.
         future.add_done_callback(_report)
 
-    def response_hook(self, response, *args, **kwargs):
+    def response_hook(self, response:requests.Response, *args:Any, **kwargs:Any):
         """When the FuturesSession completes downloading a tile,
            draw it on the map when possible.
         """
-        if self.mapwin.controller.Debug:
+        debug = (self.mapwin and self.mapwin.controller.Debug)
+        if debug:
             print("response_hook", response.status_code)
         if response.status_code != 200:
-            if self.mapwin.controller.Debug:
+            if debug:
                 print("Response was", response.status_code, "on", response.url)
 
             # Handle 301 Moved Permanently and other 300 codes.
             if response.status_code // 100 == 3:
-                if self.mapwin.controller.Debug:
+                if debug:
                     print(response.status_code, "redirect from",
                           response.url, "to", response.headers['Location'])
                 # requests-futures will automatically try the new location,
@@ -498,14 +525,14 @@ TiledMapCollection classes must implement:
             # in which case it shouldn't go on failed_download_urls
             self.num_failed_downloads += 1
             self.last_failed_download_time = time.time()
-            self.failed_download_urls[response.url] = \
+            self.failed_download_url_times[response.url] = \
                 self.last_failed_download_time
             try:
                 self.urls_queued.remove(response.url)
             except ValueError:
                 pass
 
-            if self.mapwin.exiting:
+            if self.mapwin and self.mapwin.exiting:
                 print("Map window is exiting! Clearing downloads after failure")
                 self.urls_queued = []
 
@@ -536,7 +563,7 @@ TiledMapCollection classes must implement:
         with open(tilepath, 'wb') as tilefp:
             content = response.content
             tilefp.write(content)
-            if self.mapwin.controller.Debug:
+            if debug:
                 print("Wrote", response.url, "to", tilepath,
                       "(", len(content), "bytes)")
 
@@ -562,19 +589,21 @@ TiledMapCollection classes must implement:
         # been drawn, and drawing over them again will double their opacity.
         if self.opacity < 1.:
             if not self.urls_queued:
-                if self.mapwin.controller.Debug:
+                if debug:
                     print("All tiles downloaded for", self,
                           ": scheduling redraw")
-                self.mapwin.idle_add(self.mapwin.draw_map)
-            elif self.mapwin.controller.Debug:
+                if self.mapwin:
+                    self.mapwin.idle_add(self.mapwin.draw_map)
+            elif debug:
                 print("downloaded", tilepath, "but still",
                       len(self.urls_queued), "tiles to download")
         else:
-            if self.mapwin.controller.Debug > 1:
+            if debug:
                 print("Scheduling draw of single tile", tilepath)
-            self.mapwin.idle_add(self.draw_single_tile,
-                                 tilepath, self.mapwin)
+            if self.mapwin:
+                self.mapwin.idle_add(self.draw_single_tile,
+                                     tilepath, self.mapwin)
 
-        if self.mapwin.exiting:
+        if self.mapwin and self.mapwin.exiting:
             print("Map window is exiting! Clearing downloads")
             self.urls_queued = []

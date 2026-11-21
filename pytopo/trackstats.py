@@ -14,14 +14,20 @@ import argparse
 
 import math
 from pathlib import Path
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 import sys, os
 
 try:
     import numpy as np
+    import numpy.typing as npt
     from numpy.lib.stride_tricks import sliding_window_view
 except ImportError:
     pass
+
+from typing import Any
+
+# Needed for type hinting, sigh
+from collections.abc import Iterable, Sequence
 
 from pytopo import MapUtils, __version__
 
@@ -37,13 +43,14 @@ SPEED_THRESHOLD = .3
 # Variables that need to be global, because statistics() and
 # accumulate_climb() need to share them, and python 2.7 doesn't
 # have nonlocal.
-total_climb = 0
-this_climb = 0
-this_climb_start = 0
-lastele = -1
+total_climb = 0.
+this_climb = 0.
+this_climb_start = 0.
+lastele = -1.
 
 
-def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
+def statistics(trackpoints: TrackPoints, halfwin:int, beta:float, metric:bool,
+               startpt:int = 0, onetrack:bool=False) -> dict:
     """Accumulate statistics like mileage and total climb.
        Return a dictionary of stats collected.
        If startpt is provided, start from a sub-track.
@@ -61,9 +68,9 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     missing_times = False
 
     # Accumulators:
-    lastlat = 0
-    lastlon = 0
-    total_dist = 0
+    lastlat = 0.
+    lastlon = 0.
+    total_dist = 0.
 
     start_time = None
     end_time = None
@@ -73,30 +80,30 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
     stopped_time = timedelta(0)
     tot_time = timedelta(0)
 
-    def accumulate_climb(ele):
+    def accumulate_climb(ele:float):
         global total_climb, this_climb, this_climb_start, lastele
 
         if lastele and lastele >= 0:             # Not the first call
-            if ele > lastele:        # Climbed since last step
+            if ele > lastele:                    # Climbed since last step
                 if this_climb == 0:
                     this_climb_start = lastele
                 this_climb = this_climb + ele - lastele
             else:
                 if this_climb > CLIMB_THRESHOLD:
                     total_climb = total_climb + this_climb
-                    this_climb = 0
+                    this_climb = 0.
                 elif ele <= this_climb_start:
                     # We got a little hump but not big enough to count;
                     # probably an artifact like taking the GPS out of its
                     # case or getting off the bike or something. Reset.
-                    this_climb = 0
+                    this_climb = 0.
         lastele = ele
 
     for pt in trackpoints.points[startpt:]:
         if trackpoints.is_start(pt):
-            lastlat = 0
-            lastlon = 0
-            lastele = -1
+            lastlat = 0.
+            lastlon = 0.
+            lastele = -1.
             if onetrack and total_dist:
                 break
             else:
@@ -144,14 +151,14 @@ def statistics(trackpoints, halfwin, beta, metric, startpt=0, onetrack=False):
         # time interval for distance calculations,
         # but also try calculating the speed, to see how close they are.
         # Sometimes they're way off.
-        dist = 0
+        dist = 0.
         calcdist = MapUtils.haversine_distance(lat, lon,
                                                lastlat, lastlon, metric)
         if delta_t:
             calcspeed = calcdist * 3600 / delta_t.total_seconds()
             calcspeeds.append(calcspeed)
         else:
-            calcspeeds.append(0)
+            calcspeeds.append(0.)
 
         '''
         XXX
@@ -188,7 +195,7 @@ def speed_from_positions(t, lat, lon, k=2):
 
             if delta_t:
                 # speed is in mi/hr or km/hr, so convert from seconds
-                dist = speed * delta_t.seconds/3600
+                dist = speed * delta_t.seconds/3600.
 
         else:
             # It looks like places where the GPX speed disappears are mostly
@@ -196,12 +203,12 @@ def speed_from_positions(t, lat, lon, k=2):
             # they coincide with places where the calculated speed is zero.
             # If that turns out not to be true, maybe use np.nan
             # though that will require changes in algorithms like hampel_despike.
-            gpxspeeds.append(0)
+            gpxspeeds.append(0.)
             dist = calcdist
             if delta_t:
                 speed = calcspeed   # miles (or km) / hr
             else:
-                speed = 0
+                speed = 0.
 
         if not dist:
             dist = calcdist
@@ -239,9 +246,14 @@ def speed_from_positions(t, lat, lon, k=2):
         #       total_dist / len(eles))
         halfwin = 15
 
+
     # Smoothing eles will fail if there are no eles or if numpy isn't there.
+    smoothed_eles: Any
     try:
+        # Used to have this:
         smoothed_eles = smooth(eles, halfwin, beta)
+        # This might make mypy happy
+        # smoothed_eles = [float(v) for v in arr]
     except (TypeError, NameError):
         smoothed_eles = []
 
@@ -328,11 +340,11 @@ def speed_from_positions(t, lat, lon, k=2):
     return out
 
 
-def tot_climb(arr):
+def tot_climb(arr:Iterable[float]) -> tuple[float, float, float]:
     global this_climb, this_climb_start
 
     tot = 0.
-    lastel = -1
+    lastel = -1.
     this_climb = 0.
     this_climb_start = 0.
     lowest = 30000.
@@ -346,9 +358,9 @@ def tot_climb(arr):
             elif el < lastel:
                 if this_climb > CLIMB_THRESHOLD:
                     tot += this_climb
-                    this_climb = 0
+                    this_climb = 0.
                 elif el <= this_climb_start:
-                    this_climb = 0
+                    this_climb = 0.
 
         if el > highest:
             highest = el
@@ -356,72 +368,28 @@ def tot_climb(arr):
             lowest = el
         lastel = el
 
-    if this_climb > 0:
+    if this_climb > 0.:
         tot += this_climb
 
     return tot, lowest, highest
 
 
-def hr_series(points):
-    """Extract (local_time, hr) pairs for points that have hr data."""
-    times = []
-    hrs = []
-    for p in points:
-        try:
-            hr = p.extensions.get("hr")
-        except:
-            continue
-        if hr is None:
-            continue
-        utc_dt = datetime.strptime(p.timestamp,
-                                   "%Y-%m-%dT%H:%M:%SZ").replace(
-                                       tzinfo=datetime.timezone.utc
-        )
-        local_dt = utc_dt.astimezone()  # converts to system-local timezone
-        times.append(local_dt)
-        hrs.append(int(hr))
-    return times, hrs
-
-
-def plot_hr(points):
-    try:
-        import matplotlib.pyplot as plt
-        import matplotlib.dates as mdates
-    except:
-        print("Couldn't import matplotlib, can't plot heart rate",
-              file=sys.stderr)
-
-    times, hrs = hr_series(points)
-
-    fig, ax = plt.subplots(figsize=(12, 5))
-    ax.bar(times, hrs, width=0.0005, color="crimson")  # width in days (matplotlib date units)
-
-    ax.set_xlabel("Time")
-    ax.set_ylabel("Heart Rate (bpm)")
-    ax.set_title("Heart Rate")
-
-    # Format x-axis as HH:MM in local time
-    local_tz = datetime.now().astimezone().tzinfo  # get system local tz
-    ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M", tz=local_tz))
-    fig.autofmt_xdate()
-
-    plt.tight_layout()
-    plt.show(block=False)
-    plt.pause(0.1)  # lets the GUI event loop actually draw the window
-
-
-def smooth(vals, halfwin, beta):
+def smooth(vals:npt.ArrayLike, halfwin:int, beta:float
+           ) -> npt.NDArray[np.float64]:
     """ Kaiser window smoothing."""
+    varr = np.asarray(vals, dtype=np.float64) # explicit array to make mypy happy
     window_len = 2 * halfwin + 1
     # extending the data at beginning and at the end
     # to apply the window at the borders
-    s = np.r_[vals[window_len-1:0:-1], vals, vals[-1:-window_len:-1]]
+    s = np.r_[varr[window_len-1:0:-1], varr, varr[-1:-window_len:-1]]
     w = np.kaiser(window_len, beta)
     smoothed = np.convolve(w/w.sum(), s, mode='valid')
     return smoothed[halfwin:len(smoothed) - halfwin]
 
 
-def hampel_despike(x, half_window=3, n_sigmas=3.0, min_dev=0.0):
+def hampel_despike(x:npt.ArrayLike, half_window:int=3,
+                   n_sigmas:float=3.0, min_dev:float=0.0
+                  ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.bool_]]:
     """Replace spikes with the local median; leave everything else untouched.
 
        x            : 1-D array of speeds
@@ -444,7 +412,7 @@ def hampel_despike(x, half_window=3, n_sigmas=3.0, min_dev=0.0):
 #
 # main() to gather stats from a file passed in on the commandline.
 #
-def analyze_track(trackfile, args):
+def analyze_track(trackfile:str, args:argparse.Namespace):
 
     progname = os.path.basename(trackfile)
     beta = args.beta
@@ -496,7 +464,8 @@ def analyze_track(trackfile, args):
     return out
 
 
-def collect_stats(trackpoints, near_track, use_metric):
+def collect_stats(trackpoints:TrackPoints, near_track:int,
+                  use_metric:bool):
     """Build up data dictionaries for the charts we know about.
        Used for plotting charts.
     """
@@ -523,7 +492,7 @@ def collect_stats(trackpoints, near_track, use_metric):
             datafile = trackpoints.points[near_track + offset]
             break
 
-    datadics = {}
+    datadics: dict[str, dict[str, Any]] = {}
     times = []
     i = near_track
     while True:
@@ -712,7 +681,7 @@ def collect_stats(trackpoints, near_track, use_metric):
     return datadics
 
 
-def parse_trackstat_args(cmdlineargs):
+def parse_trackstat_args(cmdlineargs:list):
     parser = argparse.ArgumentParser(
         description='This parses track log files, in gpx format, '
                      'and gives you a graph and a few statistics. ')

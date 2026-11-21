@@ -10,6 +10,8 @@ from __future__ import print_function
 import os
 import math
 
+from typing import Any
+
 
 class MapCollection (object):
 
@@ -21,7 +23,7 @@ Child classes implementing MapCollection must define functions
 __init__, get_maplet, draw_map.
 """
 
-    def __init__(self, _name, _location):
+    def __init__(self, _name:str, _location:str):
         self.name = _name
         self.location = _location
 
@@ -44,7 +46,7 @@ __init__, get_maplet, draw_map.
         self.zoomlevel = 12
 
         # Child classes must set maxzoom:
-        self.maxzoom = None
+        self.maxzoom = 20
 
         self.Debug = False
 
@@ -52,7 +54,7 @@ __init__, get_maplet, draw_map.
         return 'MapCollection %s (%s)' % (self.name,
                                           os.path.basename(self.location))
 
-    def get_maplet(self, longitude, latitude):
+    def get_maplet(self, longitude:float, latitude:float):
         """Returns pixbuf, x_offset, y_offset, filename:
 
          - the pixbuf for the maplet image (or null)
@@ -61,30 +63,30 @@ __init__, get_maplet, draw_map.
         """
         return None, 0, 0, None
 
-    def get_maplet_by_number(self, xtile, ytile):
+    def get_maplet_by_number(self, xtile:int, ytile:int):
         """Returns pixbuf, filename
         """
         return None, None
 
-    def draw_map(self, center_lon, center_lat, drawwin):
+    def draw_map(self, center_lon:float, center_lat:float, drawwin:Any):
         """Draw a map in a window, centered around the specified coordinates.
         drawwin is a DrawWin object.
         """
         return
 
-    def draw_attribution(self, drawwin):
+    def draw_attribution(self, drawwin:Any):
         """Draw attribution/copyright for the map tiles used in this collection.
         """
         return
 
-    def zoom(self, amount, latitude=45):
+    def zoom(self, amount, latitude:float=45.):
         """Zoom by the given number of steps (positive to zoom in,
         negative to zoom out). Pass amount=0 to recalculate/redraw.
         Some map collections need to know latitude to determine scale.
         """
         return
 
-    def zoom_to(self, newzoom, latitude=45):
+    def zoom_to(self, newzoom:int, latitude:float=45.):
         """Zoom to a specific zoom level and recalculate scales.
         Some map collections need to know latitude to determine scale.
         """
@@ -97,20 +99,21 @@ __init__, get_maplet, draw_map.
 
     # Spherical Mercator code,
     # from http://wiki.openstreetmap.org/wiki/Mercator#Python
-    def y2lat(self, a):
+    def y2lat(self, a:int):
         """Spherical Mercator conversion to latitude (decimal degrees)"""
         return (180.0 / math.pi
                 * (2.0 * math.atan(math.exp(a * math.pi / 180.0))
                    - math.pi / 2.0))
 
-    def lat2y(self, a):
+    def lat2y(self, a:int) -> float:
         """Spherical Mercator conversion from latitude (decimal degrees)"""
         return (180.0 / math.pi
                 * math.log(math.tan(math.pi / 4.0
                                     + a * (math.pi / 180.0) / 2.0)))
 
-    def latlon2xy(self, lat, lon,
-                  center_lat, center_lon, win_width, win_height):
+    def latlon2xy(self, lat:float, lon:float,
+                  center_lat:float, center_lon:float,
+                  win_width:int, win_height:int) -> tuple[int, int]:
         """Convert a coordinate to a position in a map window.
            at the Collection's current zoom level
            and the center coordinate and pixel size of the window.

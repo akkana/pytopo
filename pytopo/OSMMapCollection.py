@@ -8,11 +8,15 @@
 """
 
 from pytopo.TiledMapCollection import TiledMapCollection
+from pytopo.MapWindow import MapWindow
 from pytopo import MapUtils
 
 import os
 import time
 import math
+
+# For mypy
+from typing import Any
 
 
 class OSMMapCollection(TiledMapCollection):
@@ -27,10 +31,10 @@ class OSMMapCollection(TiledMapCollection):
     @ivar: download_url Where to download new tiles.
     """
 
-    def __init__(self, _name, _location, _ext,
-                 _img_width, _img_height, _init_zoom,
-                 _download_url=None, maxzoom=19,
-                 reload_if_older=None, attribution=None):
+    def __init__(self, _name:str, _location:str, _ext:str,
+                 _img_width:int, _img_height:int, _init_zoom:int,
+                 _download_url:str='', maxzoom:int=19,
+                 reload_if_older:bool|None=None, attribution:str=''):
         """
         Parameters
         ----------
@@ -53,25 +57,26 @@ class OSMMapCollection(TiledMapCollection):
         """
         TiledMapCollection.__init__(self, _name, _location,
                                     _img_width, _img_height)
-        self.ext = _ext
-        self.img_width = _img_width
-        self.img_height = _img_height
-        self.zoomlevel = _init_zoom
-        self.powzoom = 2.0 ** self.zoomlevel   # to avoid re-re-calculating
-        self.download_url = _download_url
-        self.maxzoom = maxzoom
+        self.ext: str = _ext
+        self.img_width: int = _img_width
+        self.img_height: int = _img_height
+        self.zoomlevel: int = _init_zoom
+        self.powzoom: int = 2 ** self.zoomlevel   # to avoid re-re-calculating
+        self.download_url: str = _download_url
+        self.maxzoom: int = maxzoom
 
         # If reload_tiles is set, it should be set to a Unix datestamp,
         # e.g. from when the program was started.
         # Any file older than that will be re-downloaded.
         # By default, never reload tiles.
         if reload_if_older:
-            self.reload_tiles = time.time() - reload_if_older * 60*60*24
+            self.reload_tiles: float|bool \
+                = time.time() - reload_if_older * 60*60*24
         else:
             self.reload_tiles = False
 
         if attribution:
-            self.attribution = attribution
+            self.attribution: str = attribution
         else:
             self.attribution = ""
 
@@ -88,19 +93,20 @@ class OSMMapCollection(TiledMapCollection):
         # Call zoom so we set all scales appropriately:
         self.zoom(0)
 
-    def draw_attribution(self, mapwin):
+    def draw_attribution(self, mapwin:MapWindow):
         mapwin.draw_string_scale(-10, 1, self.attribution,
                                  whichfont="attribution")
         return
 
     # Utilities for mapping tiles to/from degrees.
     # From http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames
-    def deg2num(self, lat_deg, lon_deg, zoom=None):
+    def deg2num(self, lat_deg:float, lon_deg:float, zoom:int|None=None) \
+            -> tuple[int, int, int, int]:
         """Map coordinates to tile numbers and offsets.
            @return:  (xtile, ytile, x_off, y_off)
         """
         if zoom:
-            powzoom = 2.0 ** zoom
+            powzoom = 2 ** zoom
         else:
             powzoom = self.powzoom
         lat_rad = math.radians(lat_deg)
@@ -117,7 +123,7 @@ class OSMMapCollection(TiledMapCollection):
 
         return(xtile, ytile, x_off, y_off)
 
-    def num2deg(self, xtile, ytile):
+    def num2deg(self, xtile:int, ytile:int) -> tuple[float, float]:
         """Map OSM tile file numbers to coordinates.
            @return:  (lat_deg, lon_deg)
         """
@@ -127,7 +133,9 @@ class OSMMapCollection(TiledMapCollection):
         lat_deg = math.degrees(lat_rad)
         return (lat_deg, lon_deg)
 
-    def latlon2xy(self, lat, lon, center_lat, center_lon, winwidth, winheight):
+    def latlon2xy(self, lat:float, lon:float,
+                  center_lat:float, center_lon:float,
+                  winwidth:int, winheight:int) -> tuple[int, int]:
         """Convert a coordinate to a position in a map window.
            at the Collection's current zoom level
            and the center coordinate and pixel size of the window.
@@ -159,7 +167,7 @@ class OSMMapCollection(TiledMapCollection):
         # print("latlon2xy:", lat, lon, "-->", x, y)
         return x, y
 
-    def zoom_to(self, newzoom, latitude=45):
+    def zoom_to(self, newzoom:int, latitude:float=45.):
         """Zoom to a specific zoom level, updating scales accordingly.
         Pass latitude for map collections (e.g. OSM) that cover
         large areas so scale will tend to vary with latitude.
@@ -171,7 +179,7 @@ class OSMMapCollection(TiledMapCollection):
                     self.name, "map collections")
                 return
             self.zoomlevel = newzoom
-            self.powzoom = 2.0 ** self.zoomlevel
+            self.powzoom = 2 ** self.zoomlevel
 
         # Get scale, in pixels / degree.
         # (2 ** zoomlevel) tiles covers the whole world.
@@ -193,7 +201,7 @@ class OSMMapCollection(TiledMapCollection):
                 % (self.zoomlevel, self.xscale, self.yscale))
         return
 
-    def zoom(self, amount, latitude=45):
+    def zoom(self, amount:int, latitude:float=45.):
         """Zoom in or out by the specified amount,
         updating the scales appropriately.
         Call zoom(0) to update x/y scales without changing zoom level.
@@ -202,7 +210,7 @@ class OSMMapCollection(TiledMapCollection):
         """
         self.zoom_to(self.zoomlevel + amount, latitude)
 
-    def get_maplet_by_number(self, xtile, ytile):
+    def get_maplet_by_number(self, xtile:int, ytile:int) -> tuple[Any, str]:
         """Fetch or queue download for the maplet of the specified
            zoom level, X and Y indices
         Returns pixbuf, filename
@@ -212,7 +220,8 @@ class OSMMapCollection(TiledMapCollection):
         pixbuf = self.fetch_or_download_maplet(filename)
         return pixbuf, filename
 
-    def get_maplet(self, longitude, latitude):
+    def get_maplet(self, longitude:float, latitude:float) -> tuple[Any, int, int,
+                                                                   str]:
         """Fetch or queue download for the maplet containing the
         specified coordinates.
         Input coordinates are in decimal degrees.
@@ -243,31 +252,33 @@ class OSMMapCollection(TiledMapCollection):
 
         return os.path.join(zoomdir, xstr, ystr + ext)
 
-    def get_next_maplet(self, fullpathname, dX, dY):
+    def get_next_maplet(self, fullpathname:str, dX:int, dY:int) \
+            -> tuple[Any, str|None]:
         """Given a maplet's pathname, get the next or previous one.
         May not work for jumps more than 1 in any direction.
         Returns pixbuf, newpath (either may be None).
         """
         newpath = self.get_next_maplet_name(fullpathname, dX, dY)
         if newpath is None:
-            return None, newpath
+            return None, None
 
         pixbuf = self.fetch_or_download_maplet(newpath)
         return pixbuf, newpath
 
-    def get_maplet_difference(self, path1, path2):
+    def get_maplet_difference(self, path1:str, path2:str) -> tuple[int, int]:
         """Given two filenames, like .../10/162/395.jpg and .../10/163/396.jpg,
            return the number of tiles different, dx and dy.
            The first (upper leftmost) one should be first.
         """
-        path1 = path1.split('/')[-2:]
-        path1[1] = os.path.splitext(path1[-1])[0]
+        path1comp = path1.split('/')[-2:]
+        path1comp[1] = os.path.splitext(path1comp[-1])[0]
         # Now path1 is something like [162, 395] which is x, y
-        path2 = path2.split('/')[-2:]
-        path2[1] = os.path.splitext(path2[-1])[0]
-        return (int(path2[0]) - int(path1[0]), int(path2[1]) - int(path1[1]))
+        path2comp = path2.split('/')[-2:]
+        path2comp[1] = os.path.splitext(path2comp[-1])[0]
+        return (int(path2comp[0]) - int(path1comp[0]),
+                int(path2comp[1]) - int(path1comp[1]))
 
-    def url_from_path(self, path, zoomlevel=None):
+    def url_from_path(self, path:str, zoomlevel:int|None=None) -> str:
         """URL we need to get the given tile file.
            URLs can be specified like
            "http://a.tile.openstreetmap.org", and we will append /zoom/x/y.ext
@@ -291,7 +302,7 @@ class OSMMapCollection(TiledMapCollection):
         else:
             return url
 
-    def fetch_or_download_maplet(self, path):
+    def fetch_or_download_maplet(self, path:str) -> Any:
         """Return a pixbuf if the file is on disk, else download"""
         # Does the tile already exist on local disk?
         # Even if it does, do we need to re-download it?
@@ -308,7 +319,11 @@ class OSMMapCollection(TiledMapCollection):
             on_disk = False
             needs_download = True
 
-        if self.mapwin.controller.Debug > 1:
+        if self.mapwin:
+            debug = self.mapwin.controller.Debug
+        else:
+            debug = 0
+        if debug > 1:
             if on_disk:
                 print("fetch_or_download", path, ": got it")
             elif needs_download:
@@ -321,7 +336,7 @@ class OSMMapCollection(TiledMapCollection):
             return
 
         if needs_download:
-            if self.mapwin.controller.Debug:
+            if debug:
                 if on_disk:
                     print("Need to download", path, ": too old")
                     print(os.stat(path).st_mtime, "<", self.reload_tiles)
@@ -339,6 +354,10 @@ class OSMMapCollection(TiledMapCollection):
         # Any needed downloads are queued.
         # Now return the current pixbuf, if any.
         if not on_disk:
+            return None
+
+        if not self.mapwin:
+            print("Downloaded %s, but there's no mapwin to display it" % path)
             return None
 
         try:
@@ -369,6 +388,6 @@ class OSMMapCollection(TiledMapCollection):
 
         return pixbuf
 
-    def coords_to_filename(self, longitude, latitude):
+    def coords_to_filename(self, longitude:float, latitude:float) -> str|None:
         """Given coordinates in decimal degrees, map to the closest filename"""
         return None

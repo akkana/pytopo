@@ -9,11 +9,17 @@ from __future__ import print_function
 
 import os, sys
 import xml.dom.minidom
+from xml.parsers.expat import ExpatError
 import re
 import zipfile
 import json
 import time
 from pathlib import Path
+
+# For mypy
+from typing import Any, Pattern, Sequence
+from collections.abc import Iterator
+from xml.dom.minidom import Element, Text
 
 from pytopo import __version__
 
@@ -75,9 +81,10 @@ class GeoPoint(object):
     # If you need a particular format that pytopo doesn't handle,
     # please file a bug with an example data file.
     #
-    def __init__(self, lat, lon, ele=None, speed=None,
-                 name=False, timestamp=None,
-                 attrs=None, extensions=None):
+    def __init__(self, lat:float, lon:float,
+                 ele:float|None=None, speed:float|None=None,
+                 name:str|bool=False, timestamp:str|None=None,
+                 attrs=Any, extensions=Any):
         self.lat = lat
         self.lon = lon
         self.ele = ele
@@ -87,7 +94,7 @@ class GeoPoint(object):
         self.attrs = attrs
         self.extensions = extensions
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if self.ele:
             s ="(%f, %f, %s)" % (self.lat, self.lon, self.ele)
         else:
@@ -114,7 +121,7 @@ class GeoPoint(object):
 
         return s
 
-    def format_timestamp(self):
+    def format_timestamp(self) -> str:
         if self.timestamp:
             return self.timestamp
 
@@ -125,10 +132,10 @@ class GeoPoint(object):
 
 
 # Impossible values:
-TOOBIGLON = 361
-TOOSMALLLON = -361
-TOOBIGLAT = 91
-TOOSMALLLAT = -91
+TOOBIGLON = 361.
+TOOSMALLLON = -361.
+TOOBIGLAT = 91.
+TOOSMALLLAT = -91.
 
 class BoundingBox(object):
 
@@ -145,12 +152,12 @@ class BoundingBox(object):
     def __bool__(self):
         return not self.uninitialized()
 
-    def as_tuple(self):
+    def as_tuple(self) -> tuple[float, float, float, float]:
         """Return a tuple of minlon, minlat, maxlon, maxlat
         """
         return (self.minlon, self.minlat, self.maxlon, self.maxlat)
 
-    def uninitialized(self):
+    def uninitialized(self) -> bool:
         if self.minlon == TOOBIGLON:
             return True
         if self.maxlon == TOOSMALLLON:
@@ -161,7 +168,7 @@ class BoundingBox(object):
             return True
         return False
 
-    def add_point(self, lat, lon):
+    def add_point(self, lat:float, lon:float):
         """Extend the bounds if the given coords are outside.
         """
         if lon < self.minlon:
@@ -173,7 +180,7 @@ class BoundingBox(object):
         if lat > self.maxlat:
             self.maxlat = lat
 
-    def union(self, bbox):
+    def union(self, bbox:BoundingBox):
         """Set the current bbox to be the union of itself and
            the bbox passed in.
         """
@@ -182,7 +189,7 @@ class BoundingBox(object):
         self.minlat = min(self.minlat, bbox.minlat)
         self.maxlat = max(self.maxlat, bbox.maxlat)
 
-    def center(self):
+    def center(self) -> tuple[float, float]:
         """Return the center of the given bounding box as lat, lon
         """
         # This doesn't compensate for crossing the date line.
@@ -222,9 +229,9 @@ class TrackPoints(object):
     """
 
     def __init__(self):
-        self.points = []
-        self.waypoints = []
-        self.polygons = []
+        self.points:list[GeoPoint|str|Path] = []
+        self.waypoints:list[GeoPoint|str] = []
+        self.polygons:list[dict[str, Any]] = []
 
         # Bounding boxes.
         # self.bbox contains all trackpoints and waypoints,
@@ -236,14 +243,14 @@ class TrackPoints(object):
         # in case there are no track- or waypoints
         self.outer_bbox = BoundingBox()
 
-        self.max_speed = 0
-        self.min_ele = 0
-        self.max_ele = 0
+        self.max_speed = 0.
+        self.min_ele = 0.
+        self.max_ele = 0.
 
         # Remember which files each set of points came from
         self.srcfiles = {}
 
-        self.saved_points = False
+        self.saved_points:Any = False
 
         # fieldnames is a list of keys that can be used to indicate
         # class (for colorizing purposes) of polygons in a geojson file.
@@ -251,15 +258,15 @@ class TrackPoints(object):
 
         self.Debug = False
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<TrackPoints: %d points, %s waypoints, %d polygons>" \
             % (len(self.points), len(self.waypoints), len(self.polygons))
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return bool(self.points) or bool(self.waypoints or bool(self.polygons))
 
     @staticmethod
-    def get_version():
+    def get_version() -> str:
         # There doesn't seem to be any good way of getting the current
         # module's version. from . import __version__ works from external
         # scripts that are importing the module, but if you try to run
@@ -269,13 +276,13 @@ class TrackPoints(object):
         # then get the version from it.
         return __version__
 
-    def is_start(self, point):
+    def is_start(self, point:Any) -> bool:
         """Is this the start of a new track segment?
            If so, it's a string (or unicode), the name of the track section.
         """
         return isinstance(point, str)
 
-    def get_bounds(self):
+    def get_bounds(self) -> BoundingBox|None:
         """Return a bounding box:
            - for all track- and waypoints, if any
            - for all polygons, if any
@@ -287,11 +294,11 @@ class TrackPoints(object):
             return self.outer_bbox
         return None
 
-    def is_attributes(self, point):
+    def is_attributes(self, point:Any):
         """Is this point actually a set of attributes?"""
         return isinstance(point, dict)
 
-    def attributes(self, trackindex):
+    def attributes(self, trackindex:int) -> Any:
         """Does the indicated track have attributes? Then return them.
         """
         # Currently attributes are represented by a dictionary
@@ -303,9 +310,10 @@ class TrackPoints(object):
             pass
         return None
 
-    def handle_track_point(self, lat, lon, ele=None, speed=None,
-                           timestamp=None, waypoint_name=False,
-                           attrs=None, extensions=None):
+    def handle_track_point(self, lat:float, lon:float,
+                           ele:float|None=None, speed:float|None=None,
+                           timestamp:str|None=None, waypoint_name:str|bool=False,
+                           attrs:Any=None, extensions:Any=None) -> Any:
         """Add a new trackpoint or waypoint after some basic sanity checks.
            lat and lon are in degrees.
            If waypoint_name, we assume this is a waypoint,
@@ -340,7 +348,7 @@ class TrackPoints(object):
 
         return point
 
-    def add_waypoint(self, point):
+    def add_waypoint(self, point:Any):
         """Add the given point as a waypoint, if there isn't already
            a waypoint at the given location.
            If there is, append the name to the existing point.
@@ -356,27 +364,29 @@ class TrackPoints(object):
                 return
         self.waypoints.append(point)
 
-    def inside_box(self, pt, bb):
+    def inside_box(self, pt:Any, bb:Sequence[float]) -> bool:
         """Is the point inside the given bounding box?
            Bounding box is (min_lon, min_lat, max_lon, max_lat).
         """
         return (pt.lon >= bb[0] and pt.lon <= bb[2] and
                 pt.lat >= bb[1] and pt.lat <= bb[3])
 
-    def get_segment_name(self, seg):
+    def get_segment_name(self, seg: Element) -> str | None:
         """See if this trkseg or trk has a <name> child.
            If so, return the text out of it, else None.
         """
         trkname = seg.getElementsByTagName("name")
-        if trkname and \
-           trkname[0].parentNode == seg and \
-           trkname[0].hasChildNodes() and \
-           trkname[0].firstChild.nodeName == '#text' and \
-           trkname[0].firstChild.wholeText:
-            return trkname[0].firstChild.wholeText
+        if not trkname:
+            return None
+        nameelem = trkname[0]
+        if nameelem.parentNode != seg:
+            return None
+        child = nameelem.firstChild
+        if isinstance(child, Text) and child.wholeText:
+            return child.wholeText
         return None
 
-    def read_track_file_GPX(self, filename):
+    def read_track_file_GPX(self, filename:str) -> BoundingBox:
         """Read a GPX track file into the current TrackPoints object.
            Return the BoundingBox.
            Raise FileNotFoundError if the file doesn't exist,
@@ -388,7 +398,7 @@ class TrackPoints(object):
             print("Reading track file", filename)
         try:
             dom = xml.dom.minidom.parse(filename)
-        except xml.parsers.expat.ExpatError as e:
+        except ExpatError as e:
             print("Expat error parsing", filename, ":", e)
             sys.exit(1)
 
@@ -455,14 +465,17 @@ class TrackPoints(object):
 
         return bbox
 
-    def filename_for_index(self, index):
+    def filename_for_index(self, index:int) -> str:
         filename = ''
         for i in self.srcfiles:
             if i > index:
                 return filename
             filename = self.srcfiles[i]
+        return ''
 
-    def find_matching_child(self, node, childname):
+    '''
+    def find_matching_child(self, node:Element, childname:str|Pattern[str]) \
+            -> Element|None:
         """Find a child node with a name matching childname,
            which may be a regexp.
         """
@@ -485,15 +498,32 @@ class TrackPoints(object):
                     return matchnode
 
         return None
+    '''
 
-    def get_DOM_text(self, node, childname=None):
+    def find_matching_children(self, node: Element,
+                               childname: str | re.Pattern[str]) \
+            -> list[Element]:
+        """Find child nodes with a name matching childname,
+           which may be a regexp.
+        """
+        if isinstance(childname, str):
+            return list(node.getElementsByTagName(childname))
+        return [e for e in node.getElementsByTagName("*")
+                if childname.match(e.tagName)]
+
+    def get_DOM_text(self, innode:Element,
+                     childname:str|Pattern[str]|None=None) -> str|None:
         """Return the text out of a DOM node.
            Or, if childname is specified,
            find a matching child (see previous function)
            and return the text inside.
         """
         if childname:
-            node = self.find_matching_child(node, childname)
+            nodes = self.find_matching_children(innode, childname)
+            if nodes:
+                node = nodes[0]
+        else:
+            node = innode
         if not node:
             return None
 
@@ -508,7 +538,7 @@ class TrackPoints(object):
         return None
 
     @staticmethod
-    def flatten_leaves_iter(node):
+    def flatten_leaves_iter(node:Element) -> Iterator[tuple[str, str]]:
         """Yield (localname, text) for every leaf element under node,
            depth-first.
         """
@@ -530,7 +560,8 @@ class TrackPoints(object):
                 ).strip()
                 yield (localname, text)
 
-    def GPX_point_coords(self, pointnode):
+    def GPX_point_coords(self, pointnode:Element) \
+            -> tuple[float, float, float|None, float|None, str|None, Any, Any]:
         """Parse a new trackpoint or waypoint from a GPX node.
            Returns lat (float), lon (float), ele (string or None),
                    speed (string or None),
@@ -542,9 +573,9 @@ class TrackPoints(object):
         lon = float(pointnode.getAttribute("lon"))
         time = self.get_DOM_text(pointnode, "time")
 
-        ele = self.get_DOM_text(pointnode, "ele")
         try:
-            ele = float(ele)
+            eletext = self.get_DOM_text(pointnode, "ele")
+            ele = float(str(eletext))
         except:
             ele = 0.
 
@@ -570,28 +601,36 @@ class TrackPoints(object):
 
         # Old versions of osmand used a <speed> node, but now it's inside
         # <extensions><osmand:speed>.
-        speed = self.get_DOM_text(pointnode, SPEEDRE)
-        if not speed and 'speed' in extensions:
-            speed = extensions['speed']
-        if speed:
+        # Unfortunately minidom can't take regular expressions.
+        def find_children(node: Element, childname: str | re.Pattern[str]) \
+                -> list[Element]:
+            if isinstance(childname, str):
+                return list(node.getElementsByTagName(childname))
+            return [e for e in node.getElementsByTagName("*")
+                    if childname.match(e.tagName)]
+
+        speedstr = self.get_DOM_text(pointnode, SPEEDRE)
+        if not speedstr and 'speed' in extensions:
+            speedstr = extensions['speed']
+        if speedstr:
             try:
-                speed = float(speed)
+                speed = float(speedstr)
             except (ValueError, TypeError):
                 if self.Debug:
-                    print("Couldn't parse speed '%s'" % speed)
+                    print("Couldn't parse speed '%s'" % speedstr)
                 speed = None
         else:
             speed = None
 
         # If there were no extra attributes, pass None, not an empty dict.
         if not attrs:
-            attrs = None
+            return lat, lon, ele, speed, time, None, extensions
 
         # For now, keep elevation and time as unchanged strings.
         return lat, lon, ele, speed, time, attrs, extensions
 
     @staticmethod
-    def make_bogus_timestamp(t=None):
+    def make_bogus_timestamp(t:float|None=None) -> str:
         """Make a timestamp with the given time, or now"""
         if not t:
             t = time.time()
@@ -632,7 +671,7 @@ class TrackPoints(object):
         if curtrack:
             print("%s: %d points" % (curtrack, count))
 
-    def remove_after(self, pointidx):
+    def remove_after(self, pointidx:int):
         """Remove all points after index pointidx."""
         self.save_for_undo()
         nextstart = None
@@ -660,13 +699,13 @@ class TrackPoints(object):
         else:
             # This shouldn't happen: there should always be a track start.
             print("Internal error, no track start")
-            self.points = [ "Track start" ] + self.points[pointidx+1:]
+            self.points = ["Track start", *self.points[pointidx+1:]]
 
     #
     # Format handling, file reading and saving functions:
     #
 
-    def read_track_file(self, filename):
+    def read_track_file(self, filename:str) -> BoundingBox|None:
         """Read a track file.
            Return the BoundingBox.
            Raise FileNotFoundError if the file doesn't exist,
@@ -688,8 +727,8 @@ class TrackPoints(object):
                            + ', '.join([ ', '.join(m[0])
                                          for m in self.mappers])))
 
-    @classmethod
-    def lowerext(classname, filename):
+    @staticmethod
+    def lowerext(filename:str) -> str:
         base, ext = os.path.splitext(filename)
         if ext.startswith('.'):
             ext = ext[1:]
@@ -697,7 +736,7 @@ class TrackPoints(object):
         return ext
 
     @classmethod
-    def is_track_file(classname, filename):
+    def is_track_file(classname, filename:str) -> bool:
         """Is the file a type PyTopo recognizes as a track file?
            But it's more efficient to call read_track_file() wrapped in a try
            to avoid checking the extension twice.
@@ -708,12 +747,14 @@ class TrackPoints(object):
                 return True
         return False
 
-    def save_GPX_in_region(self, start_lon, start_lat, end_lon, end_lat,
-                           filename):
+    def save_GPX_in_region(self, start_lon:float, start_lat:float,
+                           end_lon:float, end_lat:float,
+                           filename:str):
         # print("Save GPX in", filename, start_lon, start_lat, end_lon, end_lat)
         self.save_GPX(filename, (start_lon, start_lat, end_lon, end_lat))
 
-    def save_GPX(self, filename, boundingbox=None):
+    def save_GPX(self, filename:str, boundingbox:tuple[float, float,
+                                                       float, float]|None=None):
         """Save all known tracks and waypoints as a GPX file.
            XXX We don't have valid <time> saved for these points.
         """
@@ -729,16 +770,16 @@ class TrackPoints(object):
 <gpx version="1.1" creator="PyTopo %s~" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
 ''' % __version__)
 
-            for pt in self.waypoints:
+            for wpt in self.waypoints:
                 # If it doesn't have lat, lon then it's not a GeoPoint
                 # and can't be added to the track.
-                if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
+                if not isinstance(wpt, GeoPoint):
                     continue
-                if not boundingbox or self.inside_box(pt, boundingbox):
+                if not boundingbox or self.inside_box(wpt, boundingbox):
                     outfp.write('''  <wpt lat="%f" lon="%f">
     <time>%s</time>
     <name>%s</name>
-  </wpt>\n''' % (pt.lat, pt.lon, pt.format_timestamp(), pt.name))
+  </wpt>\n''' % (wpt.lat, wpt.lon, wpt.format_timestamp(), wpt.name))
 
             if self.points:
                 outfp.write("  <trk>\n")
@@ -755,6 +796,9 @@ class TrackPoints(object):
                         if pt:
                             segstr += "      <name>%s</name>\n" % pt
                         skipping = False
+                        continue
+
+                    if not isinstance(pt, GeoPoint):
                         continue
 
                     # If it doesn't have lat, lon then it's not a GeoPoint
@@ -801,7 +845,7 @@ class TrackPoints(object):
 
             outfp.write("</gpx>")
 
-    def read_track_file_GeoJSON(self, filename):
+    def read_track_file_GeoJSON(self, filename:str) -> BoundingBox|None:
         """Read a GeoJSON track or polygon file.
            Return the BoundingBox.
            Raises FileNotFoundError if the file doesn't exist,
@@ -842,10 +886,11 @@ class TrackPoints(object):
 
             def add_polygon(polycoords, polyname, properties):
                 polyclasses = []
-                for field in self.fieldnames:
-                    if field in properties:
-                        polyclasses.append(properties[field])
-                        break
+                if self.fieldnames:
+                    for field in self.fieldnames:
+                        if field in properties:
+                            polyclasses.append(properties[field])
+                            break
                 newpoly = {}
                 if name:
                     newpoly["name"] = polyname
@@ -947,7 +992,7 @@ class TrackPoints(object):
 
         return bbox
 
-    def save_geojson(self, filename, boundingbox=None):
+    def save_geojson(self, filename:str, boundingbox:Sequence[float]|None=None):
         """Save known tracks and waypoints as a GeoJSON file,
            with each track segment a different feature
            (rather than using MultiLineStrings).
@@ -960,31 +1005,33 @@ class TrackPoints(object):
                            max(boundingbox[1], boundingbox[3]))
 
         with open(filename, "w") as outfp:
-            jsonout = {
+            jsonout: dict[str, Any] = {
                 "type": "FeatureCollection",
                 "features": []
             }
 
             # Convert waypoints
-            for pt in self.waypoints:
+            for wpt in self.waypoints:
                 # If it doesn't have lat, lon then it's not a GeoPoint
                 # and can't be added to the track.
-                if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
+                if not hasattr(wpt, 'lat') or not hasattr(wpt, 'lon'):
                     continue
-                if not boundingbox or self.inside_box(pt, boundingbox):
+                if not isinstance(wpt, GeoPoint):
+                    continue
+                if not boundingbox or self.inside_box(wpt, boundingbox):
                     jsonout["features"].append({
                         "type": "Feature",
                         "properties": {
-                            "name": pt.name,
+                            "name": wpt.name,
                         },
                         "geometry": {
                             "type": "Point",
-                            "coordinates": [ pt.lon, pt.lat ]
+                            "coordinates": [ wpt.lon, wpt.lat ]
                         }
                     })
-                    if pt.ele:
+                    if wpt.ele:
                         jsonout["features"][-1]["geometry"]["coordinates"] \
-                            .append(pt.ele)
+                            .append(wpt.ele)
 
             # Convert tracks:
             if self.points:
@@ -1007,6 +1054,8 @@ class TrackPoints(object):
                     # It might be a dict of attributes from a GeoJSON.
                     if not hasattr(pt, 'lat') or not hasattr(pt, 'lon'):
                         continue
+                    if not isinstance(pt, GeoPoint):
+                        continue
 
                     # Else it's presumably a coordinate pair or triple
                     if boundingbox:
@@ -1023,7 +1072,7 @@ class TrackPoints(object):
             print(json.dumps(jsonout, indent=2), file=outfp)
 
 
-    def read_track_file_KML(self, filename):
+    def read_track_file_KML(self, filename:str) -> BoundingBox|None:
         """Read a KML or KMZ track file.
            Return the BoundingBox.
            Just read Placemarks (which cover both paths and points);
@@ -1045,7 +1094,7 @@ class TrackPoints(object):
             namelist = zipf.namelist()
             kmlfile = 'doc.kml'
             if kmlfile not in namelist:
-                kmlfile = None
+                kmlfile = ''
                 for n in namelist:
                     if n.lower().endswith('.kml'):
                         kmlfile = n
@@ -1060,7 +1109,7 @@ class TrackPoints(object):
             doc_kml = kmlfp.read()
             kmlfp.close()
             dom = xml.dom.minidom.parseString(doc_kml)
-            doc_kml = None
+            doc_kml = b''
         else:
             dom = xml.dom.minidom.parse(filename)
 
@@ -1164,14 +1213,14 @@ class TrackPoints(object):
 
         return ret
 
-    def read_track_file_fit(self, fitfilename):
+    def read_track_file_fit(self, fitfilename:str) -> BoundingBox|None:
         """Read a Specialized .fit file.
            This could be extended to other types of fit files,
            but for now, Specialized is the only kind I have.
         """
         if 'fitsplit' not in sys.modules:
             try:
-                import fitsplit
+                from . import fitsplit
             except ModuleNotFoundError as e:
                 raise RuntimeError(
                     "Reading .fit files requires fitsplit and fitdecode,"
